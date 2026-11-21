@@ -51,7 +51,7 @@ Every token belongs to a language. Grammar is not modeled: the sentence is the t
 |---|---|
 | Work verbs | `MINE` `CHOP` `HARVEST` `COOK` `HAUL` `BUILD` |
 | Movement | `GO` `RETURN` (to ground) |
-| Order flow | `CHECK` (board or mailbox) `DELIVER` (a carrier, to a worker or place) `REPEAT` |
+| Order flow | `CHECK` (board or mailbox) `DELIVER` (a carrier, to a worker or place) `COPY` (a carrier) `REPEAT` |
 | Nouns | `STONE` `WOOD` `GRAIN` `BREAD` `BLUEPRINT` |
 | Places | `FLOOR n` `NEAREST` `STOCKPILE` `BOARD` `MAILBOX` `HOME` |
 
@@ -85,17 +85,23 @@ A design isn't an order until a **scribe** writes it out. The player composes or
 - **The tutorial chokepoint:** you can't write other orders until a scribe is set up on a loop, because a scribe out of orders has nothing to write.
 - **An early specialist:** scribes level up, and a fast scribe is precious. Overwork your best scribe and they may quit, so you either pamper them or spread the writing across several scribes.
 - **Bootstrapping:** the game starts with one scribe already hired by the patron, carrying the **patron's charter**: a single scroll that sets them up on the scribe loop. It's the only order the player doesn't have to have written. Writing it could be the tutorial's first step.
-- **Board notices have a count.** A posted notice is addressed to Anyone or to a named worker, and carries a count. `[MINE][STONE] (50)` is a job that can be done 50 times, by one worker or any mix of workers, each taking it as their next task. The notice comes down when its count runs out. Scribes write notices once rather than once per job, so the scribe limits throughput without choking the ground economy. Cards and scrolls that workers carry are used up.
+- **Board notices have a count.** A posted notice is addressed to Anyone or to a named worker, and carries a count. `[MINE][STONE] (50)` is a job that can be done 50 times, by one worker or any mix of workers, each taking it as their next task. **The count goes down when a job is finished, not when it's taken.** The notice comes down when its count runs out. A worker who arrives to finish a job that's already used up doesn't get paid, and gets mad (a mood hit). Scribes write notices once rather than once per job, so the scribe limits throughput without choking the ground economy. Cards and scrolls that workers carry are used up.
 - **A scribe has to know a language to write in it.**
   - **New orders:** writing a new order in a language the scribe knows is fast. Without the language, it's possible but with a severe time penalty.
   - **Knowledge is per token.** A scribe who knows the mining words but not the food words writes mining orders fast and food orders slowly.
-  - **Copying is fast either way.** An existing card or scroll can be copied word for word with little time lost, even in a language the scribe doesn't know.
+  - **Without the language, the player spells it out.** Writing a fresh order in a language the scribe doesn't know means the player dictates it letter by letter, which is where the time penalty comes from.
+  - **Copying is its own order.** A copy job is a chain like `[GO][location] [COPY][carrier] [DELIVER][person or place]`. Copying works word for word with little time lost, even in a language the scribe doesn't know. The copy order itself can be written quickly in the scribe's own language. So a French scroll kept at base camp can be copied and sent to the top without taking up your French speaker's time.
   - **So languages shape the scribe staff.** You either train one scribe in several languages or keep different scribes and split the work.
 - **The lexicon and the scribe do different jobs.** The player's lexicon ([§7.2](#72-vocabulary-model)) decides what the player can compose. Scribes decide how quickly it gets written.
 
 ### 5.3 Execution
 
 A worker works through what they're carrying. When they run out of orders and no board is within reach, they fall back on free will ([§6.4](#64-free-will)).
+
+**Memory vs. carrying:**
+- **A worker remembers one job.** Reading a notice on a board puts that one order in the worker's memory as their current job. They don't take the card with them.
+- **Memory survives distraction.** A worker who goes off to sleep in the middle of a mining job still remembers it afterward.
+- **Chains need a carrier.** A worker only holds one order in mind at a time. To do a sequence of orders, they have to carry a scroll.
 
 The player avoids this by ending a chain with a return order: `CHECK BOARD`, `CHECK MAILBOX`, `RETURN`, or a `REPEAT` loop. A loop pays the order's wage every time it completes.
 
@@ -349,8 +355,10 @@ Fights, metalwork, cordage, the full tech tree, contraptions (crane, bucket brig
 ## 14. Open questions
 
 - **Numbers:** are numerals universal, or does each language have its own (for example, Hebrew letter numerals)?
-- **Copying:** is copying a separate order (`COPY` plus a carrier), or something a scribe does on their own when a notice runs out?
-- **Notice counts:** if one worker takes several jobs from a count at once, does that use up the count straight away, or only as each job finishes?
+- **Running out of a notice's count:** counts go down only when a job is finished, so on a busy board several workers can be heading for the last few jobs, and the ones who lose out get mad. A spread of mild frustration adds character; a crowd of angry workers on every board is tedious. Possible fixes if playtests show it's a problem:
+  - Workers with a perceptive trait skip notices that look nearly done.
+  - The mood hit is smaller when the job was small.
+  - The board shows how many workers are already on a notice.
 - **Courier bags:** exact sizes. Better bags might be craftable, as well as bags growing with experience.
 - **Drift pool:** the exact heights where each language joins the pool. Playtesting will decide.
 - **Scroll default:** ordered or bundle?
