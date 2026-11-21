@@ -1,0 +1,138 @@
+import { updateWorker } from './ai';
+import { startActivity } from './activities';
+import { applyCommand, validateCommand, type Command, type CommandResult, type StampedCommand } from './commands';
+import { makeName } from './names';
+import { nextU32, rand, seedRng } from './rng';
+import { rollPersonality } from './traits';
+import { AI, ECONOMY, POPULATION } from './tuning';
+import type { SimState, Worker } from './types';
+import { buildWorld, siteOf } from './world';
+
+export function createState(seed: number): SimState {
+  const s: SimState = {
+    version: 1,
+    seed,
+    tick: 0,
+    rng: seedRng(seed),
+    nextId: 1,
+    width: 0,
+    height: 0,
+    tiles: [],
+    sites: [],
+    items: [],
+    workers: [],
+    notices: [],
+    gold: ECONOMY.startingGold,
+    reserved: 0,
+    events: [],
+  };
+  buildWorld(s);
+  siteOf(s, 'kitchen').store.bread = 16;
+  siteOf(s, 'stockpile').store.grain = 10;
+  for (let i = 0; i < POPULATION.start; i++) addWorker(s);
+  // a few starter notices so the ground is busy from the first second
+  const starter: Command[] = [
+    { type: 'postNotice', playerId: 0, verb: 'MINE', noun: 'STONE', count: 20, wage: 2, addressee: null },
+    { type: 'postNotice', playerId: 0, verb: 'HAUL', noun: 'STONE', count: 20, wage: 2, addressee: null },
+    { type: 'postNotice', playerId: 0, verb: 'HARVEST', noun: 'GRAIN', count: 10, wage: 2, addressee: null },
+    { type: 'postNotice', playerId: 0, verb: 'HAUL', noun: 'GRAIN', count: 10, wage: 1, addressee: null },
+    { type: 'postNotice', playerId: 0, verb: 'COOK', noun: 'BREAD', count: 8, wage: 3, addressee: null },
+  ];
+  for (const c of starter) applyCommand(s, c);
+  s.events = [];
+  return s;
+}
+
+export function addWorker(s: SimState): Worker {
+  const { traits, p } = rollPersonality(s.rng);
+  const w: Worker = {
+    id: s.nextId++,
+    name: makeName(s.rng, s.workers.map((o) => o.name)),
+    traits,
+    p,
+    x: 44 + Math.floor(rand(s.rng) * 16),
+    y: siteOf(s, 'beds').y,
+    path: [],
+    pathGoal: null,
+    stepProgress: 0,
+    stepCost: 0,
+    facing: rand(s.rng) < 0.5 ? 1 : -1,
+    hunger: rand(s.rng) * 30,
+    thirst: rand(s.rng) * 30,
+    fatigue: rand(s.rng) * 30,
+    mood: 55,
+    moodlets: [],
+    purse: 0,
+    carrying: null,
+    memory: null,
+    avoid: [],
+    activity: { kind: 'idle', stage: 0, timer: 0, target: null, ref: null },
+    nextThink: Math.floor(rand(s.rng) * AI.thinkInterval),
+    lastScores: [],
+    thought: '',
+    jobsDone: 0,
+    look: nextU32(s.rng),
+  };
+  startActivity(w, 'idle');
+  s.workers.push(w);
+  return w;
+}
+
+/** Advance one tick, applying any commands first. */
+export function step(s: SimState, cmds: readonly Command[] = []): CommandResult[] {
+  const results = cmds.map((c) => applyCommand(s, c));
+  for (const w of s.workers) updateWorker(s, w);
+  s.tick++;
+  return results;
+}
+
+/** FNV-1a over the JSON state. Used by the determinism tests. */
+export function hashState(s: SimState): string {
+  const str = JSON.stringify(s);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+/**
+ * Owns a state plus the queue of commands waiting for the next tick and the
+ * full command history (enough to replay the session from the seed).
+ */
+export class Sim {
+  state: SimState;
+  history: StampedCommand[] = [];
+  private pending: Command[] = [];
+
+  constructor(seed: number) {
+    this.state = createState(seed);
+  }
+
+  /** Check a command now so the UI can show errors, then queue it. */
+  enqueue(cmd: Command): CommandResult {
+    const v = validateCommand(this.state, cmd);
+    if (v.ok) this.pending.push(cmd);
+    return v;
+  }
+
+  step(): void {
+    const cmds = this.pending;
+    this.pending = [];
+    for (const c of cmds) this.history.push({ tick: this.state.tick, cmd: c });
+    step(this.state, cmds);
+  }
+}
+
+/** Rebuild a game from its seed and command history. */
+export function replay(seed: number, history: readonly StampedCommand[], ticks: number): SimState {
+  const s = createState(seed);
+  let i = 0;
+  while (s.tick < ticks) {
+    const cmds: Command[] = [];
+    while (i < history.length && history[i].tick === s.tick) cmds.push(history[i++].cmd);
+    step(s, cmds);
+  }
+  return s;
+}

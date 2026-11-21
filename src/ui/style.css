@@ -1,0 +1,472 @@
+/* System 7 flavored chrome. The world canvas stays strict 1-bit; the UI
+   uses black, white and dither patterns too, with anti-aliased text for
+   readability (a deliberate deviation). */
+
+:root {
+  --ink: #000;
+  --paper: #fff;
+  --font: Geneva, Verdana, 'Segoe UI', sans-serif;
+  --font-title: 'Chicago', 'ChicagoFLF', Geneva, Verdana, 'Segoe UI', sans-serif;
+  --dither-50: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2' shape-rendering='crispEdges'%3E%3Crect width='1' height='1' fill='%23000'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000'/%3E%3C/svg%3E");
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font: 12px/1.35 var(--font);
+}
+
+#world {
+  position: fixed;
+  inset: 0;
+  display: block;
+  image-rendering: pixelated;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+#ui > * {
+  pointer-events: auto;
+}
+
+/* ---------------------------------------------------------------- menubar */
+
+.menubar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--ink);
+  z-index: 1000;
+  font-family: var(--font-title);
+  font-weight: bold;
+}
+
+.menu-apple {
+  padding: 0 10px 0 2px;
+}
+
+.menu-item {
+  font: inherit;
+  background: none;
+  border: 0;
+  padding: 2px 9px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: var(--ink);
+  color: var(--paper);
+  outline: none;
+}
+
+.menu-spacer {
+  flex: 1;
+}
+
+.menu-stat {
+  padding: 0 10px;
+  font-weight: normal;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+}
+
+.speeds {
+  display: flex;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.speed {
+  font: 10px var(--font);
+  min-width: 30px;
+  height: 16px;
+  padding: 0 4px;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.speed.on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ---------------------------------------------------------------- windows */
+
+.win {
+  position: fixed;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 1px 1px 0 var(--ink);
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+}
+
+.win-title {
+  position: relative;
+  height: 19px;
+  flex: none;
+  border-bottom: 1px solid var(--ink);
+  cursor: grab;
+  user-select: none;
+  /* pinstripes */
+  background: repeating-linear-gradient(to bottom, var(--paper) 0 2px, var(--ink) 2px 3px);
+  background-clip: content-box;
+  padding: 3px 2px;
+}
+
+.win-title-text {
+  position: absolute;
+  left: 50%;
+  top: 1px;
+  transform: translateX(-50%);
+  background: var(--paper);
+  padding: 0 7px;
+  font: bold 12px/16px var(--font-title);
+  white-space: nowrap;
+}
+
+.win-close {
+  position: absolute;
+  left: 8px;
+  top: 3px;
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 0 0 0 1px var(--paper);
+  cursor: pointer;
+}
+
+.win-close:hover {
+  background: var(--ink);
+}
+
+.win-body {
+  padding: 8px 10px 10px;
+  overflow: auto;
+}
+
+/* ------------------------------------------------------------- controls */
+
+.btn {
+  font: 12px var(--font);
+  padding: 2px 12px;
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.btn:active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn-default {
+  box-shadow: 0 0 0 1px var(--paper), 0 0 0 3px var(--ink);
+  margin: 3px;
+}
+
+.btn-small {
+  padding: 0 6px;
+  border-radius: 4px;
+  line-height: 14px;
+}
+
+select,
+input {
+  font: 12px var(--font);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 1px 3px;
+}
+
+input[type='number'] {
+  width: 52px;
+  margin: 0 4px;
+}
+
+label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 5px 0;
+  flex-wrap: wrap;
+}
+
+.row-end {
+  justify-content: flex-end;
+}
+
+.section-label {
+  font: bold 11px var(--font-title);
+  margin: 10px 0 4px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.section-label:first-child {
+  margin-top: 0;
+}
+
+.hint {
+  color: var(--ink);
+  opacity: 0.7;
+  font-size: 11px;
+}
+
+.error {
+  flex: 1;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* ---------------------------------------------------------------- notices */
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.notice {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  border: 1px solid var(--ink);
+  padding: 3px 6px;
+}
+
+.notice-order {
+  font-weight: bold;
+}
+
+.notice-meta {
+  grid-row: 2;
+  font-size: 11px;
+}
+
+.notice .btn-small {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+}
+
+/* -------------------------------------------------------------- inspector */
+
+.traits {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.trait {
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  padding: 0 7px;
+  font-size: 11px;
+  cursor: help;
+}
+
+.thought {
+  font-style: italic;
+  margin: 4px 0 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--ink);
+  border-radius: 10px;
+}
+
+.kv,
+.need {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+}
+
+.k {
+  width: 82px;
+  flex: none;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 28px;
+}
+
+.bar {
+  display: inline-block;
+  position: relative;
+  width: 120px;
+  height: 9px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  vertical-align: middle;
+}
+
+.bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--ink);
+}
+
+.bar-bad {
+  background: var(--dither-50);
+  background-size: 2px 2px;
+  image-rendering: pixelated;
+}
+
+.moodlets {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  font-size: 11px;
+}
+
+.moodlets .bad {
+  font-weight: bold;
+}
+
+.debug {
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.debug summary {
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.scores {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 3px;
+}
+
+.scores td {
+  padding: 1px 4px;
+  border-bottom: 1px dotted var(--ink);
+}
+
+.scores tr.top td {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ---------------------------------------------------------------- tables */
+
+.roster,
+.stores {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.roster th,
+.stores th {
+  text-align: left;
+  font-size: 11px;
+  border-bottom: 1px solid var(--ink);
+  padding: 2px 4px;
+}
+
+.roster td,
+.stores td {
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.roster tr {
+  cursor: pointer;
+}
+
+.roster tr:hover td {
+  text-decoration: underline;
+}
+
+.roster tr.sel td {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.roster tr.sel .bar {
+  border-color: var(--paper);
+}
+
+.roster .bar {
+  width: 60px;
+}
+
+.log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+}
+
+.log li {
+  padding: 1px 0;
+  border-bottom: 1px dotted var(--ink);
+}
+
+.when {
+  font-variant-numeric: tabular-nums;
+  font-weight: bold;
+}
+
+.keys {
+  padding-left: 18px;
+  margin: 6px 0;
+}
+
+p {
+  margin: 0 0 8px;
+}
