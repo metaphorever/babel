@@ -470,3 +470,22 @@ label {
 p {
   margin: 0 0 8px;
 }
+
+.skills {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.skills td {
+  padding: 1px 4px 1px 0;
+}
+
+.pips {
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.knack {
+  cursor: help;
+}

@@ -1,8 +1,9 @@
 import { addMoodlet, dropCarried, log, moveTo, settle } from './actions';
 import { orderText, type Noun, type Verb } from './lang';
 import { rand, randInt } from './rng';
-import { ECONOMY, MOOD, NEEDS, POPULATION, WORK } from './tuning';
-import type { ActivityKind, ItemType, Notice, SimState, SiteKind, Worker } from './types';
+import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_OF_VERB, skillLevel } from './skills';
+import { ECONOMY, MOOD, NEEDS, POPULATION, SKILLS, WORK } from './tuning';
+import type { ActivityKind, Item, ItemType, Notice, SimState, SiteKind, SkillId, Worker } from './types';
 import { siteOf, spotFor, standable } from './world';
 
 export type Result = 'running' | 'done' | 'failed';
@@ -169,8 +170,19 @@ export function eligibleNotices(s: SimState, w: Worker) {
     (n) =>
       n.remaining > 0 &&
       (n.addressee === null || n.addressee === w.id) &&
-      !w.avoid.some((av) => av.noticeId === n.id && av.until > s.tick),
+      !w.avoid.some((av) => av.noticeId === n.id && av.until > s.tick) &&
+      !nothingToHaul(s, n),
   );
+}
+
+/**
+ * On the ground, workers can see whether there's anything lying around, so
+ * they don't take a haul job for an empty field.
+ */
+function nothingToHaul(s: SimState, n: Notice): boolean {
+  if (n.order[0].t !== 'HAUL') return false;
+  const type = nounItem(n.order[1].t as Noun);
+  return !s.items.some((it) => it.type === type && it.reservedBy === null);
 }
 
 function readBoard(s: SimState, w: Worker): Result {
@@ -205,7 +217,13 @@ export function pickNotice(s: SimState, w: Worker, options: Notice[]): Notice {
   const pool = named.length > 0 ? named : options;
   let total = 0;
   const weights = pool.map((n) => {
-    const appeal = WORK.boardWeightBase + n.wage * w.p.greed;
+    // wages are per unit, so a skilled worker earns more per trip at their
+    // specialty, and likes doing what they're good at besides
+    const verb = n.order[0].t as Verb;
+    const appeal =
+      WORK.boardWeightBase +
+      n.wage * w.p.greed * expectedUnits(w, verb) +
+      skillLevel(w, SKILL_OF_VERB[verb]) * SKILLS.pickPerLevel;
     const wt = appeal * appeal;
     total += wt;
     return wt;
@@ -255,49 +273,88 @@ function produceJob(s: SimState, w: Worker, site: SiteKind, ticks: number, doing
     w.thought = doing;
   }
   if (--a.timer > 0) return 'running';
-  s.items.push({ id: s.nextId++, type: out, x: w.x, y: w.y, reservedBy: null });
-  return completeJob(s, w);
+  const skill = SKILL_OF_VERB[w.memory!.order[0].t as Verb];
+  const units = rollYield(s.rng, w, skill, 1);
+  for (let i = 0; i < units; i++) s.items.push({ id: s.nextId++, type: out, x: w.x, y: w.y, reservedBy: null });
+  train(s, w, skill);
+  return completeJob(s, w, units);
 }
 
-/** a.ref = reserved item id. */
+/**
+ * Claim up to a full armload: the nearest loose item, then others close to
+ * it. Strong or practiced haulers carry more than one per trip.
+ */
+function claimLoad(s: SimState, w: Worker, type: ItemType, room: number): number {
+  let claimed = 0;
+  let from = { x: w.x, y: w.y };
+  while (claimed < room) {
+    let best = null as null | Item;
+    let bestD = Infinity;
+    for (const it of s.items) {
+      if (it.type !== type || it.reservedBy !== null) continue;
+      const d = Math.abs(it.x - from.x) + Math.abs(it.y - from.y);
+      if (claimed > 0 && d > SKILLS.gatherRange) continue;
+      if (d < bestD) {
+        bestD = d;
+        best = it;
+      }
+    }
+    if (!best) break;
+    best.reservedBy = w.id;
+    from = { x: best.x, y: best.y };
+    claimed++;
+  }
+  return claimed;
+}
+
+function nearestClaimed(s: SimState, w: Worker): Item | null {
+  let best: Item | null = null;
+  let bestD = Infinity;
+  for (const it of s.items) {
+    if (it.reservedBy !== w.id) continue;
+    const d = Math.abs(it.x - w.x) + Math.abs(it.y - w.y);
+    if (d < bestD) {
+      bestD = d;
+      best = it;
+    }
+  }
+  return best;
+}
+
 function haulJob(s: SimState, w: Worker, type: ItemType): Result {
   const a = w.activity;
   const pile = siteOf(s, 'stockpile');
   if (a.stage === 0) {
     if (w.carrying === type) {
+      // picking a haul back up after a break: deliver what's in hand
       a.stage = 2;
     } else {
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
-      // nearest loose item nobody else has claimed
-      let best = null as null | (typeof s.items)[number];
-      let bestD = Infinity;
-      for (const it of s.items) {
-        if (it.type !== type || it.reservedBy !== null) continue;
-        const d = Math.abs(it.x - w.x) + Math.abs(it.y - w.y);
-        if (d < bestD) {
-          bestD = d;
-          best = it;
-        }
-      }
-      if (!best) return failJob(s, w, `No ${type} lying around to haul.`);
-      best.reservedBy = w.id;
-      a.ref = best.id;
-      a.target = { x: best.x, y: best.y };
+      if (claimLoad(s, w, type, carryCapacity(w)) === 0) return failJob(s, w, `No ${type} lying around to haul.`);
       a.stage = 1;
       w.thought = `Fetching ${type}.`;
     }
   }
   if (a.stage === 1) {
-    const m = moveTo(s, w, a.target!);
-    if (m === 'moving') return 'running';
-    const idx = s.items.findIndex((it) => it.id === a.ref);
-    if (m === 'unreachable' || idx < 0) return failJob(s, w, "Couldn't get to it.");
-    s.items.splice(idx, 1);
-    w.carrying = type;
-    a.stage = 2;
+    const next = nearestClaimed(s, w);
+    if (!next) {
+      if (w.carryCount === 0) return failJob(s, w, "Couldn't get to it.");
+      a.stage = 2;
+    } else {
+      const m = moveTo(s, w, { x: next.x, y: next.y });
+      if (m === 'moving') return 'running';
+      if (m === 'unreachable') {
+        next.reservedBy = null;
+        return 'running';
+      }
+      s.items.splice(s.items.indexOf(next), 1);
+      w.carrying = type;
+      w.carryCount++;
+      return 'running';
+    }
   }
   if (a.stage === 2) {
-    w.thought = `Taking ${type} to the stockpile.`;
+    w.thought = w.carryCount > 1 ? `Taking ${w.carryCount} ${type} to the stockpile.` : `Taking ${type} to the stockpile.`;
     const m = moveTo(s, w, spotFor(pile, w.id));
     if (m === 'moving') return 'running';
     if (m === 'unreachable') return failJob(s, w, "Can't reach the stockpile.");
@@ -305,9 +362,17 @@ function haulJob(s: SimState, w: Worker, type: ItemType): Result {
     a.timer = WORK.dropTicks;
   }
   if (--a.timer > 0) return 'running';
-  pile.store[type]++;
+  const units = w.carryCount;
+  pile.store[type] += units;
   w.carrying = null;
-  return completeJob(s, w);
+  w.carryCount = 0;
+  train(s, w, 'hauling');
+  return completeJob(s, w, units);
+}
+
+function train(s: SimState, w: Worker, skill: SkillId): void {
+  const up = practice(w, skill);
+  if (up !== null) log(s, `${w.name} is getting better at ${SKILL_LABEL[skill].toLowerCase()} (level ${up}).`, w.id);
 }
 
 function cookJob(s: SimState, w: Worker): Result {
@@ -326,6 +391,7 @@ function cookJob(s: SimState, w: Worker): Result {
       if (pile.store.grain <= 0) return failJob(s, w, 'Somebody took the last grain.');
       pile.store.grain--;
       w.carrying = 'grain';
+      w.carryCount = 1;
       a.stage = 2;
     }
   }
@@ -339,31 +405,44 @@ function cookJob(s: SimState, w: Worker): Result {
     w.thought = 'Baking bread.';
   }
   if (--a.timer > 0) return 'running';
-  w.carrying = null;
-  kitchen.store.bread += WORK.breadPerGrain;
-  return completeJob(s, w);
+  // one grain makes a batch; a practiced cook gets an extra loaf out of it
+  w.carryCount--;
+  if (w.carryCount <= 0) {
+    w.carrying = null;
+    w.carryCount = 0;
+  }
+  const units = rollYield(s.rng, w, 'cooking', WORK.breadPerGrain);
+  kitchen.store.bread += units;
+  train(s, w, 'cooking');
+  return completeJob(s, w, units);
 }
 
 /**
- * The notice's count goes down only now, when the job is finished. If it
- * already ran out, the worker did the work for nothing and is annoyed in
- * proportion to the wage they expected.
+ * Notice counts are in units (stone, loaves...), and wages are per unit. One
+ * trip can finish several units: a skilled miner's bonus stone, a strong
+ * hauler's double armload. The count goes down only now, when the work is
+ * done. If it already ran out, the worker did the work for nothing and is
+ * annoyed in proportion to the wage they expected. If only part was left,
+ * they're paid for that part.
  *
  * One job per board visit: a worker holds one order in mind and forgets it
  * once done. Repeating work needs a carried scroll with a loop on it.
  */
-function completeJob(s: SimState, w: Worker): Result {
+function completeJob(s: SimState, w: Worker, units: number): Result {
   const mem = w.memory!;
   w.memory = null;
+  w.jobsDone++;
   const notice = s.notices.find((n) => n.id === mem.noticeId);
   if (notice && notice.remaining > 0) {
-    notice.remaining--;
-    s.gold -= notice.wage;
-    s.reserved -= notice.wage;
-    w.purse += notice.wage;
-    w.jobsDone++;
-    if (notice.wage > 0) addMoodlet(s, w, 'paid', `Paid ${notice.wage} gold`, MOOD.gotPaid.value, MOOD.gotPaid.ticks);
-    w.thought = notice.wage > 0 ? `Done! +${notice.wage} gold.` : 'Done.';
+    const counted = Math.min(units, notice.remaining);
+    const pay = counted * notice.wage;
+    notice.remaining -= counted;
+    s.gold -= pay;
+    s.reserved -= pay;
+    w.purse += pay;
+    if (pay > 0) addMoodlet(s, w, 'paid', `Paid ${pay} gold`, MOOD.gotPaid.value, MOOD.gotPaid.ticks);
+    const what = `${counted} ${mem.order[1].t.toLowerCase()}`;
+    w.thought = pay > 0 ? `Done! ${what}, +${pay} gold.` : `Done: ${what}.`;
     if (notice.remaining === 0) {
       s.notices = s.notices.filter((n) => n.id !== notice.id);
       log(s, `Notice finished: ${orderText(notice.order)}.`);

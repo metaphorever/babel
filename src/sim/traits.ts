@@ -11,6 +11,13 @@ export interface TraitDef {
 }
 
 export const TRAITS: Record<TraitId, TraitDef> = {
+  strong: {
+    id: 'strong',
+    label: 'Strong',
+    blurb: 'Can carry an extra load.',
+    apply: () => {},
+    excludes: [],
+  },
   industrious: {
     id: 'industrious',
     label: 'Industrious',

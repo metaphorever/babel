@@ -5,6 +5,8 @@ import { setTile } from '../src/sim/world';
 import { Tile } from '../src/sim/types';
 import { siteOf } from '../src/sim/world';
 import { applyCommand } from '../src/sim/commands';
+import { levelOf } from '../src/sim/skills';
+import { SKILLS } from '../src/sim/tuning';
 
 function run(s: ReturnType<typeof createState>, ticks: number) {
   for (let i = 0; i < ticks; i++) step(s);
@@ -102,16 +104,16 @@ describe('notices and jobs', () => {
     const s = createState(3);
     s.notices = [];
     s.reserved = 0;
+    const startGold = s.gold;
     applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'MINE', noun: 'STONE', count: 1, wage: 5, addressee: null });
     // run until the notice is gone
     let t = 0;
     while (s.notices.length > 0 && t++ < 5000) step(s);
     expect(s.notices.length).toBe(0);
     expect(s.reserved).toBe(0);
-    // anyone who also took it and finishes later gets nothing and a bad mood
+    // anyone who also took it and finishes later gets nothing
     for (let i = 0; i < 2000; i++) step(s);
-    const paid = s.workers.filter((w) => w.jobsDone > 0);
-    expect(paid.length).toBe(1);
+    expect(startGold - s.gold).toBe(5); // paid exactly once
   });
 
   it('gold is conserved: treasury + purses + tavern spending', () => {
@@ -122,5 +124,54 @@ describe('notices and jobs', () => {
     const spent = start - s.gold - purses;
     expect(spent).toBeGreaterThanOrEqual(0);
     expect(spent % 5).toBe(0); // only the tavern takes gold out, 5 at a time
+  });
+});
+
+describe('skills and multi-unit work', () => {
+  it('levels follow the XP table', () => {
+    expect(levelOf(0)).toBe(0);
+    expect(levelOf(SKILLS.levelXp[1])).toBe(1);
+    expect(levelOf(SKILLS.levelXp[1] - 1)).toBe(0);
+    expect(levelOf(10_000)).toBe(SKILLS.levelXp.length - 1);
+  });
+
+  it('every worker starts with a knack', () => {
+    const s = createState(8);
+    for (const w of s.workers) expect(w.skills[w.knack]).toBe(SKILLS.knackStartXp);
+  });
+
+  it('a strong worker hauls two in one trip and is paid for both', () => {
+    const s = createState(21);
+    s.notices = [];
+    s.reserved = 0;
+    const w = s.workers[0];
+    if (!w.traits.includes('strong')) w.traits.push('strong');
+    w.skills.hauling = 0;
+    w.hunger = w.thirst = w.fatigue = 0;
+    const y = siteOf(s, 'beds').y;
+    s.items.push({ id: s.nextId++, type: 'stone', x: w.x, y, reservedBy: null });
+    s.items.push({ id: s.nextId++, type: 'stone', x: w.x + 1, y, reservedBy: null });
+    const gold = s.gold;
+    applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'HAUL', noun: 'STONE', count: 2, wage: 3, addressee: w.id });
+    let t = 0;
+    while (s.notices.length > 0 && t++ < 4000) step(s);
+    expect(siteOf(s, 'stockpile').store.stone).toBe(2);
+    expect(w.jobsDone).toBe(1); // one trip
+    expect(gold - s.gold).toBe(6);
+  });
+
+  it('a master miner often brings back extra stone', () => {
+    const s = createState(33);
+    s.notices = [];
+    s.reserved = 0;
+    const w = s.workers[0];
+    w.skills.mining = 10_000;
+    applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'MINE', noun: 'STONE', count: 200, wage: 0, addressee: w.id });
+    for (let i = 0; i < 20 * 600; i++) step(s);
+    const notice = s.notices[0];
+    const units = 200 - notice.remaining;
+    expect(w.jobsDone).toBeGreaterThan(5);
+    // with a 60% bonus chance, the average should be well above one per trip
+    expect(units / w.jobsDone).toBeGreaterThan(1.3);
   });
 });

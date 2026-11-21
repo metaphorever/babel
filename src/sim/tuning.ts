@@ -66,7 +66,23 @@ export const AI = {
   tavernMoodWeight: 0.35,
   wanderBase: 8,
   noise: 4, // random jitter on each candidate so equal workers differ
-  boardPickNoise: 3,
+};
+
+export const SKILLS = {
+  /** XP needed for each level; index = level. One work action = 1 XP. */
+  levelXp: [0, 5, 15, 30, 55, 90],
+  /** Each level adds this chance of a bonus unit per work action. */
+  bonusPerLevel: 0.12,
+  bonusCap: 0.6,
+  /** Hauling level that adds one to carry capacity. */
+  haulExtraAtLevel: 3,
+  /** Knack skill: starting XP and XP multiplier. */
+  knackStartXp: 15,
+  knackXpMult: 1.6,
+  /** Board pick appeal per skill level in that job (people like what they're good at). */
+  pickPerLevel: 0.4,
+  /** How far a hauler will range from their first pickup to fill their arms. */
+  gatherRange: 6,
 };
 
 export const MOOD = {

@@ -1,7 +1,12 @@
 import {
   availableGold,
+  bonusChance,
+  carryCapacity,
   orderText,
   NOUNS,
+  SKILL_IDS,
+  SKILL_LABEL,
+  skillLevel,
   TICKS_PER_SECOND,
   TRAITS,
   VALID_JOBS,
@@ -136,7 +141,7 @@ export class Ui {
       'div',
       { class: 'form' },
       h('div', { class: 'row' }, this.verbSel, this.nounSel),
-      h('div', { class: 'row' }, h('label', {}, '×', this.countIn), h('label', {}, 'Wage', this.wageIn, 'g')),
+      h('div', { class: 'row' }, h('label', {}, '×', this.countIn), h('label', {}, 'Wage', this.wageIn, 'g each')),
       h('div', { class: 'row' }, h('label', {}, 'For', this.forSel)),
       this.costLine,
       h('div', { class: 'row row-end' }, this.formError, post),
@@ -169,7 +174,7 @@ export class Ui {
 
   private updateCost(): void {
     const cost = (Number(this.countIn.value) || 0) * (Number(this.wageIn.value) || 0);
-    this.costLine.textContent = `Reserves ${cost} gold now; paid out as jobs are finished.`;
+    this.costLine.textContent = `Reserves ${cost} gold now; paid per unit as the work is done.`;
   }
 
   private postNotice(): void {
@@ -206,7 +211,7 @@ export class Ui {
           'div',
           { class: 'notice' },
           h('span', { class: 'notice-order' }, cap(orderText(n.order))),
-          h('span', { class: 'notice-meta' }, `${n.remaining} left · ${n.wage}g · ${to}${working ? ` · ${working} on it` : ''}`),
+          h('span', { class: 'notice-meta' }, `${n.remaining} left · ${n.wage}g each · ${to}${working ? ` · ${working} on it` : ''}`),
           h('button', { class: 'btn btn-small', title: 'Take down (refunds unpaid wages)', onclick: () => this.sim.enqueue({ type: 'removeNotice', playerId: 0, noticeId: n.id }) }, '×'),
         ),
       );
@@ -240,12 +245,28 @@ export class Ui {
     for (const m of w.moodlets) moodlets.append(h('li', { class: m.value >= 0 ? 'good' : 'bad' }, `${m.value >= 0 ? '+' : ''}${m.value} ${m.label}`));
     const scores = h('table', { class: 'scores' });
     w.lastScores.forEach((sc, i) => scores.append(h('tr', { class: i === 0 ? 'top' : '' }, h('td', {}, sc.label), h('td', { class: 'num' }, sc.score.toFixed(1)))));
+    const skills = h('table', { class: 'skills' });
+    for (const id of SKILL_IDS) {
+      const lvl = skillLevel(w, id);
+      const pips = '●'.repeat(lvl) + '○'.repeat(5 - lvl);
+      const extra = id === 'hauling' ? `carries ${carryCapacity(w)}` : lvl > 0 ? `${Math.round(bonusChance(w, id) * 100)}% bonus` : '';
+      skills.append(
+        h(
+          'tr',
+          {},
+          h('td', {}, SKILL_LABEL[id], w.knack === id ? h('span', { class: 'knack', title: 'A natural: learns this faster' }, ' ★') : null),
+          h('td', { class: 'pips', 'aria-label': `level ${lvl} of 5` }, pips),
+          h('td', { class: 'hint' }, extra),
+        ),
+      );
+    }
+    const holding = w.carrying ? `${w.carryCount} ${w.carrying}` : 'nothing';
     win.body.append(
       traits,
       h('div', { class: 'thought' }, `“${w.thought || '...'}”`),
       kv('Doing', DOING[w.activity.kind]),
-      kv('Job in mind', w.memory ? `${cap(orderText(w.memory.order))} (${w.memory.wage}g)` : '—'),
-      kv('Carrying', w.carrying ?? 'nothing'),
+      kv('Job in mind', w.memory ? `${cap(orderText(w.memory.order))} (${w.memory.wage}g each)` : '—'),
+      kv('Carrying', `${holding} (holds ${carryCapacity(w)})`),
       kv('Purse', `${w.purse} gold`),
       kv('Jobs done', String(w.jobsDone)),
       h('div', { class: 'section-label' }, 'Needs'),
@@ -254,6 +275,8 @@ export class Ui {
       need('Tiredness', w.fatigue),
       h('div', { class: 'need' }, h('span', { class: 'k' }, 'Mood'), bar(w.mood), h('span', { class: 'num' }, Math.round(w.mood))),
       w.moodlets.length ? moodlets : h('div', { class: 'hint' }, 'Nothing much on their mind.'),
+      h('div', { class: 'section-label' }, 'Skills'),
+      skills,
       h('details', { class: 'debug', open: this.debugOpen, ontoggle: (e) => (this.debugOpen = (e.target as HTMLDetailsElement).open) }, h('summary', {}, 'What they’re weighing (debug)'), scores),
       h(
         'div',

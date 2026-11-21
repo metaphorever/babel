@@ -70,7 +70,10 @@ export interface Job {
   wage: number;
 }
 
+export type SkillId = 'mining' | 'woodcutting' | 'farming' | 'cooking' | 'hauling';
+
 export type TraitId =
+  | 'strong'
   | 'industrious'
   | 'lazy'
   | 'greedy'
@@ -144,6 +147,13 @@ export interface Worker {
 
   purse: number;
   carrying: ItemType | null;
+  /** How many of `carrying` are in their arms (0 when carrying nothing). */
+  carryCount: number;
+
+  /** XP per skill. Levels come from tuning SKILLS.levelXp. */
+  skills: Record<SkillId, number>;
+  /** The skill this worker has a natural knack for. */
+  knack: SkillId;
   /** The one job held in mind (read from a board). Survives distractions. */
   memory: Job | null;
   /** Notices this worker recently failed at and won't pick again for a while. */

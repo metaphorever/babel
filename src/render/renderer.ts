@@ -325,7 +325,8 @@ export class Renderer {
     g.drawImage(spr, sx, sy);
     if (w.carrying && !lying) {
       const it = itemSprite(w.carrying);
-      g.drawImage(it, x - Math.floor(it.width / 2), sy - it.height);
+      // an armload stacks up over their head
+      for (let i = 0; i < Math.min(w.carryCount, 4); i++) g.drawImage(it, x - Math.floor(it.width / 2), sy - it.height * (i + 1));
     }
     const glyph = this.statusGlyph(s, w, lying);
     if (glyph) {
@@ -334,7 +335,7 @@ export class Renderer {
     }
     if (selected) {
       // a little pointer above the head
-      const ty = sy - (w.carrying ? 10 : 6);
+      const ty = sy - (w.carrying ? 4 + 3 * Math.min(w.carryCount, 4) : 0) - 6;
       this.rect(x - 2, ty - 3, 5, 1);
       this.rect(x - 1, ty - 2, 3, 1);
       this.rect(x, ty - 1, 1, 1);

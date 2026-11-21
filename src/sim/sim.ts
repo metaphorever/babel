@@ -2,9 +2,10 @@ import { updateWorker } from './ai';
 import { startActivity } from './activities';
 import { applyCommand, validateCommand, type Command, type CommandResult, type StampedCommand } from './commands';
 import { makeName } from './names';
-import { nextU32, rand, seedRng } from './rng';
+import { nextU32, pick, rand, seedRng } from './rng';
+import { emptySkills, SKILL_IDS } from './skills';
 import { rollPersonality } from './traits';
-import { AI, ECONOMY, POPULATION } from './tuning';
+import { AI, ECONOMY, POPULATION, SKILLS } from './tuning';
 import type { SimState, Worker } from './types';
 import { buildWorld, siteOf } from './world';
 
@@ -36,7 +37,7 @@ export function createState(seed: number): SimState {
     { type: 'postNotice', playerId: 0, verb: 'HAUL', noun: 'STONE', count: 20, wage: 2, addressee: null },
     { type: 'postNotice', playerId: 0, verb: 'HARVEST', noun: 'GRAIN', count: 10, wage: 2, addressee: null },
     { type: 'postNotice', playerId: 0, verb: 'HAUL', noun: 'GRAIN', count: 10, wage: 1, addressee: null },
-    { type: 'postNotice', playerId: 0, verb: 'COOK', noun: 'BREAD', count: 8, wage: 3, addressee: null },
+    { type: 'postNotice', playerId: 0, verb: 'COOK', noun: 'BREAD', count: 16, wage: 1, addressee: null },
   ];
   for (const c of starter) applyCommand(s, c);
   s.events = [];
@@ -64,6 +65,9 @@ export function addWorker(s: SimState): Worker {
     moodlets: [],
     purse: 0,
     carrying: null,
+    carryCount: 0,
+    skills: emptySkills(),
+    knack: pick(s.rng, SKILL_IDS),
     memory: null,
     avoid: [],
     activity: { kind: 'idle', stage: 0, timer: 0, target: null, ref: null },
@@ -73,6 +77,7 @@ export function addWorker(s: SimState): Worker {
     jobsDone: 0,
     look: nextU32(s.rng),
   };
+  w.skills[w.knack] = SKILLS.knackStartXp;
   startActivity(w, 'idle');
   s.workers.push(w);
   return w;

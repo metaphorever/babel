@@ -36,6 +36,7 @@ In the browser console, `babel.sim.state` holds the live game state, for poking 
 - [x] Deterministic core: fixed tick, seeded randomness, command log and replay
 - [x] Workers with needs, moods, traits and the utility AI (with a debug view)
 - [x] Ground strip, resources, job board notices with counts and wages
+- [x] Skills, knacks and multi-unit trips (bonus yields, strong haulers)
 - [ ] Cards, scrolls, scribes, the patron's charter
 - [ ] Tower floors, couriers, mailboxes
 - [ ] Language drift, confusion, translation

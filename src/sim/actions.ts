@@ -85,8 +85,9 @@ export function log(s: SimState, text: string, workerId: number | null = null): 
 /** Drop whatever the worker is holding as a loose item where they stand. */
 export function dropCarried(s: SimState, w: Worker): void {
   if (!w.carrying) return;
-  s.items.push({ id: s.nextId++, type: w.carrying, x: w.x, y: w.y, reservedBy: null });
+  for (let i = 0; i < w.carryCount; i++) s.items.push({ id: s.nextId++, type: w.carrying, x: w.x, y: w.y, reservedBy: null });
   w.carrying = null;
+  w.carryCount = 0;
 }
 
 export function releaseReservations(s: SimState, w: Worker): void {
