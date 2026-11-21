@@ -1,7 +1,7 @@
 import { releaseReservations } from './actions';
 import { eligibleNotices, runActivity, startActivity } from './activities';
 import { rand } from './rng';
-import { AI, ECONOMY, MOOD, NEEDS } from './tuning';
+import { AI, ECONOMY, MOOD, NEEDS, SCRIBE } from './tuning';
 import type { ActivityKind, Score, SimState, Worker } from './types';
 import { siteOf } from './world';
 
@@ -38,6 +38,11 @@ export function scoreOptions(s: SimState, w: Worker, inProgress: boolean): Score
   }
 
   const wageAppeal = (wage: number) => wage * w.p.greed * AI.wageWeight;
+  const scroll = w.held[0];
+  if (scroll && scroll.waitUntil <= s.tick && scroll.pc < scroll.orders.length) {
+    const line = labelOf(scroll.orders[scroll.pc]);
+    add('scroll', `${scroll.kind === 'card' ? 'Card' : 'Scroll'}: ${line}`, AI.workBase * w.p.work + wageAppeal(scroll.wage) + SCRIBE.duty);
+  }
   if (w.memory) {
     add('job', `Work: ${labelOf(w.memory.order)}`, AI.workBase * w.p.work + wageAppeal(w.memory.wage));
   } else {

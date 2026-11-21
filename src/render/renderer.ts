@@ -1,6 +1,6 @@
 import { MOOD, Tile, type SimState, type Site, type Worker } from '../sim';
 import { INK, PAPER, Patterns, type PatternName } from './patterns';
-import { glyphSprite, itemSprite, workerSprite } from './sprites';
+import { glyphSprite, itemSprite, propSprite, workerSprite } from './sprites';
 
 export const TILE = 8; // native pixels per tile
 export const ZOOMS = [1, 2, 3, 4, 5, 6] as const;
@@ -247,6 +247,22 @@ export class Renderer {
         this.rect(left + width - 3, base - 6, 3, 1);
         break;
       }
+      case 'scriptorium': {
+        this.building(left, width, base, 22);
+        // writing desk with a slanted top, a stool, and the queue of work
+        this.rect(left + 6, base - 9, 1, 9);
+        this.rect(left + 16, base - 9, 1, 9);
+        this.rect(left + 5, base - 10, 13, 1);
+        this.rect(left + 6, base - 11, 11, 1);
+        this.rect(left + 21, base - 5, 6, 1);
+        this.rect(left + 22, base - 4, 1, 4);
+        this.rect(left + 25, base - 4, 1, 4);
+        // shelf of pending designs: one sheet per design in the queue
+        this.rect(left + 30, base - 14, 16, 1);
+        const n = Math.min(s.designs.length, 5);
+        for (let i = 0; i < n; i++) this.g.drawImage(propSprite('sheet'), left + 30 + i * 3, base - 17);
+        break;
+      }
       case 'tavern': {
         this.building(left, width, base, 22);
         this.box(left + 8, base - 12, 7, 12, 'dark'); // door
@@ -327,6 +343,11 @@ export class Renderer {
       const it = itemSprite(w.carrying);
       // an armload stacks up over their head
       for (let i = 0; i < Math.min(w.carryCount, 4); i++) g.drawImage(it, x - Math.floor(it.width / 2), sy - it.height * (i + 1));
+    }
+    if (!lying) {
+      // a scroll in hand at the front, a courier's bag at the back
+      if (w.held.length > 0) g.drawImage(propSprite('scroll'), x + (w.facing > 0 ? 3 : -6), y - 9);
+      if (w.bag.length > 0) g.drawImage(propSprite('bag'), x + (w.facing > 0 ? -7 : 4), y - 8);
     }
     const glyph = this.statusGlyph(s, w, lying);
     if (glyph) {

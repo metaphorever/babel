@@ -37,7 +37,7 @@ In the browser console, `babel.sim.state` holds the live game state, for poking 
 - [x] Workers with needs, moods, traits and the utility AI (with a debug view)
 - [x] Ground strip, resources, job board notices with counts and wages
 - [x] Skills, knacks and multi-unit trips (bonus yields, strong haulers)
-- [ ] Cards, scrolls, scribes, the patron's charter
+- [x] Cards, scrolls, scribes, the patron's charter (WRITE, DELIVER, REPEAT, CHECK BOARD)
 - [ ] Tower floors, couriers, mailboxes
 - [ ] Language drift, confusion, translation
 - [ ] Patron stipend and quitting

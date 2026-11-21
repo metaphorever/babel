@@ -7,6 +7,7 @@ export * from './commands';
 export * from './lang';
 export * from './tuning';
 export { TRAITS } from './traits';
+export { carrierText, destText } from './carriers';
 export { SKILL_IDS, SKILL_LABEL, skillLevel, carryCapacity, bonusChance } from './skills';
 export { standable, tileAt, siteOf } from './world';
 export { findPath } from './path';

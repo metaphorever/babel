@@ -1,4 +1,4 @@
-import type { Verb } from './lang';
+import type { WorkVerb } from './lang';
 import { rand, type RngState } from './rng';
 import { SKILLS, WORK } from './tuning';
 import type { SkillId, Worker } from './types';
@@ -8,7 +8,7 @@ import type { SkillId, Worker } from './types';
 // more than one load. Each worker also has a knack: one skill they start a
 // little ahead in and learn faster.
 
-export const SKILL_IDS: readonly SkillId[] = ['mining', 'woodcutting', 'farming', 'cooking', 'hauling'];
+export const SKILL_IDS: readonly SkillId[] = ['mining', 'woodcutting', 'farming', 'cooking', 'hauling', 'writing'];
 
 export const SKILL_LABEL: Record<SkillId, string> = {
   mining: 'Mining',
@@ -16,9 +16,10 @@ export const SKILL_LABEL: Record<SkillId, string> = {
   farming: 'Farming',
   cooking: 'Cooking',
   hauling: 'Hauling',
+  writing: 'Writing',
 };
 
-export const SKILL_OF_VERB: Record<Verb, SkillId> = {
+export const SKILL_OF_VERB: Record<WorkVerb, SkillId> = {
   MINE: 'mining',
   CHOP: 'woodcutting',
   HARVEST: 'farming',
@@ -27,7 +28,7 @@ export const SKILL_OF_VERB: Record<Verb, SkillId> = {
 };
 
 export function emptySkills(): Record<SkillId, number> {
-  return { mining: 0, woodcutting: 0, farming: 0, cooking: 0, hauling: 0 };
+  return { mining: 0, woodcutting: 0, farming: 0, cooking: 0, hauling: 0, writing: 0 };
 }
 
 export function levelOf(xp: number): number {
@@ -66,7 +67,7 @@ export function carryCapacity(w: Worker): number {
 }
 
 /** Units a worker expects from one trip at a job. Used to weigh wages per unit. */
-export function expectedUnits(w: Worker, verb: Verb): number {
+export function expectedUnits(w: Worker, verb: WorkVerb): number {
   if (verb === 'HAUL') return carryCapacity(w);
   const base = verb === 'COOK' ? WORK.breadPerGrain : 1;
   return base + bonusChance(w, SKILL_OF_VERB[verb]);

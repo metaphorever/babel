@@ -92,4 +92,6 @@ export function dropCarried(s: SimState, w: Worker): void {
 
 export function releaseReservations(s: SimState, w: Worker): void {
   for (const it of s.items) if (it.reservedBy === w.id) it.reservedBy = null;
+  // a half-written design stays half-written for whoever picks it up next
+  for (const d of s.designs) if (d.claimedBy === w.id) d.claimedBy = null;
 }

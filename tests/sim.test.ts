@@ -6,10 +6,29 @@ import { Tile } from '../src/sim/types';
 import { siteOf } from '../src/sim/world';
 import { applyCommand } from '../src/sim/commands';
 import { levelOf } from '../src/sim/skills';
+import { pinNotice } from '../src/sim/carriers';
+import { makeOrder, type Noun, type WorkVerb } from '../src/sim/lang';
 import { SKILLS } from '../src/sim/tuning';
 
-function run(s: ReturnType<typeof createState>, ticks: number) {
+type State = ReturnType<typeof createState>;
+
+function run(s: State, ticks: number) {
   for (let i = 0; i < ticks; i++) step(s);
+}
+
+/** Pin a notice straight onto the board, skipping the scribe (for testing notice mechanics). */
+function post(s: State, verb: WorkVerb, noun: Noun, count: number, wage: number, addressee: number | null = null) {
+  pinNotice(s, makeOrder(verb, noun), count, wage, addressee);
+  s.reserved += count * wage;
+}
+
+/** Run until a condition holds or the tick budget runs out. */
+function runUntil(s: State, done: () => boolean, maxTicks: number): boolean {
+  for (let i = 0; i < maxTicks; i++) {
+    if (done()) return true;
+    step(s);
+  }
+  return done();
 }
 
 describe('determinism', () => {
@@ -76,11 +95,23 @@ describe('pathfinding', () => {
 });
 
 describe('notices and jobs', () => {
-  it('posting reserves gold; removing refunds it', () => {
+  it('posting queues a design and reserves gold; scrapping it refunds', () => {
     const s = createState(1);
     const before = s.reserved;
+    const notices = s.notices.length;
     applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'MINE', noun: 'STONE', count: 10, wage: 3, addressee: null });
     expect(s.reserved).toBe(before + 30);
+    expect(s.notices.length).toBe(notices); // nothing on the board until it's written and carried
+    expect(s.designs.length).toBe(1);
+    applyCommand(s, { type: 'cancelDesign', playerId: 0, designId: s.designs[0].id });
+    expect(s.reserved).toBe(before);
+    expect(s.designs.length).toBe(0);
+  });
+
+  it('taking a notice down refunds what is left', () => {
+    const s = createState(1);
+    const before = s.reserved;
+    post(s, 'MINE', 'STONE', 10, 3);
     const n = s.notices[s.notices.length - 1];
     applyCommand(s, { type: 'removeNotice', playerId: 0, noticeId: n.id });
     expect(s.reserved).toBe(before);
@@ -105,7 +136,7 @@ describe('notices and jobs', () => {
     s.notices = [];
     s.reserved = 0;
     const startGold = s.gold;
-    applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'MINE', noun: 'STONE', count: 1, wage: 5, addressee: null });
+    post(s, 'MINE', 'STONE', 1, 5);
     // run until the notice is gone
     let t = 0;
     while (s.notices.length > 0 && t++ < 5000) step(s);
@@ -144,7 +175,7 @@ describe('skills and multi-unit work', () => {
     const s = createState(21);
     s.notices = [];
     s.reserved = 0;
-    const w = s.workers[0];
+    const w = s.workers[1];
     if (!w.traits.includes('strong')) w.traits.push('strong');
     w.skills.hauling = 0;
     w.hunger = w.thirst = w.fatigue = 0;
@@ -152,7 +183,7 @@ describe('skills and multi-unit work', () => {
     s.items.push({ id: s.nextId++, type: 'stone', x: w.x, y, reservedBy: null });
     s.items.push({ id: s.nextId++, type: 'stone', x: w.x + 1, y, reservedBy: null });
     const gold = s.gold;
-    applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'HAUL', noun: 'STONE', count: 2, wage: 3, addressee: w.id });
+    post(s, 'HAUL', 'STONE', 2, 3, w.id);
     let t = 0;
     while (s.notices.length > 0 && t++ < 4000) step(s);
     expect(siteOf(s, 'stockpile').store.stone).toBe(2);
@@ -164,14 +195,79 @@ describe('skills and multi-unit work', () => {
     const s = createState(33);
     s.notices = [];
     s.reserved = 0;
-    const w = s.workers[0];
+    const w = s.workers[1];
     w.skills.mining = 10_000;
-    applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'MINE', noun: 'STONE', count: 200, wage: 0, addressee: w.id });
+    post(s, 'MINE', 'STONE', 200, 0, w.id);
     for (let i = 0; i < 20 * 600; i++) step(s);
     const notice = s.notices[0];
     const units = 200 - notice.remaining;
     expect(w.jobsDone).toBeGreaterThan(5);
     // with a 60% bonus chance, the average should be well above one per trip
     expect(units / w.jobsDone).toBeGreaterThan(1.3);
+  });
+});
+
+describe('scribes, scrolls and the charter', () => {
+  it('the game starts with a scribe holding the charter', () => {
+    const s = createState(4);
+    const scribe = s.workers[0];
+    expect(scribe.knack).toBe('writing');
+    expect(scribe.held.length).toBe(1);
+    expect(scribe.held[0].orders.map((o) => o[0].t)).toEqual(['WRITE', 'DELIVER', 'REPEAT']);
+  });
+
+  it('a posted notice is written and pinned up by the scribe', () => {
+    const s = createState(4);
+    applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'CHOP', noun: 'WOOD', count: 5, wage: 2, addressee: null });
+    const pinned = runUntil(s, () => s.notices.some((n) => n.order[0].t === 'CHOP'), 3000);
+    expect(pinned).toBe(true);
+    expect(s.designs.length).toBe(0);
+  });
+
+  it('a scroll is handed to a worker by name and loops', () => {
+    const s = createState(4);
+    const miner = s.workers[3];
+    applyCommand(s, {
+      type: 'sendScroll',
+      playerId: 0,
+      lines: [
+        { verb: 'MINE', noun: 'STONE' },
+        { verb: 'HAUL', noun: 'STONE' },
+        { verb: 'REPEAT', noun: null },
+      ],
+      wage: 1,
+      to: miner.id,
+    });
+    expect(runUntil(s, () => miner.held.length > 0, 4000)).toBe(true);
+    expect(runUntil(s, () => miner.held[0]?.loops >= 2, 20 * 300)).toBe(true);
+    expect(siteOf(s, 'stockpile').store.stone).toBeGreaterThan(0);
+  });
+
+  it('a scroll with the scribe loop makes a second scribe', () => {
+    const s = createState(4);
+    const second = s.workers[5];
+    applyCommand(s, {
+      type: 'sendScroll',
+      playerId: 0,
+      lines: [
+        { verb: 'WRITE', noun: null },
+        { verb: 'DELIVER', noun: null },
+        { verb: 'REPEAT', noun: null },
+      ],
+      wage: 1,
+      to: second.id,
+    });
+    expect(runUntil(s, () => second.held.length > 0, 4000)).toBe(true);
+    // give them plenty to write
+    for (let i = 0; i < 6; i++) applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'CHOP', noun: 'WOOD', count: 1, wage: 1, addressee: null });
+    expect(runUntil(s, () => second.skills.writing > 0, 20 * 300)).toBe(true);
+  });
+
+  it('a line that cannot be done is skipped, not stuck on', () => {
+    const s = createState(4);
+    const w = s.workers[2];
+    s.items = [];
+    w.held.push({ id: s.nextId++, kind: 'scroll', orders: [makeOrder('HAUL', 'WOOD'), makeOrder('CHOP', 'WOOD')], wage: 0, dest: { kind: 'worker', workerId: w.id }, pc: 0, loops: 0, waitUntil: 0, retryAfter: 0 });
+    expect(runUntil(s, () => w.held.length === 0, 20 * 200)).toBe(true);
   });
 });

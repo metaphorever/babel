@@ -1,5 +1,6 @@
 import {
   availableGold,
+  carrierText,
   bonusChance,
   carryCapacity,
   orderText,
@@ -15,10 +16,11 @@ import {
   type Noun,
   type Sim,
   type SimState,
-  type Verb,
+  type WorkVerb,
   type Worker,
 } from '../sim';
 import { bar, clear, h } from './dom';
+import { ScriptoriumPanel } from './scriptorium';
 import { WindowManager } from './windows';
 
 const DOING: Record<ActivityKind, string> = {
@@ -29,6 +31,7 @@ const DOING: Record<ActivityKind, string> = {
   sleep: 'Sleeping',
   readBoard: 'Reading the board',
   job: 'Working',
+  scroll: 'Following a scroll',
   tavern: 'At the tavern',
 };
 
@@ -52,6 +55,7 @@ export interface UiHooks {
 export class Ui {
   selected: number | null = null;
   wm: WindowManager;
+  scriptorium!: ScriptoriumPanel;
 
   private gold!: HTMLElement;
   private clock!: HTMLElement;
@@ -77,6 +81,7 @@ export class Ui {
     this.wm = new WindowManager(root);
     this.buildMenubar();
     this.buildBoard();
+    this.scriptorium = new ScriptoriumPanel(this.wm, this.sim);
     this.wm.create('inspector', 'Worker', -336, 34, 320);
     this.wm.create('roster', 'Workers', -656, 34, 300);
     this.wm.create('stores', 'Stores', 390, 34, 220);
@@ -111,6 +116,7 @@ export class Ui {
       { class: 'menubar' },
       h('span', { class: 'menu-apple' }, 'Babel'),
       menu('Job Board', 'board'),
+      menu('Scriptorium', 'scriptorium'),
       menu('Workers', 'roster'),
       menu('Stores', 'stores'),
       menu('Log', 'log'),
@@ -136,7 +142,7 @@ export class Ui {
     this.forSel = h('select', { 'aria-label': 'For', onchange: () => this.updateCost() });
     this.costLine = h('div', { class: 'hint' });
     this.formError = h('div', { class: 'error', role: 'alert' });
-    const post = h('button', { class: 'btn btn-default', onclick: () => this.postNotice() }, 'Post');
+    const post = h('button', { class: 'btn btn-default', onclick: () => this.postNotice() }, 'Send to scribe');
     const form = h(
       'div',
       { class: 'form' },
@@ -156,7 +162,7 @@ export class Ui {
   }
 
   private syncNouns(): void {
-    const verb = this.verbSel.value as Verb;
+    const verb = this.verbSel.value as WorkVerb;
     clear(this.nounSel);
     for (const n of NOUNS) if (VALID_JOBS[verb].includes(n)) this.nounSel.append(h('option', { value: n }, n.toLowerCase()));
     this.updateCost();
@@ -181,7 +187,7 @@ export class Ui {
     const r = this.sim.enqueue({
       type: 'postNotice',
       playerId: 0,
-      verb: this.verbSel.value as Verb,
+      verb: this.verbSel.value as WorkVerb,
       noun: this.nounSel.value as Noun,
       count: Math.floor(Number(this.countIn.value)),
       wage: Math.floor(Number(this.wageIn.value)),
@@ -199,7 +205,20 @@ export class Ui {
   private refreshBoard(): void {
     this.syncForOptions();
     clear(this.noticeList);
-    if (this.s.notices.length === 0) {
+    // notices that exist only as designs or in a courier's bag so far
+    const pending: { text: string; status: string }[] = [];
+    for (const d of this.s.designs) {
+      if (d.carrier.dest.kind !== 'board') continue;
+      const writer = this.s.workers.find((w) => w.id === d.claimedBy);
+      pending.push({ text: carrierText(d.carrier), status: writer ? `${writer.name} is writing it (${Math.floor((d.progress / d.cost) * 100)}%)` : 'Waiting for a scribe' });
+    }
+    for (const w of this.s.workers) {
+      for (const c of w.bag) if (c.dest.kind === 'board') pending.push({ text: carrierText(c), status: `${w.name} is bringing it` });
+    }
+    for (const p of pending) {
+      this.noticeList.append(h('div', { class: 'notice notice-pending' }, h('span', { class: 'notice-order' }, cap(p.text)), h('span', { class: 'notice-meta' }, p.status)));
+    }
+    if (this.s.notices.length === 0 && pending.length === 0) {
       this.noticeList.append(h('div', { class: 'hint' }, 'The board is empty. Idle workers will do as they please.'));
       return;
     }
@@ -261,6 +280,16 @@ export class Ui {
       );
     }
     const holding = w.carrying ? `${w.carryCount} ${w.carrying}` : 'nothing';
+    // the scrolls and cards in their hands, with a marker on the current line
+    const inHand = h('div', { class: 'held' });
+    w.held.forEach((c, i) => {
+      const lines = h('ol', { class: 'scroll-lines' });
+      c.orders.forEach((o, li) =>
+        lines.append(h('li', { class: i === 0 && li === c.pc ? 'current' : '' }, i === 0 && li === c.pc ? '▸ ' : '', cap(orderText(o)))),
+      );
+      const meta = `${c.wage}g per unit${c.loops ? ` · looped ${c.loops}×` : ''}${i > 0 ? ' · next up' : ''}${c.waitUntil > this.s.tick ? ' · taking a breather' : ''}`;
+      inHand.append(h('div', { class: 'held-carrier' }, h('div', { class: 'held-kind' }, cap(c.kind), h('span', { class: 'hint' }, ` ${meta}`)), lines));
+    });
     win.body.append(
       traits,
       h('div', { class: 'thought' }, `“${w.thought || '...'}”`),
@@ -269,6 +298,9 @@ export class Ui {
       kv('Carrying', `${holding} (holds ${carryCapacity(w)})`),
       kv('Purse', `${w.purse} gold`),
       kv('Jobs done', String(w.jobsDone)),
+      w.bag.length ? kv('Bag', `${w.bag.length} to deliver`) : '',
+      w.held.length ? h('div', { class: 'section-label' }, 'In hand') : '',
+      w.held.length ? inHand : '',
       h('div', { class: 'section-label' }, 'Needs'),
       need('Hunger', w.hunger),
       need('Thirst', w.thirst),
@@ -282,7 +314,8 @@ export class Ui {
         'div',
         { class: 'row row-end' },
         h('button', { class: 'btn', onclick: () => this.hooks.centerOnWorker(w.id) }, 'Find'),
-        h('button', { class: 'btn', onclick: () => this.openBoardFor(w.id) }, `Post a job for ${w.name}`),
+        h('button', { class: 'btn', onclick: () => this.openBoardFor(w.id) }, 'Post a notice for them'),
+        h('button', { class: 'btn', onclick: () => this.scriptorium.openFor(w.id) }, 'Write them a scroll'),
       ),
     );
   }
@@ -348,8 +381,8 @@ export class Ui {
   private buildHelp(): void {
     const win = this.wm.create('help', 'Welcome to Babel (P0)', 390, 34, 420);
     win.body.append(
-      h('p', {}, 'Grey-box prototype. You can’t touch anything: you post notices on the job board, and workers decide for themselves whether to take them. Better pay is more likely to be picked, never guaranteed. Needs and moods compete with work.'),
-      h('p', {}, 'Each notice has a count. It goes down when a job is finished, not when it’s taken, so a worker who finishes a job that already ran out goes unpaid and gets annoyed.'),
+      h('p', {}, 'Grey-box prototype. You can’t touch anything. Every order is written down by your scribe and carried by hand: notices go up on the job board for anyone to take; scrolls go to one worker by name and can loop. Workers still decide for themselves: needs, moods and pay all compete.'),
+      h('p', {}, 'Counts and wages are per unit. A count goes down when the work is finished, not when it’s taken, so a worker who finishes after it ran out goes unpaid and gets annoyed. Your first scribe came with the patron’s charter: write, deliver, repeat.'),
       h(
         'ul',
         { class: 'keys' },
@@ -358,7 +391,7 @@ export class Ui {
         h('li', {}, h('b', {}, 'Click'), ' a worker to inspect; click the board, stockpile or kitchen to open their window'),
         h('li', {}, h('b', {}, 'Space'), ' pause · ', h('b', {}, '1 2 3'), ' speed · ', h('b', {}, 'N'), ' show all names'),
       ),
-      h('p', { class: 'hint' }, 'Not in yet: scribes, scrolls, the tower, couriers, languages, the patron and quitting. Those are the next steps.'),
+      h('p', { class: 'hint' }, 'Not in yet: the tower, couriers with their own bags, COPY, languages, the patron’s stipend and quitting.'),
     );
   }
 
@@ -373,6 +406,7 @@ export class Ui {
     this.speedBtns.forEach((b, i) => b.classList.toggle('on', i === speed));
     if (this.mouseDown) return;
     if (this.wm.get('board')!.open) this.refreshBoard();
+    if (this.wm.get('scriptorium')!.open) this.scriptorium.refresh();
     this.refreshInspector();
     this.refreshRoster();
     this.refreshStores();

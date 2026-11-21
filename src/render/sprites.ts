@@ -130,6 +130,25 @@ export function itemSprite(type: ItemType): HTMLCanvasElement {
   return c;
 }
 
+const PROPS: Record<string, Grid> = {
+  // a rolled scroll, held at the side
+  scroll: ['.11.', '1001', '1001', '1001', '.11.'],
+  // a courier's satchel
+  bag: ['.11.', '1..1', '1111', '1001', '1111'],
+  // a single sheet on the scriptorium desk
+  sheet: ['111', '101', '111'],
+};
+
+export function propSprite(name: keyof typeof PROPS): HTMLCanvasElement {
+  const key = `p${name}`;
+  let c = cache.get(key);
+  if (!c) {
+    c = toCanvas(PROPS[name]);
+    cache.set(key, c);
+  }
+  return c;
+}
+
 const GLYPHS: Record<string, Grid> = {
   z: ['1111', '..1.', '.1..', '1111'],
   '!': ['1', '1', '1', '.', '1'],

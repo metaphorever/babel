@@ -1,5 +1,6 @@
 import { addMoodlet, dropCarried, log, moveTo, settle } from './actions';
-import { orderText, type Noun, type Verb } from './lang';
+import { orderText, type Noun, type Order, type Verb, type WorkVerb } from './lang';
+import { runScroll, scrollLineDone, scrollLineFailed } from './scrolls';
 import { rand, randInt } from './rng';
 import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_OF_VERB, skillLevel } from './skills';
 import { ECONOMY, MOOD, NEEDS, POPULATION, SKILLS, WORK } from './tuning';
@@ -28,6 +29,8 @@ export function runActivity(s: SimState, w: Worker): Result {
       return readBoard(s, w);
     case 'tavern':
       return tavern(s, w);
+    case 'scroll':
+      return runScroll(s, w);
     case 'job':
       return job(s, w);
   }
@@ -219,7 +222,7 @@ export function pickNotice(s: SimState, w: Worker, options: Notice[]): Notice {
   const weights = pool.map((n) => {
     // wages are per unit, so a skilled worker earns more per trip at their
     // specialty, and likes doing what they're good at besides
-    const verb = n.order[0].t as Verb;
+    const verb = n.order[0].t as WorkVerb;
     const appeal =
       WORK.boardWeightBase +
       n.wage * w.p.greed * expectedUnits(w, verb) +
@@ -251,33 +254,50 @@ function nounItem(n: Noun): ItemType {
 function job(s: SimState, w: Worker): Result {
   const mem = w.memory;
   if (!mem) return 'failed';
-  const verb = mem.order[0]?.t as Verb;
-  const noun = mem.order[1]?.t as Noun;
-  const prod = PRODUCE[verb];
-  if (prod) return produceJob(s, w, prod.site, prod.ticks, prod.doing, nounItem(noun));
-  if (verb === 'HAUL') return haulJob(s, w, nounItem(noun));
-  if (verb === 'COOK') return cookJob(s, w);
-  return failJob(s, w, "I don't know how to do that.");
+  return workOrder(s, w, mem.order);
 }
 
-function produceJob(s: SimState, w: Worker, site: SiteKind, ticks: number, doing: string, out: ItemType): Result {
+/**
+ * Carry out one work order, whether it came from a notice (held in memory)
+ * or a line on a scroll. finishWork / failWork route the result back to
+ * whichever it came from.
+ */
+export function workOrder(s: SimState, w: Worker, order: Order): Result {
+  const verb = order[0]?.t as Verb;
+  const noun = order[1]?.t as Noun;
+  const prod = PRODUCE[verb];
+  if (prod) return produceJob(s, w, verb as WorkVerb, prod.site, prod.ticks, prod.doing, nounItem(noun));
+  if (verb === 'HAUL') return haulJob(s, w, nounItem(noun));
+  if (verb === 'COOK') return cookJob(s, w);
+  return failWork(s, w, "I don't know how to do that.");
+}
+
+function finishWork(s: SimState, w: Worker, units: number): Result {
+  return w.activity.kind === 'scroll' ? scrollLineDone(s, w, units) : completeJob(s, w, units);
+}
+
+function failWork(s: SimState, w: Worker, why: string): Result {
+  return w.activity.kind === 'scroll' ? scrollLineFailed(s, w, why) : failJob(s, w, why);
+}
+
+function produceJob(s: SimState, w: Worker, verb: WorkVerb, site: SiteKind, ticks: number, doing: string, out: ItemType): Result {
   const a = w.activity;
   if (a.stage === 0) {
     if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
     w.thought = `Heading to the ${site}.`;
     const m = moveTo(s, w, spotFor(siteOf(s, site), w.id));
     if (m === 'moving') return 'running';
-    if (m === 'unreachable') return failJob(s, w, "Can't get there.");
+    if (m === 'unreachable') return failWork(s, w, "Can't get there.");
     a.stage = 1;
     a.timer = ticks;
     w.thought = doing;
   }
   if (--a.timer > 0) return 'running';
-  const skill = SKILL_OF_VERB[w.memory!.order[0].t as Verb];
+  const skill = SKILL_OF_VERB[verb];
   const units = rollYield(s.rng, w, skill, 1);
   for (let i = 0; i < units; i++) s.items.push({ id: s.nextId++, type: out, x: w.x, y: w.y, reservedBy: null });
   train(s, w, skill);
-  return completeJob(s, w, units);
+  return finishWork(s, w, units);
 }
 
 /**
@@ -330,7 +350,7 @@ function haulJob(s: SimState, w: Worker, type: ItemType): Result {
       a.stage = 2;
     } else {
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
-      if (claimLoad(s, w, type, carryCapacity(w)) === 0) return failJob(s, w, `No ${type} lying around to haul.`);
+      if (claimLoad(s, w, type, carryCapacity(w)) === 0) return failWork(s, w, `No ${type} lying around to haul.`);
       a.stage = 1;
       w.thought = `Fetching ${type}.`;
     }
@@ -338,7 +358,7 @@ function haulJob(s: SimState, w: Worker, type: ItemType): Result {
   if (a.stage === 1) {
     const next = nearestClaimed(s, w);
     if (!next) {
-      if (w.carryCount === 0) return failJob(s, w, "Couldn't get to it.");
+      if (w.carryCount === 0) return failWork(s, w, "Couldn't get to it.");
       a.stage = 2;
     } else {
       const m = moveTo(s, w, { x: next.x, y: next.y });
@@ -357,7 +377,7 @@ function haulJob(s: SimState, w: Worker, type: ItemType): Result {
     w.thought = w.carryCount > 1 ? `Taking ${w.carryCount} ${type} to the stockpile.` : `Taking ${type} to the stockpile.`;
     const m = moveTo(s, w, spotFor(pile, w.id));
     if (m === 'moving') return 'running';
-    if (m === 'unreachable') return failJob(s, w, "Can't reach the stockpile.");
+    if (m === 'unreachable') return failWork(s, w, "Can't reach the stockpile.");
     a.stage = 3;
     a.timer = WORK.dropTicks;
   }
@@ -367,10 +387,10 @@ function haulJob(s: SimState, w: Worker, type: ItemType): Result {
   w.carrying = null;
   w.carryCount = 0;
   train(s, w, 'hauling');
-  return completeJob(s, w, units);
+  return finishWork(s, w, units);
 }
 
-function train(s: SimState, w: Worker, skill: SkillId): void {
+export function train(s: SimState, w: Worker, skill: SkillId): void {
   const up = practice(w, skill);
   if (up !== null) log(s, `${w.name} is getting better at ${SKILL_LABEL[skill].toLowerCase()} (level ${up}).`, w.id);
 }
@@ -383,12 +403,12 @@ function cookJob(s: SimState, w: Worker): Result {
     if (w.carrying === 'grain') a.stage = 2;
     else {
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
-      if (pile.store.grain <= 0) return failJob(s, w, 'No grain in the stockpile.');
+      if (pile.store.grain <= 0) return failWork(s, w, 'No grain in the stockpile.');
       w.thought = 'Fetching grain.';
       const m = moveTo(s, w, spotFor(pile, w.id));
       if (m === 'moving') return 'running';
-      if (m === 'unreachable') return failJob(s, w, "Can't reach the stockpile.");
-      if (pile.store.grain <= 0) return failJob(s, w, 'Somebody took the last grain.');
+      if (m === 'unreachable') return failWork(s, w, "Can't reach the stockpile.");
+      if (pile.store.grain <= 0) return failWork(s, w, 'Somebody took the last grain.');
       pile.store.grain--;
       w.carrying = 'grain';
       w.carryCount = 1;
@@ -399,7 +419,7 @@ function cookJob(s: SimState, w: Worker): Result {
     w.thought = 'Taking grain to the kitchen.';
     const m = moveTo(s, w, spotFor(kitchen, w.id));
     if (m === 'moving') return 'running';
-    if (m === 'unreachable') return failJob(s, w, "Can't reach the kitchen.");
+    if (m === 'unreachable') return failWork(s, w, "Can't reach the kitchen.");
     a.stage = 3;
     a.timer = WORK.cookTicks;
     w.thought = 'Baking bread.';
@@ -414,7 +434,7 @@ function cookJob(s: SimState, w: Worker): Result {
   const units = rollYield(s.rng, w, 'cooking', WORK.breadPerGrain);
   kitchen.store.bread += units;
   train(s, w, 'cooking');
-  return completeJob(s, w, units);
+  return finishWork(s, w, units);
 }
 
 /**

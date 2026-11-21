@@ -343,6 +343,14 @@ All the numbers in this section are placeholders until playtests say otherwise.
 1. Is chaining orders while workers think for themselves fun, or frustrating?
 2. Does drift create interesting problems, or just annoying ones?
 
+**How P0 handles scrolls (provisional, revisit in playtests):**
+- **The scribe is also the first courier.** The patron's charter is `[WRITE] [DELIVER] [REPEAT]`. WRITE writes the next design in the queue into the scribe's bag. DELIVER pins notices on the board and hands scrolls to workers by name. Any worker given that loop becomes another scribe.
+- **With nothing queued, a scribe waits at the desk.**
+- **A line that can't be done is skipped,** and the holder takes a short breather. A loop that keeps failing doesn't pin a worker in place.
+- **`CHECK BOARD` ends the scroll** and sends the worker to read the board.
+- **Scroll wages come out of the treasury as each line is done.** Nothing is reserved up front, because a loop has no end. If the treasury is empty, the line goes unpaid and the worker's mood drops.
+- **Taking a notice down is immediate.** That's a P0 shortcut, since the ground board sits beside the scriptorium.
+
 ### P0.5: art test (can run in parallel)
 
 The procedural worker generator and the portrait card. Question: can a tiny 1-bit worker be lovable?

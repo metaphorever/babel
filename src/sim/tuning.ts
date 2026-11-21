@@ -48,6 +48,27 @@ export const WORK = {
   idleTicks: 40,
 };
 
+export const SCRIBE = {
+  /** Writing cost of a carrier: base + per token. */
+  baseCost: 40,
+  perToken: 25,
+  /** Work units a scribe adds per tick: 1 + level * perLevel. */
+  speedPerLevel: 0.15,
+  /** Carriers a courier's bag holds. */
+  bagSize: 10,
+  /** Cards and scrolls a worker can hold to carry out. */
+  holdSize: 2,
+  /** A courier hands over from this many tiles away (calling out the name). */
+  handRange: 2,
+  /** After a failed handover, wait this long before trying again. */
+  retryTicks: 600,
+  /** After a failed line, the holder waits this long before going on. */
+  lineRetryTicks: 300,
+  maxLines: 6,
+  /** Extra pull of a scroll in hand over free time (it's an obligation). */
+  duty: 8,
+};
+
 export const ECONOMY = {
   startingGold: 400,
   tavernCost: 5,

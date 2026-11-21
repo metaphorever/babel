@@ -1,6 +1,9 @@
 import { updateWorker } from './ai';
 import { startActivity } from './activities';
+import { log } from './actions';
+import { newCarrier, pinNotice } from './carriers';
 import { applyCommand, validateCommand, type Command, type CommandResult, type StampedCommand } from './commands';
+import { makeOrder, type Noun, type WorkVerb } from './lang';
 import { makeName } from './names';
 import { nextU32, pick, rand, seedRng } from './rng';
 import { emptySkills, SKILL_IDS } from './skills';
@@ -11,7 +14,7 @@ import { buildWorld, siteOf } from './world';
 
 export function createState(seed: number): SimState {
   const s: SimState = {
-    version: 1,
+    version: 2,
     seed,
     tick: 0,
     rng: seedRng(seed),
@@ -23,6 +26,7 @@ export function createState(seed: number): SimState {
     items: [],
     workers: [],
     notices: [],
+    designs: [],
     gold: ECONOMY.startingGold,
     reserved: 0,
     events: [],
@@ -31,16 +35,30 @@ export function createState(seed: number): SimState {
   siteOf(s, 'kitchen').store.bread = 16;
   siteOf(s, 'stockpile').store.grain = 10;
   for (let i = 0; i < POPULATION.start; i++) addWorker(s);
-  // a few starter notices so the ground is busy from the first second
-  const starter: Command[] = [
-    { type: 'postNotice', playerId: 0, verb: 'MINE', noun: 'STONE', count: 20, wage: 2, addressee: null },
-    { type: 'postNotice', playerId: 0, verb: 'HAUL', noun: 'STONE', count: 20, wage: 2, addressee: null },
-    { type: 'postNotice', playerId: 0, verb: 'HARVEST', noun: 'GRAIN', count: 10, wage: 2, addressee: null },
-    { type: 'postNotice', playerId: 0, verb: 'HAUL', noun: 'GRAIN', count: 10, wage: 1, addressee: null },
-    { type: 'postNotice', playerId: 0, verb: 'COOK', noun: 'BREAD', count: 16, wage: 1, addressee: null },
+
+  // The patron left a few notices up so the ground is busy from the start.
+  const starter: [WorkVerb, Noun, number, number][] = [
+    ['MINE', 'STONE', 20, 2],
+    ['HAUL', 'STONE', 20, 2],
+    ['HARVEST', 'GRAIN', 10, 2],
+    ['HAUL', 'GRAIN', 10, 1],
+    ['COOK', 'BREAD', 16, 1],
   ];
-  for (const c of starter) applyCommand(s, c);
+  for (const [verb, noun, count, wage] of starter) {
+    pinNotice(s, makeOrder(verb, noun), count, wage, null);
+    s.reserved += count * wage;
+  }
+
+  // The patron's charter: the one order the player didn't have to write.
+  // It hires the first scribe and sets them on the writing loop.
+  const scribe = s.workers[0];
+  scribe.knack = 'writing';
+  scribe.skills = emptySkills();
+  scribe.skills.writing = SKILLS.knackStartXp;
+  const charter = newCarrier(s, [makeOrder('WRITE'), makeOrder('DELIVER'), makeOrder('REPEAT')], 1, { kind: 'worker', workerId: scribe.id });
+  scribe.held.push(charter);
   s.events = [];
+  log(s, `The patron's charter names ${scribe.name} your scribe. Their loop: write, deliver, repeat.`, scribe.id);
   return s;
 }
 
@@ -69,6 +87,8 @@ export function addWorker(s: SimState): Worker {
     skills: emptySkills(),
     knack: pick(s.rng, SKILL_IDS),
     memory: null,
+    held: [],
+    bag: [],
     avoid: [],
     activity: { kind: 'idle', stage: 0, timer: 0, target: null, ref: null },
     nextThink: Math.floor(rand(s.rng) * AI.thinkInterval),

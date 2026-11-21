@@ -31,7 +31,8 @@ export type SiteKind =
   | 'stockpile'
   | 'foundation'
   | 'tavern'
-  | 'quarry';
+  | 'quarry'
+  | 'scriptorium';
 
 export interface Site {
   id: number;
@@ -64,13 +65,49 @@ export interface Notice {
   postedTick: number;
 }
 
+/** Where a written carrier is headed. */
+export type Dest =
+  | { kind: 'board'; count: number; addressee: number | null }
+  | { kind: 'worker'; workerId: number };
+
+/**
+ * A physical object with orders written on it. A card holds one order; a
+ * scroll holds several, carried out top to bottom.
+ */
+export interface Carrier {
+  id: number;
+  kind: 'card' | 'scroll';
+  orders: Order[];
+  /** Gold per unit of work for each order carried out (or per notice unit). */
+  wage: number;
+  dest: Dest;
+  /** Next line to carry out. */
+  pc: number;
+  loops: number;
+  /** After a failed line, the holder takes a breather before carrying on. */
+  waitUntil: number;
+  /** A courier who couldn't hand it over waits until then to try again. */
+  retryAfter: number;
+}
+
+/** A carrier the player has composed, waiting in the scriptorium to be written out. */
+export interface Design {
+  id: number;
+  carrier: Carrier;
+  /** Writing time needed, in work units; a scribe adds their speed each tick. */
+  cost: number;
+  progress: number;
+  claimedBy: number | null;
+  postedTick: number;
+}
+
 export interface Job {
   noticeId: number;
   order: Order;
   wage: number;
 }
 
-export type SkillId = 'mining' | 'woodcutting' | 'farming' | 'cooking' | 'hauling';
+export type SkillId = 'mining' | 'woodcutting' | 'farming' | 'cooking' | 'hauling' | 'writing';
 
 export type TraitId =
   | 'strong'
@@ -108,6 +145,7 @@ export type ActivityKind =
   | 'sleep'
   | 'readBoard'
   | 'job'
+  | 'scroll'
   | 'tavern';
 
 export interface Activity {
@@ -156,6 +194,10 @@ export interface Worker {
   knack: SkillId;
   /** The one job held in mind (read from a board). Survives distractions. */
   memory: Job | null;
+  /** Cards and scrolls in hand, carried out in order (the first one is active). */
+  held: Carrier[];
+  /** Written carriers this worker is carrying to deliver to someone else. */
+  bag: Carrier[];
   /** Notices this worker recently failed at and won't pick again for a while. */
   avoid: { noticeId: number; until: number }[];
 
@@ -176,7 +218,7 @@ export interface GameEvent {
 }
 
 export interface SimState {
-  version: 1;
+  version: 2;
   seed: number;
   tick: number;
   rng: RngState;
@@ -191,6 +233,8 @@ export interface SimState {
   items: Item[];
   workers: Worker[];
   notices: Notice[];
+  /** The scriptorium's writing queue. */
+  designs: Design[];
 
   gold: number;
   /** Gold promised to posted notices but not yet paid. */

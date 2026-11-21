@@ -106,6 +106,7 @@ canvas.addEventListener('click', (e) => {
   }
   const site = renderer.siteAt(sim.state, p.x, p.y);
   if (site?.kind === 'board') ui.wm.show('board');
+  else if (site?.kind === 'scriptorium') ui.wm.show('scriptorium');
   else if (site?.kind === 'stockpile' || site?.kind === 'kitchen') ui.wm.show('stores');
   else ui.select(null);
 });
