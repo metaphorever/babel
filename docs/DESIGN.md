@@ -69,7 +69,14 @@ Orders are written onto carriers:
 
 How many orders a worker can carry grows with experience.
 
-**Couriers** carry a bag with a limited number of carriers. Restocking or changing an upper board means sending a courier with a bag, so how far orders reach up the tower depends on courier trips.
+**Couriers** carry a bag with a limited number of carriers: at least 10 to start, growing with experience. Restocking or changing an upper board means sending a courier with a bag, so how far orders reach up the tower depends on courier trips.
+
+### 5.2.0 Addressing and names
+
+- **Every worker has a unique name.** Orders can always be addressed to a worker by name.
+- **Names are beyond language.** A worker never forgets their own name, even as their language drifts. They recognize it on any order, even when they can't read anything else on it, and they know the order is meant for them.
+- **Any worker can find any named worker.** Any worker can pathfind to a named worker to deliver something, whatever languages either of them speaks.
+- **Orders without a name are addressed to Anyone.**
 
 ### 5.2.1 Scribes write the orders
 
@@ -77,8 +84,14 @@ A design isn't an order until a **scribe** writes it out. The player composes or
 
 - **The tutorial chokepoint:** you can't write other orders until a scribe is set up on a loop, because a scribe out of orders has nothing to write.
 - **An early specialist:** scribes level up, and a fast scribe is precious. Overwork your best scribe and they may quit, so you either pamper them or spread the writing across several scribes.
-- **Proposal: bootstrapping.** The game starts with one scribe already hired by the patron, carrying the **patron's charter**: a single scroll that sets them up on the scribe loop. It's the only order the player doesn't have to have written. Writing it could be the tutorial's first step.
-- **Proposal: board notices aren't used up.** A notice posted on a board can be read by any number of workers. Each worker takes away only the job they read. Cards and scrolls that workers carry are used up. Scribes are then needed for carried orders and for changing board notices, not for every single job, so the scribe limits throughput without choking the ground economy.
+- **Bootstrapping:** the game starts with one scribe already hired by the patron, carrying the **patron's charter**: a single scroll that sets them up on the scribe loop. It's the only order the player doesn't have to have written. Writing it could be the tutorial's first step.
+- **Board notices have a count.** A posted notice is addressed to Anyone or to a named worker, and carries a count. `[MINE][STONE] (50)` is a job that can be done 50 times, by one worker or any mix of workers, each taking it as their next task. The notice comes down when its count runs out. Scribes write notices once rather than once per job, so the scribe limits throughput without choking the ground economy. Cards and scrolls that workers carry are used up.
+- **A scribe has to know a language to write in it.**
+  - **New orders:** writing a new order in a language the scribe knows is fast. Without the language, it's possible but with a severe time penalty.
+  - **Knowledge is per token.** A scribe who knows the mining words but not the food words writes mining orders fast and food orders slowly.
+  - **Copying is fast either way.** An existing card or scroll can be copied word for word with little time lost, even in a language the scribe doesn't know.
+  - **So languages shape the scribe staff.** You either train one scribe in several languages or keep different scribes and split the work.
+- **The lexicon and the scribe do different jobs.** The player's lexicon ([§7.2](#72-vocabulary-model)) decides what the player can compose. Scribes decide how quickly it gets written.
 
 ### 5.3 Execution
 
@@ -200,7 +213,7 @@ Drift and confusion are separate. Drift is what happens to a worker's vocabulary
 - **Exposure:** drift exposure builds while a worker is above the **drift line**. It builds faster the higher they are and the more of heaven's attention the tower has drawn. It slowly falls on the ground.
 - **What happens when it fills:** the worker loses one token from a language they know and learns the same token in their **drift tongue**. Then exposure resets.
 - **The drift tongue:** each worker is given one the first time they drift, using the seeded random generator, so it's random but fixed. The player can see what it is after the first swap.
-- **The tower's height sets the language pool.** A worker's drift tongue is chosen from the languages the tower has unlocked so far. A short tower might only have French and Spanish, so five workers can't drift into five different languages. Taller towers add languages to the pool. This keeps the early game understandable and recoverable. Above a much higher altitude, a worker may be given a second drift tongue.
+- **The tower's height sets the language pool.** A worker's drift tongue is chosen from the languages the tower has unlocked so far. A short tower might only have French and Spanish, so five workers can't drift into five different languages. Taller towers add languages to the pool. This keeps the early game understandable and recoverable. New languages arrive slowly at first to ease players in, and more often higher up. The exact curve is for playtesting. Above a much higher altitude, a worker may be given a second drift tongue.
 - **Early warning:** a worker's thoughts are shown one token at a time, each in whichever language the worker knows that token in. So mixed-language thoughts are the first sign of drift. For example, a thought might be the English token for "want" followed by the French *pain* ("bread").
 - **Proposal:** drift exposure is not shown as a meter. The first swapped word is the warning. If the first swap catches playtesters by surprise, we can show it.
 - **Lost words don't come back on their own.** Grounding a worker stops the drift but doesn't restore their vocabulary. Only translation does.
@@ -336,10 +349,10 @@ Fights, metalwork, cordage, the full tech tree, contraptions (crane, bucket brig
 ## 14. Open questions
 
 - **Numbers:** are numerals universal, or does each language have its own (for example, Hebrew letter numerals)?
-- **Scribes and language:** does a scribe have to know a language to write it, or can they copy a foreign script they can't read? Copying keeps scribes and translators separate. Requiring knowledge makes teaching scribes part of translation.
-- **Bootstrapping:** is the patron's charter the right start ([§5.2.1](#521-scribes-write-the-orders))?
-- **Courier bags:** how many carriers fit in a bag, and does that grow with experience or with better bags?
-- **Drift pool:** at which heights does each new language enter the pool?
+- **Copying:** is copying a separate order (`COPY` plus a carrier), or something a scribe does on their own when a notice runs out?
+- **Notice counts:** if one worker takes several jobs from a count at once, does that use up the count straight away, or only as each job finishes?
+- **Courier bags:** exact sizes. Better bags might be craftable, as well as bags growing with experience.
+- **Drift pool:** the exact heights where each language joins the pool. Playtesting will decide.
 - **Scroll default:** ordered or bundle?
 - **Talk between workers:** does language affect how workers talk to each other, and does it affect mood?
 - **Session length:** does the floor count fit the session length ([§9](#9-pacing-needs-tuning))?
@@ -360,6 +373,8 @@ Fights, metalwork, cordage, the full tech tree, contraptions (crane, bucket brig
 | **Drift line** | The floor above which confusion builds. |
 | **Drift tongue** | The language a worker's vocabulary drifts into, chosen from the pool the tower's height has unlocked. |
 | **Confusion** | A worker's distress at not understanding the orders they're carrying. |
-| **Scribe** | The worker who writes the player's designs onto carriers. |
+| **Scribe** | The worker who writes the player's designs onto carriers. Fast in languages they know, slow in others; copying is always fast. |
+| **Notice** | An order posted on a board, addressed to Anyone or to a name, with a count of how many times it can be done. |
+| **Name** | A worker's unique name. Never lost to drift, always recognized on an order. |
 | **Courier** | A worker carrying a bag of carriers to deliver. |
 | **Patron** | The funder. Their patience is the difficulty. |
