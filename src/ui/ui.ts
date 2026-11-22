@@ -411,7 +411,7 @@ export class Ui {
         h('li', {}, h('b', {}, 'Click'), ' a worker to inspect; click the board, stockpile or kitchen to open their window'),
         h('li', {}, h('b', {}, 'Space'), ' pause · ', h('b', {}, '1 2 3'), ' speed · ', h('b', {}, 'N'), ' show all names'),
       ),
-      h('p', { class: 'hint' }, 'To build the tower: draw a blueprint (Tower window or Scriptorium), then post “build tower” work. Not in yet: languages, mailboxes, COPY, the patron’s stipend and quitting.'),
+      h('p', { class: 'hint' }, 'To build the tower: draw a blueprint (Tower window or Scriptorium), then post “build tower” work. Languages drift above floor 2 (see the Languages window). Keep the patron pleased by finishing floors, and keep your workers fed or they’ll quit. Not in yet: mailboxes, upper job boards, COPY.'),
     );
   }
 
