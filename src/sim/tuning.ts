@@ -74,6 +74,8 @@ export const SCRIBE = {
   /** Writing cost of a carrier: base + per token. */
   baseCost: 40,
   perToken: 25,
+  /** A word the scribe doesn't know costs this many times more (you spell it out letter by letter). */
+  unknownWordMult: 4,
   /** Work units a scribe adds per tick: 1 + level * perLevel. */
   speedPerLevel: 0.15,
   /** Carriers a courier's bag holds. */
@@ -87,6 +89,39 @@ export const SCRIBE = {
   maxLines: 6,
   /** Extra pull of a scroll in hand over free time (it's an obligation). */
   duty: 8,
+};
+
+export const DRIFT = {
+  /** Workers on this floor or higher build up exposure. */
+  lineFloor: 2,
+  /** Exposure per tick at the drift line, and extra per floor above it. */
+  rate: 0.08,
+  ratePerFloor: 0.03,
+  /** On the ground, exposure fades this much per tick. */
+  decay: 0.02,
+  /** A word drifts each time exposure reaches this. */
+  threshold: 100,
+};
+
+export const CONFUSION = {
+  /** Added when a worker can't read their order at all. */
+  unreadable: 25,
+  /** Added per word they had to guess. */
+  perGuess: 8,
+  /** Fades this much per tick. */
+  decay: 0.01,
+  /** Above this, it drags their mood down. */
+  moodAbove: 40,
+  moodPenalty: 10,
+};
+
+export const LESSON = {
+  /** Work units to pass on one word; a translator adds their speed each tick. */
+  perWord: 120,
+  /** Extra speed per language the translator knows well (5+ words). */
+  speedPerLanguage: 0.25,
+  /** How hard a called student wants to come to their lesson. */
+  pull: 48,
 };
 
 export const PATRON = {

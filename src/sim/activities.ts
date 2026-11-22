@@ -1,7 +1,8 @@
 import { addMoodlet, dropCarried, log, moveTo, settle } from './actions';
 import { isWorkVerb, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
 import { carrierText } from './carriers';
-import { giveCarrier, runScroll, scrollLineDone, scrollLineFailed } from './scrolls';
+import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed } from './scrolls';
+import { addConfusion, knows, readOrder } from './drift';
 import { rand, randInt } from './rng';
 import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_OF_VERB, skillLevel } from './skills';
 import { ECONOMY, MOOD, NEEDS, POPULATION, SKILLS, TOWER, WORK } from './tuning';
@@ -12,7 +13,7 @@ import { activeProject, buildSpot, placeMaterial } from './tower';
 export type Result = 'running' | 'done' | 'failed';
 
 export function startActivity(w: Worker, kind: ActivityKind): void {
-  w.activity = { kind, stage: 0, timer: 0, target: null, ref: null };
+  w.activity = { kind, stage: 0, timer: 0, target: null, ref: null, read: null };
 }
 
 export function runActivity(s: SimState, w: Worker): Result {
@@ -33,6 +34,8 @@ export function runActivity(s: SimState, w: Worker): Result {
       return tavern(s, w);
     case 'scroll':
       return runScroll(s, w);
+    case 'lesson':
+      return attendLesson(s, w);
     case 'job':
       return job(s, w);
   }
@@ -175,6 +178,8 @@ export function eligibleNotices(s: SimState, w: Worker) {
     (n) =>
       n.remaining > 0 &&
       (n.addressee === null || n.addressee === w.id) &&
+      // they can't take what they can't read, unless their name is on it
+      (n.addressee === w.id || knows(w, n.order[0])) &&
       !w.avoid.some((av) => av.noticeId === n.id && av.until > s.tick) &&
       !nothingToHaul(s, n),
   );
@@ -228,7 +233,9 @@ function readBoard(s: SimState, w: Worker): Result {
 export type BoardItem = { kind: 'notice'; n: Notice } | { kind: 'scroll'; c: Carrier };
 
 export function eligibleScrolls(s: SimState, w: Worker): Carrier[] {
-  return s.boardScrolls.filter((c) => c.dest.kind === 'board' && (c.dest.addressee === null || c.dest.addressee === w.id));
+  return s.boardScrolls.filter(
+    (c) => c.dest.kind === 'board' && (c.dest.addressee === w.id || (c.dest.addressee === null && knows(w, c.orders[0][0]))),
+  );
 }
 
 /** Everything on the board this worker could take, notices and scrolls alike. */
@@ -300,7 +307,16 @@ function job(s: SimState, w: Worker): Result {
  * whichever it came from.
  */
 export function workOrder(s: SimState, w: Worker, order: Order): Result {
-  const { verb, noun, from, to } = parseOrder(order);
+  // read it once, through the worker's own vocabulary, at the start of the job
+  const a = w.activity;
+  if (!a.read) {
+    const reading = readOrder(s, w, order);
+    addConfusion(w, reading);
+    if (!reading.order) return failWork(s, w, `Can't read this: «${orderText(order)}».`);
+    if (reading.guesses > 0 && orderText(reading.order) !== orderText(order)) log(s, `${w.name} read «${orderText(order)}» as "${orderText(reading.order)}".`, w.id);
+    a.read = reading.order;
+  }
+  const { verb, noun, from, to } = parseOrder(a.read);
   const prod = PRODUCE[verb];
   if (prod) return produceJob(s, w, verb as WorkVerb, prod.site, prod.ticks, prod.doing, nounItem(noun as Noun));
   if (verb === 'HAUL') {

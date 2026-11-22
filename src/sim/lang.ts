@@ -1,26 +1,53 @@
 // Order vocabulary. An order is a sequence of tokens; each token is one word
-// in one language. P0 starts with English only, but every order already
-// records the language of each word so drift can slot in later.
+// in one language. There's no grammar: a sentence is just its words in
+// order, so every word translates on its own.
+//
+// English is the common tongue everyone starts with. French and Greek drift
+// in as the tower rises: French is one a casual player may half know, Greek
+// is a different script, so you can see at a glance that a word is foreign.
 
-export type LangId = 'en';
+export type LangId = 'en' | 'fr' | 'el';
+
+export interface LangInfo {
+  id: LangId;
+  name: string;
+  /** Workers can only drift into a language once the tower is this tall. */
+  fromFloor: number;
+}
+
+export const LANGS: readonly LangInfo[] = [
+  { id: 'en', name: 'English', fromFloor: Infinity },
+  { id: 'fr', name: 'French', fromFloor: 2 },
+  { id: 'el', name: 'Greek', fromFloor: 5 },
+];
+
+export function langName(id: LangId): string {
+  return LANGS.find((l) => l.id === id)!.name;
+}
 
 /** Verbs that produce or move goods. These can go on board notices. */
 export type WorkVerb = 'MINE' | 'CHOP' | 'HARVEST' | 'COOK' | 'HAUL' | 'BUILD';
-/** Verbs that control a scroll or move orders around. Scrolls only. */
-export type FlowVerb = 'WRITE' | 'DELIVER' | 'REPEAT' | 'CHECK';
+/** Verbs that control a scroll, move orders around, or teach. Scrolls only. */
+export type FlowVerb = 'WRITE' | 'DELIVER' | 'REPEAT' | 'CHECK' | 'TEACH' | 'LEARN';
 export type Verb = WorkVerb | FlowVerb;
 export type Noun = 'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BOARD' | 'TOWER';
 /** Little words that introduce details: where from, where to. */
 export type Prep = 'FROM' | 'TO';
 /** Places. FLOOR carries its number on the token. */
 export type PlaceWord = 'BASE' | 'FLOOR';
-export type TokenId = Verb | Noun | Prep | PlaceWord;
+/** Words workers think and say, so you can read what they want. */
+export type SayWord = 'WANT' | 'WATER' | 'SLEEP' | 'HOME' | 'GOLD' | 'WHAT';
+/** A worker's name. Names never drift and everyone recognizes their own. */
+export type NameWord = 'WHO';
+export type TokenId = Verb | Noun | Prep | PlaceWord | SayWord | NameWord;
 
 export interface Token {
   t: TokenId;
   lang: LangId;
-  /** A number carried by the word, e.g. which floor. */
+  /** A number carried by the word: which floor, or which worker (for WHO). */
   n?: number;
+  /** For WHO: the name, written as is in every language. */
+  name?: string;
 }
 
 export type Order = Token[];
@@ -28,34 +55,49 @@ export type Order = Token[];
 export const VERBS: readonly WorkVerb[] = ['MINE', 'CHOP', 'HARVEST', 'COOK', 'HAUL', 'BUILD'];
 export const NOUNS: readonly Noun[] = ['STONE', 'WOOD', 'GRAIN', 'BREAD'];
 
-const WORDS: Record<LangId, Record<TokenId, string>> = {
+/** Every word that can drift (everything except names). */
+export const DRIFTABLE: readonly Exclude<TokenId, NameWord>[] = [
+  'MINE', 'CHOP', 'HARVEST', 'COOK', 'HAUL', 'BUILD',
+  'WRITE', 'DELIVER', 'REPEAT', 'CHECK', 'TEACH', 'LEARN',
+  'STONE', 'WOOD', 'GRAIN', 'BREAD', 'BOARD', 'TOWER',
+  'FROM', 'TO', 'BASE', 'FLOOR',
+  'WANT', 'WATER', 'SLEEP', 'HOME', 'GOLD', 'WHAT',
+];
+
+const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
   en: {
-    MINE: 'mine',
-    CHOP: 'chop',
-    HARVEST: 'harvest',
-    COOK: 'cook',
-    HAUL: 'haul',
-    BUILD: 'build',
-    WRITE: 'write',
-    DELIVER: 'deliver',
-    REPEAT: 'repeat',
-    CHECK: 'check',
-    STONE: 'stone',
-    WOOD: 'wood',
-    GRAIN: 'grain',
-    BREAD: 'bread',
-    BOARD: 'board',
-    TOWER: 'tower',
-    FROM: 'from',
-    TO: 'to',
-    BASE: 'base',
-    FLOOR: 'floor',
+    MINE: 'mine', CHOP: 'chop', HARVEST: 'harvest', COOK: 'cook', HAUL: 'haul', BUILD: 'build',
+    WRITE: 'write', DELIVER: 'deliver', REPEAT: 'repeat', CHECK: 'check', TEACH: 'teach', LEARN: 'learn from',
+    STONE: 'stone', WOOD: 'wood', GRAIN: 'grain', BREAD: 'bread', BOARD: 'board', TOWER: 'tower',
+    FROM: 'from', TO: 'to', BASE: 'base', FLOOR: 'floor',
+    WANT: 'want', WATER: 'water', SLEEP: 'sleep', HOME: 'home', GOLD: 'gold', WHAT: 'what?',
+  },
+  fr: {
+    MINE: 'creuser', CHOP: 'couper', HARVEST: 'récolter', COOK: 'cuire', HAUL: 'porter', BUILD: 'bâtir',
+    WRITE: 'écrire', DELIVER: 'livrer', REPEAT: 'répéter', CHECK: 'voir', TEACH: 'enseigner', LEARN: 'apprendre de',
+    STONE: 'pierre', WOOD: 'bois', GRAIN: 'blé', BREAD: 'pain', BOARD: 'tableau', TOWER: 'tour',
+    FROM: 'de', TO: 'à', BASE: 'base', FLOOR: 'étage',
+    WANT: 'veux', WATER: 'eau', SLEEP: 'dormir', HOME: 'maison', GOLD: 'or', WHAT: 'quoi ?',
+  },
+  el: {
+    MINE: 'σκάψε', CHOP: 'κόψε', HARVEST: 'θέρισε', COOK: 'ψήσε', HAUL: 'κουβάλα', BUILD: 'χτίσε',
+    WRITE: 'γράψε', DELIVER: 'παράδωσε', REPEAT: 'επανάλαβε', CHECK: 'δες', TEACH: 'δίδαξε', LEARN: 'μάθε από',
+    STONE: 'πέτρα', WOOD: 'ξύλο', GRAIN: 'σιτάρι', BREAD: 'ψωμί', BOARD: 'πίνακας', TOWER: 'πύργος',
+    FROM: 'από', TO: 'σε', BASE: 'βάση', FLOOR: 'όροφος',
+    WANT: 'θέλω', WATER: 'νερό', SLEEP: 'ύπνος', HOME: 'σπίτι', GOLD: 'χρυσός', WHAT: 'τι;',
   },
 };
 
+/** A word as written in its own language. Numbers and names are the same everywhere. */
 export function word(tok: Token): string {
+  if (tok.t === 'WHO') return tok.name ?? '?';
   const w = WORDS[tok.lang][tok.t];
   return tok.n !== undefined ? `${w} ${tok.n}` : w;
+}
+
+/** The same word in another language (for glosses). */
+export function wordIn(t: TokenId, lang: LangId, n?: number): string {
+  return word({ t, lang, n });
 }
 
 /** A place, as a level: 0 is the base (on the ground), n is floor n. */
@@ -69,18 +111,20 @@ export function placeName(level: Place): string {
   return level === 0 ? 'the base' : `floor ${level}`;
 }
 
-/** The parts of a work order: verb, object, and optional FROM / TO places. */
+/** The parts of an order: verb, object, a worker named in it, and optional FROM / TO places. */
 export interface ParsedOrder {
   verb: Verb;
   noun: Noun | null;
+  who: number | null;
   from: Place | null;
   to: Place | null;
 }
 
 export function parseOrder(order: Order): ParsedOrder {
-  const out: ParsedOrder = { verb: order[0].t as Verb, noun: null, from: null, to: null };
+  const out: ParsedOrder = { verb: order[0].t as Verb, noun: null, who: null, from: null, to: null };
   let i = 1;
-  if (order[i] && !isPrep(order[i].t)) out.noun = order[i++].t as Noun;
+  if (order[i]?.t === 'WHO') out.who = order[i++].n ?? null;
+  else if (order[i] && !isPrep(order[i].t)) out.noun = order[i++].t as Noun;
   while (i < order.length) {
     const prep = order[i].t;
     const place = order[i + 1];
@@ -93,7 +137,7 @@ export function parseOrder(order: Order): ParsedOrder {
   return out;
 }
 
-function isPrep(t: TokenId): t is Prep {
+export function isPrep(t: TokenId): t is Prep {
   return t === 'FROM' || t === 'TO';
 }
 
@@ -101,22 +145,30 @@ export function orderText(order: Order): string {
   return order.map((tok) => word(tok)).join(' ');
 }
 
-export function makeOrder(
-  verb: Verb,
-  noun: Noun | null = null,
-  places: { from?: Place | null; to?: Place | null } = {},
-  lang: LangId = 'en',
-): Order {
+export interface OrderExtras {
+  from?: Place | null;
+  to?: Place | null;
+  /** A worker named in the order (who to teach, who to learn from). */
+  who?: { id: number; name: string } | null;
+}
+
+export function makeOrder(verb: Verb, noun: Noun | null = null, extras: OrderExtras = {}, lang: LangId = 'en'): Order {
   const o: Order = [{ t: verb, lang }];
+  if (extras.who) o.push({ t: 'WHO', lang, n: extras.who.id, name: extras.who.name });
   if (noun) o.push({ t: noun, lang });
-  if (places.from !== undefined && places.from !== null) o.push({ t: 'FROM', lang }, ...placeTokens(places.from, lang));
-  if (places.to !== undefined && places.to !== null) o.push({ t: 'TO', lang }, ...placeTokens(places.to, lang));
+  if (extras.from !== undefined && extras.from !== null) o.push({ t: 'FROM', lang }, ...placeTokens(extras.from, lang));
+  if (extras.to !== undefined && extras.to !== null) o.push({ t: 'TO', lang }, ...placeTokens(extras.to, lang));
   return o;
 }
 
 /** Only hauling takes places (FROM a stockpile, TO a stockpile) in P0. */
 export function takesPlaces(verb: Verb): boolean {
   return verb === 'HAUL';
+}
+
+/** Teaching and learning name a worker. */
+export function takesWho(verb: Verb): boolean {
+  return verb === 'TEACH' || verb === 'LEARN';
 }
 
 export function isWorkVerb(v: TokenId): v is WorkVerb {
@@ -147,6 +199,8 @@ export const SCROLL_LINES: readonly LineOption[] = [
   ...VERBS.flatMap((v) => VALID_JOBS[v].map((n) => ({ verb: v as Verb, noun: n as Noun | null }))),
   { verb: 'WRITE', noun: null },
   { verb: 'DELIVER', noun: null },
+  { verb: 'TEACH', noun: null },
+  { verb: 'LEARN', noun: null },
   { verb: 'CHECK', noun: 'BOARD' },
   { verb: 'REPEAT', noun: null },
 ];

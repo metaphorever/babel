@@ -1,4 +1,4 @@
-import type { Order } from './lang';
+import type { LangId, Order, TokenId } from './lang';
 import type { RngState } from './rng';
 
 // Everything in SimState must be plain JSON (no Maps, Sets, classes or
@@ -179,6 +179,7 @@ export type ActivityKind =
   | 'readBoard'
   | 'job'
   | 'scroll'
+  | 'lesson'
   | 'tavern';
 
 export interface Activity {
@@ -186,6 +187,8 @@ export interface Activity {
   stage: number;
   timer: number;
   target: Pt | null;
+  /** The order as this worker read it (after any guessing), fixed for the rest of the job. */
+  read: Order | null;
   /** Item id or site id, depending on the activity. */
   ref: number | null;
 }
@@ -231,6 +234,14 @@ export interface Worker {
   held: Carrier[];
   /** Written carriers this worker is carrying to deliver to someone else. */
   bag: Carrier[];
+  /** Words this worker knows, per language. Drift moves words from one language to another. */
+  vocab: Partial<Record<LangId, TokenId[]>>;
+  /** Build-up from time spent high in the tower. When it fills, a word drifts. Hidden from the player. */
+  exposure: number;
+  /** The language this worker's words drift into, chosen the first time they drift. */
+  driftTongue: LangId | null;
+  /** 0..100: how badly they understand the orders they're carrying. */
+  confusion: number;
   /** Notices this worker recently failed at and won't pick again for a while. */
   avoid: { noticeId: number; until: number }[];
 
@@ -251,7 +262,7 @@ export interface GameEvent {
 }
 
 export interface SimState {
-  version: 4;
+  version: 5;
   seed: number;
   tick: number;
   rng: RngState;
@@ -270,6 +281,8 @@ export interface SimState {
   boardScrolls: Carrier[];
   /** Written carriers left at the scriptorium for the next courier. */
   outbox: Carrier[];
+  /** Words the player can write, per language. Grows through translation. */
+  lexicon: Partial<Record<LangId, TokenId[]>>;
   /** Floors being built, lowest first. */
   projects: Project[];
   /** Highest finished floor (0 = just the ground). */

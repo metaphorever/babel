@@ -1,9 +1,10 @@
 import { addMoodlet, log, moveTo, releaseReservations } from './actions';
 import { startActivity, train, workOrder, type Result } from './activities';
-import { carrierText, hasWriteLine, lineText, pinCarrier } from './carriers';
-import { type Verb } from './lang';
+import { carrierText, hasWriteLine, lineText, pinCarrier, writingCost } from './carriers';
+import { addConfusion, knows, knowsWord } from './drift';
+import { DRIFTABLE, LANGS, isWorkVerb, langName, orderText, parseOrder, word, type LangId, type TokenId, type Verb } from './lang';
 import { skillLevel } from './skills';
-import { MOOD, SCRIBE } from './tuning';
+import { LESSON, MOOD, SCRIBE } from './tuning';
 import { startFloorFromBlueprint, topSpot } from './tower';
 import type { Carrier, SimState, Worker } from './types';
 import { siteOf, spotFor } from './world';
@@ -48,6 +49,11 @@ export function runScroll(s: SimState, w: Worker): Result {
   if (c.pc >= c.orders.length) return endCarrier(s, w, c);
   const line = c.orders[c.pc];
   const verb = line[0].t as Verb;
+  // a line they can't read is skipped; work lines are read word by word in workOrder
+  if (!isWorkVerb(verb) && !knows(w, line[0])) {
+    addConfusion(w, { order: null, guesses: 0 });
+    return scrollLineFailed(s, w, `Can't read this line: «${orderText(line)}».`);
+  }
   switch (verb) {
     case 'REPEAT':
       // a scroll that is only REPEAT would spin forever
@@ -67,6 +73,9 @@ export function runScroll(s: SimState, w: Worker): Result {
       return writeLine(s, w);
     case 'DELIVER':
       return deliverLine(s, w);
+    case 'TEACH':
+    case 'LEARN':
+      return lessonLine(s, w, c, verb);
     default:
       return workOrder(s, w, line);
   }
@@ -160,7 +169,8 @@ function writeLine(s: SimState, w: Worker): Result {
     d.claimedBy = w.id;
   }
   w.thought = `Writing: ${carrierText(d.carrier)}.`;
-  d.progress += writeSpeed(w);
+  // words the scribe doesn't know have to be spelled out for them: much slower
+  d.progress += writeSpeed(w) * (writingCost(d.carrier) / writingCostFor(d.carrier, w));
   if (d.progress < d.cost) return 'running';
   s.designs = s.designs.filter((x) => x !== d);
   // a scribe who also delivers keeps it in their bag; a pure writer leaves it in the outbox
@@ -248,4 +258,107 @@ function deliverLine(s: SimState, w: Worker): Result {
   giveCarrier(s, to, c);
   // handing yourself a new order replaces this very scroll
   return to === w ? 'done' : 'running';
+}
+
+// --------------------------------------------------------- TEACH and LEARN
+
+/** A scribe's cost to write this, given which words they know. */
+export function writingCostFor(c: Carrier, w: Worker): number {
+  if (c.kind === 'blueprint') return writingCost(c);
+  let cost = SCRIBE.baseCost;
+  for (const o of c.orders) for (const tok of o) cost += SCRIBE.perToken * (knows(w, tok) ? 1 : SCRIBE.unknownWordMult);
+  return cost;
+}
+
+/** Languages a worker knows well enough (5+ words) to help them teach. */
+function languagesKnown(w: Worker): number {
+  return LANGS.filter((l) => (w.vocab[l.id]?.length ?? 0) >= 5).length;
+}
+
+/** The next word one worker could pass to another, common tongue first. */
+function nextWord(from: Worker, to: Worker, onlyForeign: boolean): { t: TokenId; lang: LangId } | null {
+  for (const l of LANGS) {
+    if (onlyForeign && l.id === 'en') continue;
+    for (const t of DRIFTABLE) if (knowsWord(from, t, l.id) && !knowsWord(to, t, l.id)) return { t, lang: l.id };
+  }
+  return null;
+}
+
+/** The translator running a TEACH or LEARN line that names this worker, if any. */
+export function lessonFor(s: SimState, student: Worker): Worker | null {
+  for (const t of s.workers) {
+    if (t === student || t.activity.kind !== 'scroll' || t.activity.stage < 1) continue;
+    const c = t.held[0];
+    const line = c?.orders[c.pc];
+    if (!line || (line[0].t !== 'TEACH' && line[0].t !== 'LEARN')) continue;
+    if (parseOrder(line).who === student.id) return t;
+  }
+  return null;
+}
+
+function close(a: Worker, b: Worker): boolean {
+  return a.y === b.y && Math.abs(a.x - b.x) <= 2;
+}
+
+/**
+ * Translation happens at the scriptorium, on the ground. The translator
+ * calls the student by name (anyone on the ground hears their name) and
+ * they sit together, one word at a time.
+ *
+ * TEACH passes the translator's words to the student, common tongue first:
+ * that's how you bring a drifted worker back. LEARN goes the other way: the
+ * translator picks up the student's foreign words, and every word they learn
+ * is one you can now write in that language.
+ */
+function lessonLine(s: SimState, w: Worker, c: Carrier, verb: 'TEACH' | 'LEARN'): Result {
+  const a = w.activity;
+  const who = parseOrder(c.orders[c.pc]).who;
+  const student = s.workers.find((x) => x.id === who);
+  if (!student || student === w) return scrollLineFailed(s, w, 'Who am I meant to be teaching?');
+  if (a.stage === 0) {
+    w.thought = 'Off to the scriptorium for a lesson.';
+    const m = moveTo(s, w, spotFor(siteOf(s, 'scriptorium'), w.id));
+    if (m === 'moving') return 'running';
+    if (m === 'unreachable') return scrollLineFailed(s, w, "Can't reach the scriptorium.");
+    a.stage = 1;
+    a.timer = 0;
+    a.ref = 0;
+  }
+  const done = a.ref ?? 0;
+  const pair = verb === 'TEACH' ? nextWord(w, student, false) : nextWord(student, w, true);
+  if (!pair || done >= c.counts[c.pc]) {
+    w.thought = done > 0 ? `Lesson done: ${done} ${done === 1 ? 'word' : 'words'}.` : `Nothing to ${verb === 'TEACH' ? 'teach' : 'learn from'} ${student.name}.`;
+    return scrollLineDone(s, w, done, true);
+  }
+  if (!close(w, student)) {
+    w.thought = `Calling for ${student.name}.`;
+    return 'running';
+  }
+  w.thought = verb === 'TEACH' ? `Teaching ${student.name}.` : `Learning from ${student.name}.`;
+  a.timer += 1 + languagesKnown(w) * LESSON.speedPerLanguage;
+  if (a.timer < LESSON.perWord) return 'running';
+  a.timer -= LESSON.perWord;
+  a.ref = done + 1;
+  if (verb === 'TEACH') {
+    student.vocab[pair.lang] = [...(student.vocab[pair.lang] ?? []), pair.t];
+    log(s, `${w.name} taught ${student.name} «${word({ t: pair.t, lang: pair.lang })}».`, w.id);
+  } else {
+    w.vocab[pair.lang] = [...(w.vocab[pair.lang] ?? []), pair.t];
+    const lex = s.lexicon[pair.lang] ?? [];
+    if (!lex.includes(pair.t)) {
+      s.lexicon[pair.lang] = [...lex, pair.t];
+      log(s, `${w.name} learned «${word({ t: pair.t, lang: pair.lang })}» (${word({ t: pair.t, lang: 'en' })}) from ${student.name}. You can now write it in ${langName(pair.lang)}.`, w.id);
+    }
+  }
+  return 'running';
+}
+
+/** The student's side: come to the scriptorium and sit with the translator while called. */
+export function attendLesson(s: SimState, w: Worker): Result {
+  const teacher = lessonFor(s, w);
+  if (!teacher) return 'done';
+  w.thought = `${teacher.name} is calling me.`;
+  if (close(w, teacher)) return 'running';
+  const m = moveTo(s, w, { x: teacher.x + (teacher.x > 0 ? -1 : 1), y: teacher.y });
+  return m === 'unreachable' ? 'failed' : 'running';
 }

@@ -1,7 +1,9 @@
 import { releaseReservations } from './actions';
 import { boardOptions, runActivity, startActivity } from './activities';
 import { rand } from './rng';
-import { AI, ECONOMY, MOOD, NEEDS, SCRIBE } from './tuning';
+import { AI, CONFUSION, ECONOMY, LESSON, MOOD, NEEDS, SCRIBE } from './tuning';
+import { levelOfRow, updateDrift } from './drift';
+import { lessonFor } from './scrolls';
 import type { ActivityKind, Score, SimState, Worker } from './types';
 import { siteOf } from './world';
 
@@ -61,6 +63,9 @@ export function scoreOptions(s: SimState, w: Worker, inProgress: boolean): Score
     }
   }
 
+  // a translator on the ground is calling this worker's name
+  if (levelOfRow(w.y) === 0 && lessonFor(s, w)) add('lesson', 'Answer the call to a lesson', LESSON.pull);
+
   if (w.purse >= ECONOMY.tavernCost) {
     const gold = Math.min(AI.tavernCap, w.purse * AI.tavernPerGold * w.p.spend);
     const blues = Math.max(0, 60 - w.mood) * AI.tavernMoodWeight;
@@ -107,12 +112,14 @@ export function updateNeeds(s: SimState, w: Worker): void {
   if (w.hunger > 70) target -= MOOD.hungryPenalty;
   if (w.thirst > 70) target -= MOOD.thirstyPenalty;
   if (w.fatigue > 70) target -= MOOD.tiredPenalty;
+  if (w.confusion > CONFUSION.moodAbove) target -= CONFUSION.moodPenalty;
   target = Math.max(0, Math.min(100, target));
   w.mood += (target - w.mood) * MOOD.smoothing;
 }
 
 export function updateWorker(s: SimState, w: Worker): void {
   updateNeeds(s, w);
+  updateDrift(s, w);
   if (s.tick >= w.nextThink) think(s, w, true);
   const r = runActivity(s, w);
   if (r !== 'running') {

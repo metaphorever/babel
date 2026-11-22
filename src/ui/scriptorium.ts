@@ -5,7 +5,13 @@ import {
   SCROLL_LINES,
   VALID_JOBS,
   isWorkVerb,
+  LANGS,
+  langName,
   takesPlaces,
+  takesWho,
+  wordIn,
+  type LangId,
+  type TokenId,
   type Dest,
   type Noun,
   type Sim,
@@ -25,6 +31,8 @@ interface DraftLine {
   /** Hauling only: from a stockpile (null = whatever's lying around) and to one (base by default). */
   from: number | null;
   to: number | null;
+  /** Teaching / learning: which worker. */
+  who?: number | null;
   count: number;
 }
 
@@ -43,6 +51,8 @@ const VERB_LABEL: Record<Verb, string> = {
   DELIVER: 'Deliver',
   CHECK: 'Check the board',
   REPEAT: 'Repeat from the top',
+  TEACH: 'Teach',
+  LEARN: 'Learn from',
 };
 
 /** What the second slot holds for each verb. Places (from/to) come with the tower. */
@@ -55,10 +65,13 @@ function nounsFor(verb: Verb): readonly Noun[] {
 const COUNT_HINT: Partial<Record<Verb, string>> = {
   WRITE: 'designs',
   BUILD: 'materials',
+  TEACH: 'words',
+  LEARN: 'words',
   DELIVER: '',
 };
 
 function hasCount(verb: Verb): boolean {
+  if (verb === 'TEACH' || verb === 'LEARN') return true;
   return verb !== 'REPEAT' && verb !== 'CHECK' && verb !== 'DELIVER';
 }
 
@@ -125,6 +138,9 @@ export class ScriptoriumPanel {
   private error: HTMLElement;
   private whoCount = -1;
   private bpError = h('span', { class: 'error', role: 'alert' });
+  private langSel = h('select', { 'aria-label': 'Written in' });
+  private preview = h('div', { class: 'compose-preview' });
+  private lexSeen = -1;
 
   constructor(
     private wm: WindowManager,
@@ -164,12 +180,46 @@ export class ScriptoriumPanel {
       h('div', { class: 'section-label' }, 'Compose'),
       presets,
       this.linesEl,
+      h('div', { class: 'row' }, h('label', {}, 'Written in', this.langSel)),
+      this.preview,
       h('div', { class: 'row' }, this.howSel, this.whoSel, h('label', {}, 'Wage', this.wageIn, 'g per unit')),
       this.summary,
       h('div', { class: 'row row-end' }, this.error, h('button', { class: 'btn btn-default', onclick: () => this.send() }, 'Send to scribe')),
     );
+    this.langSel.addEventListener('change', () => this.renderLines());
     this.syncWho();
+    this.syncLangs();
     this.renderLines();
+  }
+
+  private get lang(): LangId {
+    return (this.langSel.value || 'en') as LangId;
+  }
+
+  /** Can the player write this word in the chosen language yet? */
+  private canWrite(t: TokenId): boolean {
+    return this.s.lexicon[this.lang]?.includes(t) ?? false;
+  }
+
+  /** A slot label: the English meaning, plus the word itself when writing in another language. */
+  private label(english: string, t: TokenId): string {
+    if (this.lang === 'en') return english;
+    return this.canWrite(t) ? `${english} · ${wordIn(t, this.lang)}` : `${english} (can't write yet)`;
+  }
+
+  /** Offer every language you can write at least one word in. */
+  private syncLangs(): void {
+    const total = LANGS.reduce((n, l) => n + (this.s.lexicon[l.id]?.length ?? 0), 0);
+    if (total === this.lexSeen) return;
+    this.lexSeen = total;
+    const keep = this.langSel.value || 'en';
+    clear(this.langSel);
+    for (const l of LANGS) {
+      const n = this.s.lexicon[l.id]?.length ?? 0;
+      if (n > 0) this.langSel.append(h('option', { value: l.id }, l.id === 'en' ? l.name : `${l.name} (${n} words)`));
+    }
+    this.langSel.value = keep;
+    if (this.langSel.selectedIndex < 0) this.langSel.selectedIndex = 0;
   }
 
   private get s(): SimState {
@@ -204,7 +254,7 @@ export class ScriptoriumPanel {
     clear(this.linesEl);
     this.lines.forEach((line, i) => {
       const verbSel = h('select', { 'aria-label': `Line ${i + 1} verb` });
-      for (const v of VERB_ORDER) verbSel.append(h('option', { value: v }, VERB_LABEL[v]));
+      for (const v of VERB_ORDER) verbSel.append(h('option', { value: v, disabled: !this.canWrite(v) && v !== line.verb }, this.label(VERB_LABEL[v], v)));
       verbSel.value = line.verb;
       verbSel.addEventListener('change', () => {
         line.verb = verbSel.value as Verb;
@@ -217,7 +267,7 @@ export class ScriptoriumPanel {
       let nounEl: HTMLElement = h('span', { class: 'slot-empty' });
       if (nouns.length > 1) {
         const nounSel = h('select', { 'aria-label': `Line ${i + 1} what` });
-        for (const n of nouns) nounSel.append(h('option', { value: n }, n.toLowerCase()));
+        for (const n of nouns) nounSel.append(h('option', { value: n, disabled: !this.canWrite(n) && n !== line.noun }, this.label(n.toLowerCase(), n)));
         nounSel.value = line.noun ?? nouns[0];
         nounSel.addEventListener('change', () => ((line.noun = nounSel.value as Noun), this.updateSummary()));
         nounEl = nounSel;
@@ -225,6 +275,14 @@ export class ScriptoriumPanel {
         nounEl = h('span', { class: 'slot-fixed' }, nouns[0].toLowerCase());
       }
       const placeEls: HTMLElement[] = [];
+      if (takesWho(line.verb)) {
+        const whoSel = h('select', { 'aria-label': `Line ${i + 1} who` });
+        for (const w of this.s.workers) whoSel.append(h('option', { value: String(w.id) }, w.name));
+        if (line.who === undefined || line.who === null) line.who = this.s.workers[0]?.id ?? null;
+        whoSel.value = String(line.who);
+        whoSel.addEventListener('change', () => ((line.who = Number(whoSel.value)), this.updateSummary()));
+        placeEls.push(whoSel);
+      }
       if (takesPlaces(line.verb)) {
         const floors = this.s.floors;
         const fromSel = h('select', { 'aria-label': `Line ${i + 1} from` }, h('option', { value: '' }, 'lying around'));
@@ -303,14 +361,36 @@ export class ScriptoriumPanel {
       text = 'A blueprint, carried to the top of the tower.';
     }
     if (!notice && wage > 0) text += ` Paid from the treasury as the work is done.`;
+    if (this.lines.some((l) => takesWho(l.verb))) text += ' Lessons happen at the scriptorium: the student has to be on the ground to hear their name.';
+    if (this.lang !== 'en') text += ` Written in ${langName(this.lang)}: only workers who know these words can read it.`;
     this.summary.textContent = text;
+    // how it will actually read, word for word, in the chosen language
+    const nameOf = (id: number | null | undefined) => this.s.workers.find((w) => w.id === id)?.name ?? '?';
+    const lineWords = this.lines.map((l) => {
+      const words = [wordIn(l.verb, this.lang)];
+      if (takesWho(l.verb)) words.push(nameOf(l.who));
+      if (l.noun && l.verb !== 'CHECK') words.push(wordIn(l.noun, this.lang));
+      if (l.verb === 'CHECK') words.push(wordIn('BOARD', this.lang));
+      if (takesPlaces(l.verb) && l.from !== null) words.push(wordIn('FROM', this.lang), l.from === 0 ? wordIn('BASE', this.lang) : wordIn('FLOOR', this.lang, l.from));
+      if (takesPlaces(l.verb) && ((l.to ?? 0) !== 0 || l.from !== null)) words.push(wordIn('TO', this.lang), (l.to ?? 0) === 0 ? wordIn('BASE', this.lang) : wordIn('FLOOR', this.lang, l.to ?? 0));
+      return words.join(' ') + (hasCount(l.verb) && l.count > 1 ? ` ×${l.count}` : '');
+    });
+    this.preview.textContent = `«${lineWords.join(' → ')}»`;
   }
 
   private send(): void {
     const r = this.sim.enqueue({
       type: 'compose',
       playerId: 0,
-      lines: this.lines.map((l) => ({ verb: l.verb, noun: l.noun, from: takesPlaces(l.verb) ? l.from : null, to: takesPlaces(l.verb) && (l.from !== null || (l.to ?? 0) !== 0) ? l.to ?? 0 : null, count: l.count })),
+      lines: this.lines.map((l) => ({
+        verb: l.verb,
+        noun: l.noun,
+        who: takesWho(l.verb) ? l.who ?? null : null,
+        from: takesPlaces(l.verb) ? l.from : null,
+        to: takesPlaces(l.verb) && (l.from !== null || (l.to ?? 0) !== 0) ? l.to ?? 0 : null,
+        count: l.count,
+      })),
+      lang: this.lang,
       wage: Math.floor(Number(this.wageIn.value)),
       dest: this.dest(),
     });
@@ -321,6 +401,10 @@ export class ScriptoriumPanel {
 
   refresh(): void {
     this.syncWho();
+    if (this.lexSeen !== LANGS.reduce((n, l) => n + (this.s.lexicon[l.id]?.length ?? 0), 0)) {
+      this.syncLangs();
+      this.renderLines();
+    }
     if (this.floorsSeen !== this.s.floors) {
       this.floorsSeen = this.s.floors;
       this.renderLines();

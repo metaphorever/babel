@@ -8,12 +8,14 @@ import { applyCommand } from '../src/sim/commands';
 import { levelOf } from '../src/sim/skills';
 import { newCarrier, pinNotice } from '../src/sim/carriers';
 import type { Command } from '../src/sim/commands';
-import { giveCarrier } from '../src/sim/scrolls';
+import { giveCarrier, writingCostFor } from '../src/sim/scrolls';
+import { addConfusion, allWords, readOrder, updateDrift } from '../src/sim/drift';
+import { eligibleNotices } from '../src/sim/activities';
 import { makeOrder, orderText, parseOrder, type Noun, type Verb, type WorkVerb } from '../src/sim/lang';
 import { deckRow, newProject, placeMaterial } from '../src/sim/tower';
 
 import type { Dest } from '../src/sim/types';
-import { SKILLS, TOWER } from '../src/sim/tuning';
+import { SKILLS, TOWER, WORLD } from '../src/sim/tuning';
 
 type State = ReturnType<typeof createState>;
 
@@ -406,7 +408,7 @@ describe('the tower', () => {
   it('orders with places read back the way they were written', () => {
     const o = makeOrder('HAUL', 'STONE', { from: 0, to: 3 });
     expect(orderText(o)).toBe('haul stone from base to floor 3');
-    expect(parseOrder(o)).toEqual({ verb: 'HAUL', noun: 'STONE', from: 0, to: 3 });
+    expect(parseOrder(o)).toEqual({ verb: 'HAUL', noun: 'STONE', who: null, from: 0, to: 3 });
   });
 
   it('only hauling takes places', () => {
@@ -418,4 +420,95 @@ describe('the tower', () => {
 
 function scrollCmdPlaces(verb: Verb, noun: Noun, from: number, to: number, count: number, workerId: number): Command {
   return { type: 'compose', playerId: 0, lines: [{ verb, noun, from, to, count }], wage: 0, dest: { kind: 'worker', workerId } };
+}
+
+describe('language drift', () => {
+  /** Put a worker on a floor and keep them there (needs off) until a condition holds. */
+  function strand(s: State, w: (typeof s.workers)[number], level: number) {
+    w.x = TOWER.x0 + 5;
+    w.y = WORLD.groundRow - 1 - level * TOWER.floorHeight;
+    w.hunger = w.thirst = w.fatigue = 0;
+  }
+
+  it('nobody drifts until the tower is tall enough to open a language', () => {
+    const s = createState(3);
+    const w = s.workers[2];
+    strand(s, w, 3);
+    for (let i = 0; i < 5000; i++) updateDrift(s, w);
+    expect(w.driftTongue).toBeNull();
+    expect(w.vocab.en!.length).toBe(allWords().length);
+  });
+
+  it('high up, words drift one at a time into a fixed tongue from the open pool', () => {
+    const s = createState(3);
+    s.floors = 3; // French is open, Greek isn't yet
+    const w = s.workers[2];
+    strand(s, w, 3);
+    for (let i = 0; i < 5000; i++) updateDrift(s, w);
+    expect(w.driftTongue).toBe('fr');
+    const moved = w.vocab.fr!.length;
+    expect(moved).toBeGreaterThan(1);
+    expect(w.vocab.en!.length + moved).toBe(allWords().length); // nothing lost, just moved
+  });
+
+  it('a worker can’t take a notice they can’t read, unless it has their name', () => {
+    const s = createState(3);
+    const w = s.workers[2];
+    w.vocab.en = w.vocab.en!.filter((t) => t !== 'CHOP');
+    post(s, 'CHOP', 'WOOD', 10, 50);
+    expect(eligibleNotices(s, w).some((n) => n.order[0].t === 'CHOP')).toBe(false);
+    post(s, 'CHOP', 'WOOD', 10, 1, w.id);
+    expect(eligibleNotices(s, w).some((n) => n.addressee === w.id)).toBe(true);
+  });
+
+  it('an unknown object gets a guess, and guessing is confusing', () => {
+    const s = createState(3);
+    const w = s.workers[2];
+    w.vocab.en = w.vocab.en!.filter((t) => t !== 'STONE');
+    const r = readOrder(s, w, makeOrder('HAUL', 'STONE'));
+    expect(r.order).not.toBeNull();
+    expect(r.guesses).toBe(1);
+    addConfusion(w, r);
+    expect(w.confusion).toBeGreaterThan(0);
+    // an unknown verb can't be read at all
+    w.vocab.en = w.vocab.en!.filter((t) => t !== 'MINE');
+    expect(readOrder(s, w, makeOrder('MINE', 'STONE')).order).toBeNull();
+  });
+
+  it('LEARN teaches you to write a word; TEACH gives a drifted worker their words back', () => {
+    const s = createState(3);
+    const translator = s.workers[1];
+    const student = s.workers[4];
+    // the student lost "stone" to French
+    student.vocab.en = student.vocab.en!.filter((t) => t !== 'STONE');
+    student.vocab.fr = ['STONE'];
+    student.driftTongue = 'fr';
+    applyCommand(s, scrollLearn('LEARN', student.id, translator.id));
+    expect(runUntil(s, () => (s.lexicon.fr ?? []).includes('STONE'), 20 * 400)).toBe(true);
+    applyCommand(s, scrollLearn('TEACH', student.id, translator.id));
+    expect(runUntil(s, () => student.vocab.en!.includes('STONE'), 20 * 400)).toBe(true);
+  });
+
+  it('you can only write words you know in a language', () => {
+    const s = createState(3);
+    const bad = applyCommand(s, { type: 'compose', playerId: 0, lines: [{ verb: 'MINE', noun: 'STONE', count: 1 }], wage: 0, dest: { kind: 'board', addressee: null }, lang: 'fr' });
+    expect(bad.ok).toBe(false);
+    s.lexicon.fr = ['MINE', 'STONE'];
+    const good = applyCommand(s, { type: 'compose', playerId: 0, lines: [{ verb: 'MINE', noun: 'STONE', count: 1 }], wage: 0, dest: { kind: 'board', addressee: null }, lang: 'fr' });
+    expect(good.ok).toBe(true);
+    expect(orderText(s.designs[s.designs.length - 1].carrier.orders[0])).toBe('creuser pierre');
+  });
+
+  it('a scribe is much slower at words they don’t know', () => {
+    const s = createState(3);
+    const scribe = s.workers[0];
+    const c = newCarrier(s, [{ order: makeOrder('MINE', 'STONE', {}, 'fr'), count: 1 }], 0, { kind: 'board', addressee: null });
+    const fast = writingCostFor(c, { ...scribe, vocab: { fr: ['MINE', 'STONE'] } });
+    const slow = writingCostFor(c, scribe);
+    expect(slow).toBeGreaterThan(fast * 2);
+  });
+});
+
+function scrollLearn(verb: 'TEACH' | 'LEARN', studentId: number, translatorId: number): Command {
+  return { type: 'compose', playerId: 0, lines: [{ verb, noun: null, who: studentId, count: 3 }], wage: 0, dest: { kind: 'worker', workerId: translatorId } };
 }

@@ -1,6 +1,11 @@
 import {
   availableGold,
   carrierText,
+  langName,
+  sayingFor,
+  speakingLang,
+  vocabSummary,
+  wordIn,
   CHARTER_TEXT,
   lineText,
   workerName,
@@ -20,6 +25,7 @@ import {
 import { bar, clear, h } from './dom';
 import { ScriptoriumPanel } from './scriptorium';
 import { TowerPanel } from './tower';
+import { LanguagesPanel } from './languages';
 import { WindowManager } from './windows';
 
 const DOING: Record<ActivityKind, string> = {
@@ -31,6 +37,7 @@ const DOING: Record<ActivityKind, string> = {
   readBoard: 'Reading the board',
   job: 'Working',
   scroll: 'Following a scroll',
+  lesson: 'At a lesson',
   tavern: 'At the tavern',
 };
 
@@ -66,6 +73,7 @@ export class Ui {
   wm: WindowManager;
   scriptorium!: ScriptoriumPanel;
   tower!: TowerPanel;
+  languages!: LanguagesPanel;
 
   private gold!: HTMLElement;
   private clock!: HTMLElement;
@@ -86,6 +94,7 @@ export class Ui {
     this.buildBoard();
     this.scriptorium = new ScriptoriumPanel(this.wm, this.sim);
     this.tower = new TowerPanel(this.wm, this.sim, (x, y) => this.hooks.centerOnTile(x, y));
+    this.languages = new LanguagesPanel(this.wm, this.sim);
     this.wm.create('inspector', 'Worker', -336, 34, 320);
     this.wm.create('roster', 'Workers', -656, 34, 300);
     this.wm.create('stores', 'Stores', 390, 34, 220);
@@ -122,6 +131,7 @@ export class Ui {
       menu('Job Board', 'board'),
       menu('Scriptorium', 'scriptorium'),
       menu('Tower', 'tower'),
+      menu('Languages', 'languages'),
       menu('Workers', 'roster'),
       menu('Stores', 'stores'),
       menu('Log', 'log'),
@@ -254,7 +264,8 @@ export class Ui {
     });
     win.body.append(
       traits,
-      h('div', { class: 'thought' }, `“${w.thought || '...'}”`),
+      h('div', { class: 'thought', title: 'What you can see them doing. Body language needs no translation.' }, w.thought || '...'),
+      this.saying(w),
       kv('Doing', DOING[w.activity.kind]),
       kv('Current job', currentJob(w)),
       kv('Carrying', `${holding} (holds ${carryCapacity(w)})`),
@@ -267,11 +278,12 @@ export class Ui {
       need('Hunger', w.hunger),
       need('Thirst', w.thirst),
       need('Tiredness', w.fatigue),
+      need('Confusion', w.confusion),
       h('div', { class: 'need' }, h('span', { class: 'k' }, 'Mood'), bar(w.mood), h('span', { class: 'num' }, Math.round(w.mood))),
       w.moodlets.length ? moodlets : h('div', { class: 'hint' }, 'Nothing much on their mind.'),
       h('div', { class: 'section-label' }, 'Skills'),
       skills,
-      h('details', { class: 'debug', open: this.debugOpen, ontoggle: (e) => (this.debugOpen = (e.target as HTMLDetailsElement).open) }, h('summary', {}, 'What they’re weighing (debug)'), scores),
+      h('details', { class: 'debug', open: this.debugOpen, ontoggle: (e) => (this.debugOpen = (e.target as HTMLDetailsElement).open) }, h('summary', {}, 'What they’re weighing (debug)'), scores, h('div', { class: 'hint' }, `Drift exposure ${Math.round(w.exposure)} / 100 (hidden from players)`)),
       h(
         'div',
         { class: 'row row-end' },
@@ -280,6 +292,37 @@ export class Ui {
         h('button', { class: 'btn', onclick: () => this.scriptorium.openFor(w.id, 'hand') }, 'Hand them an order'),
       ),
     );
+  }
+
+  /**
+   * What the worker is saying, word by word, each in whatever language they
+   * know it in. Words you can read in that language get a gloss; the rest
+   * stay as they are. Mixed languages are the first sign of drift.
+   */
+  private saying(w: Worker): HTMLElement {
+    const words = sayingFor(w);
+    const line = h('div', { class: 'saying' }, h('span', { class: 'k' }, 'Says'));
+    if (words.length === 0) {
+      line.append(h('span', { class: 'hint' }, 'nothing much'));
+      return line;
+    }
+    const spoken = h('span', { class: 'spoken' });
+    words.forEach((t, i) => {
+      const lang = speakingLang(w, t);
+      if (i > 0) spoken.append(' ');
+      if (!lang) {
+        spoken.append(h('span', { class: 'word lost', title: 'A word they have lost' }, '…'));
+        return;
+      }
+      const text = wordIn(t, lang);
+      const readable = lang === 'en' || (this.s.lexicon[lang]?.includes(t) ?? false);
+      const el = h('span', { class: `word word-${lang}`, lang, title: readable ? `${langName(lang)}: “${wordIn(t, 'en')}”` : `${langName(lang)}. You haven't learned this word yet.` }, text);
+      if (lang !== 'en' && readable) el.append(h('sub', { class: 'gloss' }, wordIn(t, 'en')));
+      spoken.append(el);
+    });
+    line.append(h('span', {}, '«', spoken, '»'));
+    const langs = vocabSummary(w).map((v) => `${langName(v.lang)} ${v.count}`).join(' · ');
+    return h('div', {}, line, h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Words'), h('span', { class: 'v' }, langs, w.driftTongue ? h('span', { class: 'hint' }, ` (drifting into ${langName(w.driftTongue)})`) : '')));
   }
 
   // ---------------------------------------------------------- other panels
@@ -372,6 +415,7 @@ export class Ui {
     if (this.wm.get('board')!.open) this.refreshBoard();
     if (this.wm.get('scriptorium')!.open) this.scriptorium.refresh();
     if (this.wm.get('tower')!.open) this.tower.refresh();
+    if (this.wm.get('languages')!.open) this.languages.refresh();
     this.refreshInspector();
     this.refreshRoster();
     this.refreshStores();

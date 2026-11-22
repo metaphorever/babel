@@ -1,6 +1,6 @@
 import { log } from './actions';
 import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCarrier, queueDesign } from './carriers';
-import { isValidLine, makeOrder, takesPlaces, type Noun, type Place, type Verb } from './lang';
+import { isValidLine, langName, makeOrder, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
 import { SCRIBE, TOWER } from './tuning';
 import type { Dest, SimState } from './types';
 
@@ -15,6 +15,8 @@ import type { Dest, SimState } from './types';
 export interface ComposeLine {
   verb: Verb;
   noun: Noun | null;
+  /** Who to teach or learn from (TEACH / LEARN only). */
+  who?: number | null;
   /** Where from and where to (hauling only). */
   from?: Place | null;
   to?: Place | null;
@@ -29,6 +31,8 @@ export type Command =
       lines: ComposeLine[];
       wage: number;
       dest: Dest;
+      /** The language it's written in. Only words in your lexicon can be used. */
+      lang?: LangId;
     }
   | { type: 'cancelDesign'; playerId: number; designId: number }
   | { type: 'removeNotice'; playerId: number; noticeId: number }
@@ -51,8 +55,18 @@ function countless(verb: Verb): boolean {
   return verb === 'REPEAT' || verb === 'CHECK';
 }
 
-function buildCarrier(s: SimState, cmd: Extract<Command, { type: 'compose' }>) {
-  const lines = cmd.lines.map((l) => ({ order: makeOrder(l.verb, l.noun, { from: l.from, to: l.to }), count: countless(l.verb) ? 1 : l.count }));
+function buildCarrier(s: SimState, cmd: Extract<Command, { type: 'compose' }>, dryRun = false) {
+  const lines = cmd.lines.map((l) => {
+    const who = l.who !== undefined && l.who !== null ? { id: l.who, name: s.workers.find((w) => w.id === l.who)?.name ?? '?' } : null;
+    return { order: makeOrder(l.verb, l.noun, { from: l.from, to: l.to, who }, cmd.lang ?? 'en'), count: countless(l.verb) ? 1 : l.count };
+  });
+  if (dryRun) {
+    // a throwaway carrier for checking words; don't use up an id
+    const id = s.nextId;
+    const c = newCarrier(s, lines, cmd.wage, cmd.dest);
+    s.nextId = id;
+    return c;
+  }
   return newCarrier(s, lines, cmd.wage, cmd.dest);
 }
 
@@ -70,6 +84,15 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
         if (l.from !== undefined && l.from !== null && l.from === l.to) return { ok: false, error: 'From and to are the same place.' };
       }
       if (cmd.lines[0].verb === 'REPEAT') return { ok: false, error: 'Repeat what? Put it after the lines to repeat.' };
+      for (const l of cmd.lines) {
+        if (takesWho(l.verb) && (l.who === undefined || l.who === null || !s.workers.some((w) => w.id === l.who))) return { ok: false, error: 'Teach or learn from whom?' };
+      }
+      // you can only write words you know in that language
+      const lang = cmd.lang ?? 'en';
+      const lex = s.lexicon[lang] ?? [];
+      for (const tok of buildCarrier(s, cmd, true).orders.flat()) {
+        if (tok.t !== 'WHO' && !lex.includes(tok.t)) return { ok: false, error: `You don't know how to write «${tok.t.toLowerCase()}» in ${langName(lang)} yet.` };
+      }
       if (!Number.isInteger(cmd.wage) || cmd.wage < 0 || cmd.wage > 50) return { ok: false, error: 'Wage must be 0 to 50.' };
       if (cmd.dest.kind === 'tower') return { ok: false, error: 'Only blueprints go to the top of the tower.' };
       const who = cmd.dest.kind === 'board' ? cmd.dest.addressee : cmd.dest.workerId;

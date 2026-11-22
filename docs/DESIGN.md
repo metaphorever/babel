@@ -377,6 +377,20 @@ All the numbers in this section are placeholders until playtests say otherwise.
 - **Couriers:** a worker holding `[DELIVER] [REPEAT]` waits at the scriptorium and carries whatever is in the outbox. A scribe whose scroll has no DELIVER line leaves what they write in the outbox. So `[WRITE] [REPEAT]` plus a courier divides the labour.
 - **Starting stock:** the patron's gift is 10 stone and 8 wood in the base stockpile, enough to start floor 1.
 - **Not in yet:** mailboxes and upper job boards, falling, structural load, and acts of god.
+
+**How P0 handles language (provisional; the numbers are in `tuning.ts`, DRIFT / CONFUSION / LESSON):**
+- **Languages:** English (the common tongue), French (opens once the tower is 2 floors tall) and Greek (opens at 5). Greek is a different script, so a foreign word stands out at a glance.
+- **Drift:** workers on floor 2 or higher build up hidden exposure, faster the higher they are. It fades on the ground. Each time it fills, one random word moves from the language they knew it in to their drift tongue. The drift tongue is picked from the open languages the first time they drift, then stays fixed for that worker.
+- **Reading an order:**
+  - An unknown verb means they can't read the order at all, and they skip it.
+  - An unknown object gets a guess: a hauler hauls whatever comes to mind; a miner can only mine stone anyway.
+  - An unknown place, or the "from"/"to" in front of it, is dropped, so they fall back on the usual place.
+  - Misreads go in the log.
+  - At the board, workers skip anything they can't read unless their name is on it.
+- **Confusion** rises with unreadable orders and guesses, fades over time, and drags mood down above 40. A confused worker shows a `?` cloud.
+- **Says:** the inspector shows what a worker wants, or their current job, word by word, each word in whatever language they still know it in. Words you've learned get a small English gloss. Mixed languages are the early warning.
+- **Translation:** `[TEACH] [name] ×N` and `[LEARN] [name] ×N` run at the scriptorium. The translator calls the student by name, and the student only hears it if they're on the ground. TEACH gives the student the translator's words back, common tongue first. LEARN takes the student's foreign words, and each one goes into your lexicon. A translator who knows more languages works faster.
+- **Lexicon and writing:** the composer has a "Written in" choice. You can only write words in your lexicon for that language, and there's a preview of exactly how the order will read. A scribe writes words they don't know 4× slower.
 - **Scroll wages come out of the treasury as each line is done.** Nothing is reserved up front, because a loop has no end. If the treasury is empty, the line goes unpaid and the worker's mood drops.
 - **Taking a notice down is immediate.** That's a P0 shortcut, since the ground board sits beside the scriptorium.
 

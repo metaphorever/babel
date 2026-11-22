@@ -2,6 +2,7 @@ import { updateWorker } from './ai';
 import { startActivity } from './activities';
 import { log } from './actions';
 import { pinNotice, scribeLoop } from './carriers';
+import { allWords } from './drift';
 import { checkCharter } from './patron';
 import { applyCommand, validateCommand, type Command, type CommandResult, type StampedCommand } from './commands';
 import { makeOrder, type Noun, type WorkVerb } from './lang';
@@ -15,7 +16,7 @@ import { buildWorld, siteOf } from './world';
 
 export function createState(seed: number): SimState {
   const s: SimState = {
-    version: 4,
+    version: 5,
     seed,
     tick: 0,
     rng: seedRng(seed),
@@ -30,6 +31,7 @@ export function createState(seed: number): SimState {
     designs: [],
     boardScrolls: [],
     outbox: [],
+    lexicon: { en: allWords() },
     projects: [],
     floors: 0,
     gold: ECONOMY.startingGold,
@@ -93,13 +95,17 @@ export function addWorker(s: SimState): Worker {
     purse: 0,
     carrying: null,
     carryCount: 0,
+    vocab: { en: allWords() },
+    exposure: 0,
+    driftTongue: null,
+    confusion: 0,
     skills: emptySkills(),
     knack: pick(s.rng, SKILL_IDS),
     memory: null,
     held: [],
     bag: [],
     avoid: [],
-    activity: { kind: 'idle', stage: 0, timer: 0, target: null, ref: null },
+    activity: { kind: 'idle', stage: 0, timer: 0, target: null, ref: null, read: null },
     nextThink: Math.floor(rand(s.rng) * AI.thinkInterval),
     lastScores: [],
     thought: '',

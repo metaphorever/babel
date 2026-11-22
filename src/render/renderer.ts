@@ -1,4 +1,4 @@
-import { MOOD, TOWER, Tile, type SimState, type Site, type Worker } from '../sim';
+import { CONFUSION, MOOD, TOWER, Tile, type SimState, type Site, type Worker } from '../sim';
 import { activeProject, deckRow, projectFraction } from '../sim/tower';
 import { INK, PAPER, Patterns, type PatternName } from './patterns';
 import { itemSprite, propSprite, thoughtSprite, workerSprite } from './sprites';
@@ -389,6 +389,7 @@ export class Renderer {
 
   private statusGlyph(s: SimState, w: Worker, lying: boolean): string | null {
     if (lying) return 'z';
+    if (w.confusion > CONFUSION.moodAbove) return '?';
     for (const m of w.moodlets) {
       const age = s.tick - (m.until - (m.kind === 'missed' ? MOOD.missedJobTicks : MOOD.failedJob.ticks));
       if ((m.kind === 'missed' || m.kind === 'failed') && age < 160) return m.kind === 'missed' ? '!' : '?';

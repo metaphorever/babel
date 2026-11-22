@@ -169,5 +169,5 @@ ui.refresh();
 requestAnimationFrame(frame);
 
 // handy in the console while tuning: babel.sim.state, babel.seed
-(window as unknown as { babel: unknown }).babel = { sim, seed, renderer };
+(window as unknown as { babel: unknown }).babel = { sim, seed, renderer, ui };
 console.info(`Babel P0 — seed ${seed}. Reload with ?seed=${seed} to replay this start.`);

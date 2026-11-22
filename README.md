@@ -41,5 +41,5 @@ In the browser console, `babel.sim.state` holds the live game state, for poking 
 - [x] Scrolls on the board for Anyone, line counts, hand delivery replaces, standing charter
 - [x] Tower floors from blueprints, builders, floor stockpiles, HAUL FROM/TO, couriers ([DELIVER] [REPEAT])
 - [ ] Mailboxes and upper job boards
-- [ ] Language drift, confusion, translation
+- [x] Language drift (French, Greek), confusion, misreads, TEACH/LEARN, lexicon, writing in other languages
 - [ ] Patron stipend and quitting
