@@ -518,9 +518,9 @@ function scrollLearn(verb: 'TEACH' | 'LEARN', studentId: number, translatorId: n
 describe('the patron and quitting', () => {
   it('the stipend shrinks with patience, and a finished floor wins patience back', () => {
     const s = createState(12, 'normal');
-    expect(currentStipend(s)).toBe(PATRON.stipendBase);
+    expect(currentStipend(s)).toBe(PATRON.stipendPerDay);
     s.patience = 50;
-    expect(currentStipend(s)).toBe(Math.round(PATRON.stipendBase / 2));
+    expect(currentStipend(s)).toBe(Math.round(PATRON.stipendPerDay / 2));
     const gold = s.gold;
     patronFloorDone(s, 1);
     expect(s.patience).toBe(50 + PATRON.floorPatience);

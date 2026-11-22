@@ -11,7 +11,7 @@ import { makeName } from './names';
 import { nextU32, pick, rand, seedRng } from './rng';
 import { emptySkills, SKILL_IDS } from './skills';
 import { rollPersonality } from './traits';
-import { AI, ARRIVALS, ECONOMY, PATRON, POPULATION, SKILLS, type Difficulty } from './tuning';
+import { AI, ARRIVALS, ECONOMY, PATRON, POPULATION, SKILLS, TIME, type Difficulty } from './tuning';
 import type { SimState, Worker } from './types';
 import { buildWorld, siteOf } from './world';
 
@@ -38,7 +38,7 @@ export function createState(seed: number, difficulty: Difficulty = 'normal'): Si
     gold: ECONOMY.startingGold,
     patience: PATRON.patienceStart,
     difficulty,
-    nextStipend: PATRON.stipendEvery,
+    nextStipend: TIME.dayTicks,
     nextArrival: ARRIVALS.every,
     income: 0,
     leftWith: 0,

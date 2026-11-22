@@ -49,7 +49,7 @@ export class TowerPanel {
     this.body.append(
       h('div', { class: 'section-label' }, 'The patron'),
       h('div', { class: 'need' }, h('span', { class: 'k' }, 'Patience'), bar(s.patience), h('span', { class: 'num' }, `${Math.round(s.patience)}%`)),
-      kv('Stipend', s.patience > 0 ? `${currentStipend(s)} gold a minute` : 'Stopped until the tower grows'),
+      kv('Stipend', s.patience > 0 ? `${currentStipend(s)} gold each dawn` : 'Stopped until the tower grows'),
       kv('Difficulty', s.difficulty),
       h('div', { class: 'hint' }, 'Patience drains steadily. Each finished floor wins some back and brings a bonus. While the patron is pleased, newcomers arrive on the road.'),
     );

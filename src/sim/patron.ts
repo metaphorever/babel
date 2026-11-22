@@ -3,7 +3,8 @@ import { hasWriteLine, scribeLoop } from './carriers';
 import { knows, knowsWord } from './drift';
 import { LANGS, langName, type LangId } from './lang';
 import { addWorker } from './sim';
-import { ARRIVALS, PATRON, POPULATION } from './tuning';
+import { ARRIVALS, PATRON, POPULATION, TIME } from './tuning';
+import { dayOf } from './time';
 import { siteOf } from './world';
 import type { Carrier, SimState } from './types';
 
@@ -91,13 +92,15 @@ export function updatePatron(s: SimState): void {
   if (before > 0 && s.patience === 0) log(s, 'The patron has run out of patience. No more stipend until the tower grows again.');
   else if (before >= 25 && s.patience < 25) log(s, 'The patron is growing impatient. Finish a floor soon.');
 
+  // the patron pays at dawn
   if (s.tick >= s.nextStipend) {
-    s.nextStipend = s.tick + PATRON.stipendEvery;
-    const pay = Math.round((PATRON.stipendBase * s.patience) / 100);
+    s.nextStipend += TIME.dayTicks;
+    const pay = currentStipend(s);
     if (pay > 0) {
       s.gold += pay;
       s.income += pay;
     }
+    log(s, `Day ${dayOf(s.tick)} dawns.${pay > 0 ? ` The patron pays ${pay} gold.` : ' The patron pays nothing.'}`);
   }
 
   if (s.tick >= s.nextArrival) {
@@ -123,7 +126,7 @@ export function patronFloorDone(s: SimState, level: number): void {
   log(s, `The patron is pleased with floor ${level} and sends ${bonus} gold.`);
 }
 
-/** Gold per stipend at the current patience. */
+/** Gold per day's stipend at the current patience. */
 export function currentStipend(s: SimState): number {
-  return Math.round((PATRON.stipendBase * s.patience) / 100);
+  return Math.round((PATRON.stipendPerDay * s.patience) / 100);
 }

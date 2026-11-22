@@ -1,4 +1,4 @@
-import { CONFUSION, MOOD, TOWER, Tile, type SimState, type Site, type Worker } from '../sim';
+import { CONFUSION, MOOD, TOWER, Tile, WORLD, darkness, hourOf, type SimState, type Site, type Worker } from '../sim';
 import { activeProject, deckRow, projectFraction } from '../sim/tower';
 import { INK, PAPER, Patterns, type PatternName } from './patterns';
 import { itemSprite, propSprite, thoughtSprite, workerSprite } from './sprites';
@@ -119,7 +119,7 @@ export class Renderer {
     g.fillRect(0, 0, bw, bh);
     g.translate(-cx, -cy);
 
-    this.drawSky(s, cy, bh);
+    this.drawSky(s, cx, cy, bw, bh);
     this.drawTiles(s, cx, cy, bw, bh);
     for (const site of s.sites) this.drawSite(s, site);
     this.drawItems(s);
@@ -312,8 +312,75 @@ export class Renderer {
     }
   }
 
+  /**
+   * The sky: it darkens through dusk into a dithered night with stars and a
+   * moon, and lightens again at dawn. Only the open sky changes. The ground
+   * strip and the column around the tower stay paper-white, so workers are
+   * always readable.
+   */
+  private drawSky(s: SimState, cx: number, cy: number, bw: number, bh: number): void {
+    const d = darkness(s.tick);
+    const horizon = (WORLD.groundRow - 6) * TILE; // just above the rooftops and treetops
+    const towerL = TOWER.x0 * TILE;
+    const towerR = (TOWER.x1 + 1) * TILE;
+    const towerTop = (deckRow(s.floors) - TOWER.floorHeight) * TILE; // the open story above the top floor
+    const inSky = (x: number, y: number) => y < horizon && !(x >= towerL && x < towerR && y >= towerTop);
+    const pattern: PatternName | null = d < 0.15 ? null : d < 0.4 ? 'sparse' : d < 0.6 ? 'light' : d < 0.85 ? 'checker' : 'dark';
+    const skyBottom = Math.min(horizon, cy + bh);
+    if (pattern && skyBottom > cy) {
+      this.rect(cx, cy, bw, skyBottom - cy, pattern);
+      // keep the tower's column clear
+      if (towerTop < skyBottom) this.rect(towerL, Math.max(cy, towerTop), towerR - towerL, skyBottom - Math.max(cy, towerTop), 'white');
+      // a soft edge at the horizon and along the tower column
+      this.rect(cx, horizon - 2, bw, 2, 'sparse');
+    }
+    // stars, fixed in the sky
+    if (d > 0.6) {
+      this.g.fillStyle = PAPER;
+      for (let i = 0; i < 260; i++) {
+        const x = (i * 7919) % (s.width * TILE);
+        const y = (i * 104729) % horizon;
+        if (x < cx || x > cx + bw || y < cy || y > cy + bh || !inSky(x, y)) continue;
+        this.g.fillRect(x, y, 1, 1);
+        if (i % 11 === 0) {
+          this.g.fillRect(x - 1, y, 3, 1);
+          this.g.fillRect(x, y - 1, 1, 3);
+        }
+      }
+    }
+    // the sun by day, the moon by night, arcing across whatever part of the sky is in view
+    const h = hourOf(s.tick);
+    const up = d < 0.5 ? (h - 6) / 12 : ((h + 6) % 24) / 12; // 0..1 across its arc
+    if (up >= 0 && up <= 1) {
+      const bx = Math.round(cx + 30 + up * (bw - 60));
+      const by = Math.round(cy + 26 + Math.abs(up - 0.5) * 2 * Math.min(60, bh / 4));
+      if (inSky(bx, by + 8)) {
+        if (d < 0.5) {
+          this.disc(bx, by, 6, 'white');
+          // rays
+          for (const [rx, ry] of [[0, -9], [0, 9], [-9, 0], [9, 0], [-7, -7], [7, -7], [-7, 7], [7, 7]]) this.rect(bx + rx, by + ry, 1, 1);
+        } else {
+          this.disc(bx, by, 6, 'white');
+          // carve the crescent with the night sky
+          this.disc(bx + 3, by - 1, 5, pattern ?? 'dark', false);
+        }
+      }
+    }
+    this.drawClouds(s, cy, bh);
+  }
+
+  /** A filled circle with a black rim (rim optional). */
+  private disc(x: number, y: number, rad: number, inner: PatternName, rim = true): void {
+    for (let dy = -rad; dy <= rad; dy++) {
+      const half = Math.floor(Math.sqrt(rad * rad - dy * dy));
+      if (rim) this.rect(x - half, y + dy, half * 2 + 1, 1);
+      const ih = rim ? half - 1 : half;
+      if (ih >= 0 && (!rim || (dy > -rad && dy < rad))) this.rect(x - ih, y + dy, ih * 2 + 1, 1, inner);
+    }
+  }
+
   /** Clouds drift in above the first few floors, so height reads at a glance. */
-  private drawSky(s: SimState, cy: number, bh: number): void {
+  private drawClouds(s: SimState, cy: number, bh: number): void {
     const groundPx = s.height * TILE;
     for (let i = 0; i < 18; i++) {
       const y = groundPx - 260 - ((i * 131) % (groundPx - 300));

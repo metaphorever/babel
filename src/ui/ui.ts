@@ -3,6 +3,8 @@ import {
   ALL,
   FOREVER,
   carrierText,
+  clockText,
+  isNight,
   currentStipend,
   QUIT,
   langName,
@@ -423,11 +425,11 @@ export class Ui {
     const s = this.s;
     const free = availableGold(s);
     this.gold.textContent = `Gold ${free}${s.reserved ? ` (+${s.reserved} promised)` : ''}`;
-    this.patron.textContent = `Patron ${Math.round(s.patience)}% · +${currentStipend(s)}g/min`;
+    this.patron.textContent = `Patron ${Math.round(s.patience)}% · +${currentStipend(s)}g/day`;
     const notice = s.workers.filter((w) => w.noticeUntil !== null || w.leaving).length;
     this.alerts.textContent = s.workers.length === 0 ? 'Everyone has gone home' : notice ? `${notice} giving notice` : '';
     this.alerts.style.display = notice || s.workers.length === 0 ? '' : 'none';
-    this.clock.textContent = formatTime(s.tick);
+    this.clock.textContent = `${isNight(s.tick) ? '☾' : '☼'} ${clockText(s.tick)}`;
     const speed = this.hooks.getSpeed();
     this.speedBtns.forEach((b, i) => b.classList.toggle('on', i === speed));
     if (this.mouseDown) return;

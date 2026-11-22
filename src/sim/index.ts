@@ -13,3 +13,4 @@ export { driftPool, levelOfRow, sayingFor, speakingLang, vocabSummary } from './
 export { SKILL_IDS, SKILL_LABEL, skillLevel, carryCapacity, bonusChance } from './skills';
 export { standable, tileAt, siteOf } from './world';
 export { findPath } from './path';
+export { clockText, darkness, dayOf, hourOf, isNight } from './time';

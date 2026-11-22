@@ -3,6 +3,13 @@
 
 export const TICKS_PER_SECOND = 20;
 
+export const TIME = {
+  /** One day: 5 real minutes at 1x speed. */
+  dayTicks: 6000,
+  /** Tick 0 is this hour on day 1 (dawn). */
+  startHour: 6,
+};
+
 /** Tallest tower the world has room for (the patron's goals go beyond this later). */
 const MAX_FLOORS = 30;
 const FLOOR_HEIGHT = 4; // tiles per story: a deck plus three rows of headroom
@@ -131,9 +138,8 @@ export type Difficulty = 'easy' | 'normal' | 'hard';
 export const PATRON = {
   /** How often the standing charter checks whether anyone is writing. */
   charterCheckTicks: 100,
-  /** The patron pays a stipend this often, scaled by their patience. */
-  stipendEvery: 1200,
-  stipendBase: 50,
+  /** The patron pays a stipend each dawn, scaled by their patience. */
+  stipendPerDay: 250,
   /** Patience runs 0..100 and drains steadily; difficulty is how fast. */
   patienceStart: 100,
   patienceDrain: { easy: 0.0035, normal: 0.006, hard: 0.01 } as Record<Difficulty, number>,
