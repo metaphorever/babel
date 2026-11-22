@@ -1,74 +1,83 @@
-# Drawing sprites for Babel
+# Drawing art for Babel
 
-The game's sprites live in plain PNG sheets in [`public/art/`](../public/art). Edit them in Photoshop (or any pixel editor) at 1× and the game picks them up. If a sheet is missing, the game uses its built-in placeholder art for that part.
+All of the game's art lives on three **MacPaint documents** in [`art-src/`](../art-src). Draw on them in MacPaint on a System 7 Mac (in the [Infinite Mac](https://infinitemac.org) emulator, or a real one), and a converter turns them into the PNGs the game uses. No Photoshop step is needed.
 
-## The workflow
+| Page | What's on it |
+|---|---|
+| `Babel Workers` | Worker bodies (with a walking frame), heads, beards, hats; items; props; thought symbols |
+| `Babel World` | Terrain and tower tiles, the tree, crops, quarry rock, well, old shack, road sign, supply wagon, sky (cloud, sun, moon) |
+| `Babel Buildings` | Generic building parts (walls, door, window, roof), the scriptorium, the job board, fixtures (bed, oven, broken oven, pantry, brewing station, bar, table, stockpile) |
 
-1. Start the dev server (`npm run dev`) and open the game.
-2. Open a sheet from `public/art/` in Photoshop, draw, and save it over itself as a PNG.
-3. Switch back to the browser window. While the dev server is running, the game reloads the sheets whenever the window comes back into focus, so you see your change right away. A normal refresh works too.
-4. When you're happy, commit the PNGs (or tell me and I will). The live site picks them up on the next deploy.
+Each page comes in three files:
 
-To get fresh templates of the current art, run:
+| File | What it's for |
+|---|---|
+| `.bin` | The page wrapped in MacBinary, which carries the Mac file type ("MacPaint document") along with it. Use this one to get pages into the emulator. |
+| `.pntg` | The same page as a raw MacPaint file. |
+| `.preview.png` | A picture of the page, so you can look at it on a modern computer. |
+
+## How a page works
+
+MacPaint is black and white only, so sprites use the classic Mac trick of a **mask**. Every sprite has two boxes side by side, each with a dotted frame:
+
+- **Left box: the sprite.** Black is ink, white is paper.
+- **Right box: the mask.** Black means "this pixel is solid"; white means "see-through".
+
+So a white pixel in the sprite is opaque white only if the mask is black there. Where the mask is white, the world shows through. A quick way to start a mask: copy the sprite into the right box and fill it solid black.
+
+**Rules:**
+- **Draw inside the boxes.** The dotted frames and labels are guides; they're ignored when the page is read back.
+- **An empty mask means "not drawn":** a slot whose mask is all white counts as empty. Spare slots stay empty until you use them, and a variant you wipe disappears from the game.
+- **New variants:** to add a body, head, beard or hat, draw in one of the spare slots. Each worker's look is picked from their personal seed, so new parts mix into the crowd automatically.
+
+## Workers
+
+Every worker part is drawn in the same **16×16 box**:
+- The worker faces **right**. The game mirrors them to face left, and rotates them when they lie down.
+- **Bodies** have their **feet on the bottom row** and are **centered on column 7** (counting from 0 at the left). The second box in each body row is the walking step.
+- **Heads** are drawn with the neck at **(7, 7)**: the face's bottom edge on row 7.
+- **Beards and hats** are drawn over the head, in that same frame. Hats can use white (with a black mask) to cover parts of the head, for hoods and brims.
+- **Where the head attaches:** the game finds each body's neck by itself. It's the pixel just above the body's topmost pixel in column 7, so a taller body automatically carries its head higher.
+
+## Small sprites
+
+Items, props and thought symbols are drawn in **8×8 boxes**, starting at the top-left. The empty space around them is trimmed. Thought symbols get a white cloud drawn around them automatically, so draw just the symbol.
+
+## The round trip
+
+1. **Get a page into the emulator:** drag the `.bin` file onto the Infinite Mac window to upload it.
+2. **Open it in MacPaint and draw.** Save it under the same name.
+3. **Get it back out:** use the emulator's file transfer to download it, then put it in `art-src/` under the same name, ending in either `.bin` or `.pntg`. The importer uses whichever of the two is newer.
+4. **Convert it:** run
+
+   ```bash
+   npm run art:import
+   ```
+
+   This writes the game's PNGs and manifest into `public/art/` and refreshes the preview pictures.
+5. **Look:** with the dev server running (`npm run dev`), switch back to the game's window and the art reloads. Commit when you're happy; the live site updates on the next push.
+
+**Still to test: the round trip through Infinite Mac.** Two things aren't verified yet:
+- **Getting in:** that Infinite Mac turns the uploaded `.bin` into a proper MacPaint document. If MacPaint's Open dialog doesn't list the page, try the `.pntg` file, or set its type to `PNTG` with ResEdit.
+- **Getting out:** exactly how Infinite Mac hands files back. The importer accepts either a MacBinary file or a raw MacPaint file, so whichever comes out should work.
+
+Do the first round trip with a small change before drawing a lot.
+
+To regenerate pages from the game's built-in art:
 
 ```bash
 npm run art:export
 ```
 
-This won't overwrite sheets you've already changed. Add `-- --force` if you really want to start over.
+It won't overwrite a page that already exists. Add `-- --force` to start a page over (that throws away what's on it).
 
-## Colors
+## What the game uses so far
 
-Only four colors mean anything:
-
-| Color | Meaning |
+| Art | In the game? |
 |---|---|
-| Black `#000000` | Ink |
-| White `#FFFFFF` | Paper (an opaque white that covers whatever is behind it) |
-| Transparent | Clear (the world shows through) |
-| Pure red `#FF0000` | An anchor marker (see the bodies section). It's drawn as clear. |
+| Workers, items, props, thought symbols | Yes, now |
+| World tiles, buildings, fixtures and sky | Not yet. They're converted into `public/art/world.png`, but the renderer still draws these in code. Switching it to the sheet art comes with the P1 building work (see [HANDOFF.md](HANDOFF.md)), and the placeholder fixtures are there for that work. |
 
-Anything else gets rounded to the nearest of those, and the browser console counts the rounded pixels, so stray anti-aliasing shows up. In Photoshop: use the Pencil tool rather than the Brush, set resampling to Nearest Neighbor when scaling, and save as PNG with transparency. Working in Image > Mode > Indexed Color with a 4-color palette keeps you honest, but RGB is fine too.
+## Changing the layout
 
-Draw at 1×. The game scales everything up by whole numbers, so one pixel in the sheet is one big square on screen. Zoom Photoshop in to 800% or more to work.
-
-## Workers: layered parts
-
-Every worker is assembled from parts, so each one looks a little different. Every part is drawn in the same **16×16 frame**:
-
-- The worker faces **right**. The game mirrors them to face left.
-- Their **feet sit on the bottom row** (row 15).
-- The body is **centered on column 7**, counting from 0.
-- Lying down (sleeping) is the standing sprite rotated, so you don't draw it.
-
-| Sheet | Layout | Notes |
-|---|---|---|
-| `workers-body.png` | Rows are body variants; columns are walk frames (2: standing/step A, step B) | The robe, arms and feet. Put **one red pixel at the neck**, where the head attaches. |
-| `workers-head.png` | Rows are head variants (only the first column is read) | The face, drawn with the neck at (7, 7). |
-| `workers-beard.png` | Rows are beard variants | Drawn on top of the head. About half of workers get one. |
-| `workers-hat.png` | Rows are hat variants | Drawn on top of the head and beard. White pixels cover the head, for hoods and brims. About three in four workers wear one. |
-
-How the layers fit together:
-- **The neck marker** lets bodies of different heights or shapes work. Whatever you draw in the head, beard and hat sheets is drawn for a neck at (7, 7), then moved so it sits on that body's red pixel. A tall body puts its marker one row higher, and every head moves up with it.
-- **Variety:** add a row to any sheet and you've added a variant. The game counts rows from the image height, and blank rows are skipped. Each worker's look is fixed for life, chosen from their personal seed.
-- **Reference sheet:** `workers-preview.png` shows 32 assembled workers. It's for reference only: the game doesn't read it, and `npm run art:export` regenerates it.
-
-## Small sprites
-
-These are drawn in **8×8 cells**, one row, in a fixed order. Draw from the top-left of each cell. Empty space around the drawing is trimmed when the game loads it.
-
-| Sheet | Cells, left to right |
-|---|---|
-| `items.png` | stone, wood, grain, bread |
-| `props.png` | scroll (held at the side), bag (a courier's satchel), sheet (paper on the scriptorium desk) |
-| `glyphs.png` | z (asleep), ! (went unpaid), ? (confused or gave up), $ (just paid), b (a bundle on a stick: giving notice) |
-
-Glyphs are drawn inside a white thought cloud automatically, so draw just the symbol.
-
-## Not on sheets yet
-
-Buildings, terrain, the tower's walls, decks and ladders, trees and the sky are still drawn in code. They're next in line for sheets once the worker parts are settled. Tell me which you want first.
-
-## The manifest
-
-`public/art/manifest.json` tells the game which file holds which part and how big the cells are. You shouldn't need to touch it.
+Box sizes and positions are set in [`tools/sheets.ts`](../tools/sheets.ts): sizes per slot, slots per row, and which page each sprite is on. To make something bigger, or to add a new kind of sprite, ask me to change the layout. Then export a fresh page and copy your drawings across in MacPaint.

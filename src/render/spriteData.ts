@@ -75,6 +75,18 @@ export function findMarker(grid: Grid): { x: number; y: number } | null {
   return null;
 }
 
+/**
+ * Without a marker (MacPaint sheets have no red), the neck is the pixel
+ * just above the body's topmost drawn pixel in its center column.
+ */
+export function autoNeck(grid: Grid): { x: number; y: number } | null {
+  for (let y = 0; y < grid.length; y++) {
+    const c = grid[y][BODY_CENTER_X];
+    if (c === '1' || c === '0') return { x: BODY_CENTER_X, y: y - 1 };
+  }
+  return null;
+}
+
 /** Markers become clear when drawn. */
 export function clean(grid: Grid): Grid {
   return grid.map((r) => r.replace(/r/g, '.'));
@@ -240,7 +252,7 @@ export function composeWorker(art: ArtSet, look: number, frame: number): Grid {
   const p = partsFor(art, look);
   const frames = art.body[p.body];
   const bodyCell = frames[frame % frames.length];
-  const neck = findMarker(bodyCell) ?? HEAD_ANCHOR;
+  const neck = findMarker(bodyCell) ?? autoNeck(bodyCell) ?? HEAD_ANCHOR;
   const dx = neck.x - HEAD_ANCHOR.x;
   const dy = neck.y - HEAD_ANCHOR.y;
   let g = clean(bodyCell);

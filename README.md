@@ -5,7 +5,9 @@ A side-view colony sim about building the Tower of Babel. You can only act by wr
 Runs in the browser. Hobby project.
 
 - Design: [docs/DESIGN.md](docs/DESIGN.md)
-- Status: P0 grey-box simulation, in progress.
+- Where things stand and what's next: [docs/HANDOFF.md](docs/HANDOFF.md)
+- Status: P0 is playable; P1 (the map and buildings) is specced and next.
+- Live: https://metaphorever.github.io/babel/
 
 ## Running it
 
@@ -37,21 +39,25 @@ To build it yourself, the command above writes a static site to `dist/`: an `ind
 - `?difficulty=easy|normal|hard` sets how fast the patron loses patience.
 
 
-## Drawing sprites
+## Drawing art
 
-Sprites are PNG sheets in `public/art/`: black for ink, white for paper, transparent for clear. Workers are layered parts (bodies, heads, beards, hats), so every row you add is a new variant. Edit them in any pixel editor; with the dev server running, switching back to the browser reloads them. The full guide is [docs/SPRITES.md](docs/SPRITES.md).
+All the art lives on three MacPaint documents in `art-src/`, drawn in black and white with a mask beside each sprite, the way classic Mac games stored them. Edit them in MacPaint (Infinite Mac works), then run
 
 ```bash
-npm run art:export
+npm run art:import
 ```
 
-regenerates template sheets from the built-in art (it won't overwrite sheets you've changed).
+to turn them into the game's PNGs in `public/art/`. Don't edit those PNGs by hand: they're generated. The full guide is [docs/SPRITES.md](docs/SPRITES.md).
 ## Layout
 
 - `src/sim/`: the simulation. Pure TypeScript, deterministic, no browser APIs. All balance numbers are in `tuning.ts`.
 - `src/render/`: the 1-bit canvas renderer and the procedural placeholder sprites.
 - `src/ui/`: the System 7 style windows.
-- `tests/`: Vitest tests for the simulation.
+- `tests/`: Vitest tests for the simulation and the art pipeline.
+- `tools/`: the MacPaint codec and the art export/import commands.
+- `art-src/`: the MacPaint working sheets (the source of the art).
+- `public/art/`: generated PNG sprite sheets the game loads.
+- `docs/`: the design doc, the art guide, and the handoff notes.
 
 In the browser console, `babel.sim.state` holds the live game state, for poking at while tuning.
 
