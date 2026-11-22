@@ -669,6 +669,92 @@ p {
   font-weight: bold;
 }
 
-.count-mode {
+.compose-line .count-mode {
+  flex: none;
+  width: auto;
   padding: 1px 0;
+}
+
+/* ------------------------------------------------ composer: who it's for */
+
+.mode-switch {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+
+.mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font: 11px var(--font);
+  padding: 4px 4px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.mode-btn.on {
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: bold;
+}
+
+.mode-icon {
+  display: inline-flex;
+}
+
+.compose-box {
+  padding: 6px 8px 8px;
+  margin-bottom: 4px;
+}
+
+/* each mode looks different at a glance: thin, double, thick + hatched */
+.compose-box.mode-anyone {
+  border: 1px solid var(--ink);
+}
+
+.compose-box.mode-named {
+  border: 4px double var(--ink);
+}
+
+.compose-box.mode-hand {
+  border: 3px solid var(--ink);
+}
+
+.mode-banner {
+  margin: -6px -8px 8px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--ink);
+  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.mode-anyone .mode-banner {
+  background: var(--paper);
+}
+
+.mode-named .mode-banner {
+  background: repeating-linear-gradient(to bottom, var(--paper) 0 3px, #000 3px 4px);
+}
+
+.mode-named .mode-banner > * {
+  background: var(--paper);
+  padding: 0 3px;
+}
+
+.mode-hand .mode-banner {
+  background: repeating-linear-gradient(45deg, var(--paper) 0 3px, #000 3px 4px);
+}
+
+.mode-hand .mode-banner > * {
+  background: var(--paper);
+  padding: 0 3px;
 }

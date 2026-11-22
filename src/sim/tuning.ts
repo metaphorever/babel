@@ -6,8 +6,8 @@ export const TICKS_PER_SECOND = 20;
 export const TIME = {
   /** One day: 5 real minutes at 1x speed. */
   dayTicks: 6000,
-  /** Tick 0 is this hour on day 1 (dawn). */
-  startHour: 6,
+  /** Tick 0 is this hour on day 1: just after dawn, in full daylight. Each new day starts (and the patron pays) at this hour. */
+  startHour: 7,
 };
 
 /** Tallest tower the world has room for (the patron's goals go beyond this later). */

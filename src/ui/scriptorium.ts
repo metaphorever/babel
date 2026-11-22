@@ -27,6 +27,19 @@ import {
 import { clear, h } from './dom';
 import type { WindowManager } from './windows';
 
+type Mode = 'anyone' | 'named' | 'hand';
+
+/** 16x16 1-bit icons: a job board on legs, and an open hand. */
+const BOARD_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="M1 2h14v1H1zM1 10h14v1H1zM1 3h1v7H1zM14 3h1v7h-1zM3 4h4v4H3zM9 4h4v2H9zM9 7h3v2H9zM3 11h1v4H3zM12 11h1v4h-1z" fill="currentColor"/></svg>';
+const NAMED_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="M1 2h14v1H1zM1 10h14v1H1zM1 3h1v7H1zM14 3h1v7h-1zM3 11h1v4H3zM12 11h1v4h-1zM6 4h4v1H6zM5 5h1v2H5zM10 5h1v2h-1zM6 7h4v1H6zM7 8h2v1H7z" fill="currentColor"/></svg>';
+const HAND_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="M5 2h1v6H5zM7 1h1v7H7zM9 2h1v6H9zM11 3h1v6h-1zM2 7h1v2H2zM3 8h1v2H3zM4 7h1v6H4zM12 8h1v4h-1zM5 13h7v1H5zM5 8h7v5H5z" fill="currentColor"/></svg>';
+
+const MODES: { id: Mode; label: string; hint: string; icon: string }[] = [
+  { id: 'anyone', label: 'Board · Anyone', hint: 'Post it on the job board for whoever is free.', icon: BOARD_ICON },
+  { id: 'named', label: 'Board · by name', hint: 'Post it on the board for one worker. Their name always wins.', icon: NAMED_ICON },
+  { id: 'hand', label: 'Hand to…', hint: 'A courier hands it straight to one worker. It replaces what they are doing.', icon: HAND_ICON },
+];
+
 function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -138,7 +151,11 @@ export class ScriptoriumPanel {
   private linesEl: HTMLElement;
   private lines: DraftLine[] = PRESETS[0].lines.map((l) => ({ ...l }));
   private wageIn: HTMLInputElement;
-  private howSel: HTMLSelectElement;
+  /** Who it's for and how it gets there: the most important choice, so it sits on top. */
+  private mode: Mode = 'anyone';
+  private modeBtns = new Map<Mode, HTMLButtonElement>();
+  private banner = h('div', { class: 'mode-banner', role: 'status' });
+  private composeBox = h('div', { class: 'compose-box' });
   private whoSel: HTMLSelectElement;
   private summary: HTMLElement;
   private error: HTMLElement;
@@ -157,13 +174,15 @@ export class ScriptoriumPanel {
     this.transit = h('div', { class: 'notices' });
     this.linesEl = h('div', { class: 'compose-lines' });
     this.wageIn = h('input', { type: 'number', min: 0, max: 50, value: 2, 'aria-label': 'Wage per unit', oninput: () => this.updateSummary() });
-    this.howSel = h(
-      'select',
-      { 'aria-label': 'Delivery', onchange: () => ((this.whoCount = -1), this.syncWho(), this.updateSummary()) },
-      h('option', { value: 'board' }, 'Post on the board'),
-      h('option', { value: 'hand' }, 'Hand it to'),
-    );
-    this.whoSel = h('select', { 'aria-label': 'For', onchange: () => this.updateSummary() });
+    this.whoSel = h('select', { 'aria-label': 'Which worker', onchange: () => this.updateSummary() });
+    const modes = h('div', { class: 'mode-switch', role: 'radiogroup', 'aria-label': 'Who it is for' });
+    for (const m of MODES) {
+      const icon = h('span', { class: 'mode-icon', 'aria-hidden': 'true' });
+      icon.innerHTML = m.icon;
+      const b = h('button', { class: 'mode-btn', role: 'radio', title: m.hint, onclick: () => this.setMode(m.id) }, icon, h('span', {}, m.label));
+      this.modeBtns.set(m.id, b);
+      modes.append(b);
+    }
     this.summary = h('div', { class: 'compose-summary' });
     this.error = h('div', { class: 'error', role: 'alert' });
     const presets = h('div', { class: 'row presets' }, h('span', { class: 'hint' }, 'Start from:'));
@@ -184,15 +203,20 @@ export class ScriptoriumPanel {
       ),
       h('div', { class: 'hint' }, 'Someone with DELIVER carries it to the top of the tower; then builders can start.'),
       h('div', { class: 'section-label' }, 'Compose'),
+      modes,
+      this.composeBox,
+    );
+    this.composeBox.append(
+      this.banner,
       presets,
       this.linesEl,
-      h('div', { class: 'row' }, h('label', {}, 'Written in', this.langSel)),
+      h('div', { class: 'row' }, h('label', {}, 'Written in', this.langSel), h('label', {}, 'Wage', this.wageIn, 'g per unit')),
       this.preview,
-      h('div', { class: 'row' }, this.howSel, this.whoSel, h('label', {}, 'Wage', this.wageIn, 'g per unit')),
       this.summary,
       h('div', { class: 'row row-end' }, this.error, h('button', { class: 'btn btn-default', onclick: () => this.send() }, 'Send to scribe')),
     );
     this.langSel.addEventListener('change', () => this.renderLines());
+    this.setMode('anyone');
     this.syncWho();
     this.syncLangs();
     this.renderLines();
@@ -234,12 +258,22 @@ export class ScriptoriumPanel {
 
   /** Open the composer with a worker preselected, as a notice for them or a scroll handed to them. */
   openFor(workerId: number, how: 'board' | 'hand'): void {
-    this.howSel.value = how;
-    this.whoCount = -1;
-    this.syncWho();
+    this.setMode(how === 'board' ? 'named' : 'hand');
     this.whoSel.value = String(workerId);
     this.updateSummary();
     this.wm.show('scriptorium');
+  }
+
+  private setMode(m: Mode): void {
+    this.mode = m;
+    for (const [id, b] of this.modeBtns) {
+      b.classList.toggle('on', id === m);
+      b.setAttribute('aria-checked', String(id === m));
+    }
+    this.composeBox.className = `compose-box mode-${m}`;
+    this.whoCount = -1;
+    this.syncWho();
+    this.updateSummary();
   }
 
   open(): void {
@@ -313,8 +347,8 @@ export class ScriptoriumPanel {
         inp.style.display = special ? 'none' : '';
         inp.addEventListener('input', () => ((line.count = Math.floor(Number(inp.value)) || 1), this.updateSummary()));
         const mode = h('select', { 'aria-label': `Line ${i + 1} how many`, class: 'count-mode' }, h('option', { value: 'n' }, '×'));
-        if (allowsAll(line.verb)) mode.append(h('option', { value: 'all' }, '× all'));
-        if (allowsForever(line.verb)) mode.append(h('option', { value: 'forever' }, '× ∞ forever'));
+        if (allowsAll(line.verb)) mode.append(h('option', { value: 'all', title: 'Until there is nothing left to do' }, 'all'));
+        if (allowsForever(line.verb)) mode.append(h('option', { value: 'forever', title: 'Forever' }, '∞'));
         mode.value = line.count === ALL ? 'all' : line.count === FOREVER ? 'forever' : 'n';
         mode.addEventListener('change', () => {
           line.count = mode.value === 'all' ? ALL : mode.value === 'forever' ? FOREVER : Math.floor(Number(inp.value)) || 1;
@@ -349,20 +383,34 @@ export class ScriptoriumPanel {
     if (this.whoCount === this.s.workers.length) return;
     const keep = this.whoSel.value;
     clear(this.whoSel);
-    if (this.howSel.value === 'board') this.whoSel.append(h('option', { value: '' }, 'for Anyone'));
-    for (const w of this.s.workers) this.whoSel.append(h('option', { value: String(w.id) }, this.howSel.value === 'board' ? `for ${w.name}` : w.name));
+    for (const w of this.s.workers) this.whoSel.append(h('option', { value: String(w.id) }, w.name));
     this.whoSel.value = keep;
     if (this.whoSel.selectedIndex < 0) this.whoSel.selectedIndex = 0;
     this.whoCount = this.s.workers.length;
   }
 
   private dest(): Dest {
-    if (this.howSel.value === 'board') return { kind: 'board', addressee: this.whoSel.value === '' ? null : Number(this.whoSel.value) };
+    if (this.mode === 'anyone') return { kind: 'board', addressee: null };
+    if (this.mode === 'named') return { kind: 'board', addressee: Number(this.whoSel.value) };
     return { kind: 'worker', workerId: Number(this.whoSel.value) };
+  }
+
+  /** The banner says, in big plain words, where this is going. */
+  private renderBanner(): void {
+    clear(this.banner);
+    const name = this.s.workers.find((w) => String(w.id) === this.whoSel.value)?.name ?? '?';
+    if (this.mode === 'anyone') {
+      this.banner.append(h('strong', {}, 'Posting on the board'), ' for anyone who’s free');
+    } else if (this.mode === 'named') {
+      this.banner.append(h('strong', {}, 'Posting on the board'), ' for ', this.whoSel, h('span', { class: 'hint' }, ` only: ${name} will always pick it first`));
+    } else {
+      this.banner.append(h('strong', {}, 'Handing directly to'), ' ', this.whoSel, h('span', { class: 'hint' }, ': replaces whatever they’re doing'));
+    }
   }
 
   /** Explain in plain words what this will do once it's written and delivered. */
   private updateSummary(): void {
+    this.renderBanner();
     const d = this.dest();
     const wage = Math.floor(Number(this.wageIn.value)) || 0;
     const name = (id: number | null) => (id === null ? 'anyone' : this.s.workers.find((w) => w.id === id)?.name ?? '?');
