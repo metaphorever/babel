@@ -1,7 +1,7 @@
 import { MOOD, TOWER, Tile, type SimState, type Site, type Worker } from '../sim';
 import { activeProject, deckRow, projectFraction } from '../sim/tower';
 import { INK, PAPER, Patterns, type PatternName } from './patterns';
-import { glyphSprite, itemSprite, propSprite, workerSprite } from './sprites';
+import { itemSprite, propSprite, thoughtSprite, workerSprite } from './sprites';
 
 export const TILE = 8; // native pixels per tile
 export const ZOOMS = [1, 2, 3, 4, 5, 6] as const;
@@ -374,8 +374,9 @@ export class Renderer {
     }
     const glyph = this.statusGlyph(s, w, lying);
     if (glyph) {
-      const gs = glyphSprite(glyph);
-      g.drawImage(gs, x + 4, sy - gs.height - 2);
+      // the cloud's trail ends just above and right of the head
+      const gs = thoughtSprite(glyph);
+      g.drawImage(gs, x + 2, sy - gs.height + 1);
     }
     if (selected) {
       // a little pointer above the head

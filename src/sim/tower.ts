@@ -87,12 +87,14 @@ function drawProgress(s: SimState, p: Project): void {
     const x = i % 2 === 0 ? TOWER.x0 : TOWER.x1;
     if (tileAt(s, x, row) === Tile.Air) setTile(s, x, row, Tile.Wall);
   }
-  // deck: planks laid from the middle outward
+  // deck: planks laid from the middle outward. With an even width the
+  // middle sits left of center, so the outward sweep starts to the right:
+  // mid, mid+1, mid-1, mid+2 ... which ends exactly at x0 and x1.
   const width = TOWER.x1 - TOWER.x0 + 1;
   const planks = Math.floor((p.placed.wood / p.needs.wood) * width);
   const mid = Math.floor((TOWER.x0 + TOWER.x1) / 2);
   for (let i = 0; i < planks; i++) {
-    const x = mid + (i % 2 === 0 ? i / 2 : -(i + 1) / 2);
+    const x = mid + (i % 2 === 1 ? (i + 1) / 2 : -i / 2);
     setTile(s, x, deck, Tile.Deck);
   }
 }

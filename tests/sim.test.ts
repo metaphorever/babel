@@ -3,16 +3,17 @@ import { Sim, createState, hashState, replay, step } from '../src/sim/sim';
 import { findPath } from '../src/sim/path';
 import { setTile } from '../src/sim/world';
 import { Tile } from '../src/sim/types';
-import { siteOf, stockpileOn } from '../src/sim/world';
+import { siteOf, stockpileOn, tileAt } from '../src/sim/world';
 import { applyCommand } from '../src/sim/commands';
 import { levelOf } from '../src/sim/skills';
 import { newCarrier, pinNotice } from '../src/sim/carriers';
 import type { Command } from '../src/sim/commands';
 import { giveCarrier } from '../src/sim/scrolls';
 import { makeOrder, orderText, parseOrder, type Noun, type Verb, type WorkVerb } from '../src/sim/lang';
-import { newProject, placeMaterial } from '../src/sim/tower';
+import { deckRow, newProject, placeMaterial } from '../src/sim/tower';
+
 import type { Dest } from '../src/sim/types';
-import { SKILLS } from '../src/sim/tuning';
+import { SKILLS, TOWER } from '../src/sim/tuning';
 
 type State = ReturnType<typeof createState>;
 
@@ -353,6 +354,21 @@ describe('the board, hand delivery and the standing charter', () => {
 });
 
 describe('the tower', () => {
+  it('a finished deck covers exactly the tower footprint', () => {
+    const s = createState(7);
+    s.projects.push(newProject(s, 1));
+    const p = s.projects[0];
+    for (let i = 0; i < p.needs.stone; i++) placeMaterial(s, p, 'stone');
+    for (let i = 0; i < p.needs.wood; i++) placeMaterial(s, p, 'wood');
+    const row = deckRow(1);
+    for (let x = TOWER.x0; x <= TOWER.x1; x++) {
+      const t = tileAt(s, x, row);
+      expect(t === Tile.Deck || t === Tile.Ladder).toBe(true);
+    }
+    expect(tileAt(s, TOWER.x0 - 1, row)).toBe(Tile.Air);
+    expect(tileAt(s, TOWER.x1 + 1, row)).toBe(Tile.Air);
+  });
+
   it('a blueprint carried up starts a floor; builders finish it with a ladder', () => {
     const s = createState(7);
     applyCommand(s, { type: 'blueprint', playerId: 0 });

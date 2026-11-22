@@ -156,12 +156,46 @@ const GLYPHS: Record<string, Grid> = {
   '$': ['.1.', '111', '1..', '111', '..1', '111', '.1.'],
 };
 
-export function glyphSprite(ch: string): HTMLCanvasElement {
-  const key = `g${ch}`;
+/**
+ * A reaction glyph inside a little thought cloud: white inside, black rim,
+ * with a trail of two small bubbles down-left toward the worker's head.
+ * The white fill keeps it readable against dark roofs and walls.
+ */
+export function thoughtSprite(ch: string): HTMLCanvasElement {
+  const key = `t${ch}`;
   let c = cache.get(key);
   if (!c) {
-    c = toCanvas(GLYPHS[ch] ?? GLYPHS['?']);
+    c = toCanvas(thoughtGrid(GLYPHS[ch] ?? GLYPHS['?']));
     cache.set(key, c);
   }
   return c;
+}
+
+function thoughtGrid(glyph: Grid): Grid {
+  const gw = Math.max(...glyph.map((r) => r.length));
+  const gh = glyph.length;
+  const W = Math.max(gw + 6, 9);
+  const H = gh + 4;
+  const left = 3 + Math.floor((W - 6 - gw) / 2);
+  const rows: string[] = [];
+  for (let y = 0; y < H; y++) {
+    let row = '';
+    for (let x = 0; x < W; x++) {
+      const edgeRow = y === 0 || y === H - 1;
+      const edgeCol = x === 0 || x === W - 1;
+      if (edgeRow && edgeCol) row += '.'; // rounded corners
+      else if (edgeRow || edgeCol) row += '1';
+      else {
+        const g = glyph[y - 2]?.[x - left];
+        row += g === '1' ? '1' : '0';
+      }
+    }
+    rows.push(row);
+  }
+  // the trail: a small bubble, then a dot, heading down-left
+  rows.push('.111' + '.'.repeat(W - 4));
+  rows.push('.101' + '.'.repeat(W - 4));
+  rows.push('.111' + '.'.repeat(W - 4));
+  rows.push('1' + '.'.repeat(W - 1));
+  return rows;
 }
