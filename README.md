@@ -29,7 +29,9 @@ runs the simulation tests, including the check that the same seed and the same c
 npm run build
 ```
 
-This writes a static site to `dist/`: an `index.html` plus an `assets/` folder. Every path in it is relative, so you can upload the contents of `dist/` to any folder on any web host and open `index.html` there. Options in the URL:
+The live build is at https://metaphorever.github.io/babel/. Every push to `main` runs the tests and redeploys it (see `.github/workflows/pages.yml`).
+
+To build it yourself, the command above writes a static site to `dist/`: an `index.html` plus an `assets/` folder. Every path in it is relative, so you can upload the contents of `dist/` to any folder on any web host and open `index.html` there. Options in the URL:
 
 - `?seed=123` replays a particular starting world.
 - `?difficulty=easy|normal|hard` sets how fast the patron loses patience.
