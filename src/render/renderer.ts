@@ -5,6 +5,8 @@ import { itemSprite, propSprite, thoughtSprite, workerSprite } from './sprites';
 
 export const TILE = 8; // native pixels per tile
 export const ZOOMS = [1, 2, 3, 4, 5, 6] as const;
+/** Scroll in steps of the dither pattern size, so patterns never shimmer. */
+const SCROLL_STEP = 4;
 
 /**
  * Draws the world at native resolution into a small buffer, then scales it
@@ -37,9 +39,24 @@ export class Renderer {
     if (this.canvas.width !== w || this.canvas.height !== h) {
       this.canvas.width = w;
       this.canvas.height = h;
-      this.canvas.style.width = `${window.innerWidth}px`;
-      this.canvas.style.height = `${window.innerHeight}px`;
+      // exactly canvas pixels / dpr, so the browser never resamples the frame
+      this.canvas.style.width = `${w / this.dpr}px`;
+      this.canvas.style.height = `${h / this.dpr}px`;
     }
+  }
+
+  /**
+   * The camera as drawn: snapped to whole dither tiles. A dither pattern
+   * moved by one pixel turns into its own inverse, so a smooth one-pixel
+   * pan makes patterns flicker to grey. Moving in steps of the pattern's
+   * width (4 px) keeps every pattern in the same phase, the way classic
+   * 1-bit games scrolled.
+   */
+  get viewX(): number {
+    return Math.floor(this.camX / SCROLL_STEP) * SCROLL_STEP;
+  }
+  get viewY(): number {
+    return Math.floor(this.camY / SCROLL_STEP) * SCROLL_STEP;
   }
 
   get viewW(): number {
@@ -52,8 +69,8 @@ export class Renderer {
   /** CSS pixel position (e.g. from a mouse event) to world native pixels. */
   screenToWorld(cssX: number, cssY: number): { x: number; y: number } {
     return {
-      x: Math.floor(this.camX) + (cssX * this.dpr) / this.zoom,
-      y: Math.floor(this.camY) + (cssY * this.dpr) / this.zoom,
+      x: this.viewX + (cssX * this.dpr) / this.zoom,
+      y: this.viewY + (cssY * this.dpr) / this.zoom,
     };
   }
 
@@ -95,8 +112,8 @@ export class Renderer {
       this.pat = new Patterns(this.g);
     }
     const g = this.g;
-    const cx = Math.floor(this.camX);
-    const cy = Math.floor(this.camY);
+    const cx = this.viewX;
+    const cy = this.viewY;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.fillStyle = PAPER;
     g.fillRect(0, 0, bw, bh);
@@ -402,8 +419,8 @@ export class Renderer {
   private drawLabels(s: SimState, alpha: number, selected: number | null, hover: number | null): void {
     const ctx = this.ctx;
     const z = this.zoom;
-    const cx = Math.floor(this.camX);
-    const cy = Math.floor(this.camY);
+    const cx = this.viewX;
+    const cy = this.viewY;
     const fontPx = Math.round(11 * this.dpr);
     ctx.font = `${fontPx}px Geneva, Verdana, "Segoe UI", sans-serif`;
     ctx.textBaseline = 'top';
