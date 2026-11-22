@@ -1,6 +1,6 @@
 import { log } from './actions';
 import { isWorkVerb, makeOrder, orderText, type Order } from './lang';
-import { SCRIBE } from './tuning';
+import { SCRIBE, TOWER } from './tuning';
 import type { Carrier, Design, Dest, Notice, SimState } from './types';
 
 // Orders are physical. The player composes a carrier; it waits in the
@@ -53,6 +53,7 @@ export function isNoticeCard(c: Carrier): boolean {
 }
 
 export function writingCost(c: Carrier): number {
+  if (c.kind === 'blueprint') return TOWER.blueprintCost;
   const tokens = c.orders.reduce((n, o) => n + o.length, 0);
   return SCRIBE.baseCost + tokens * SCRIBE.perToken;
 }
@@ -101,6 +102,7 @@ export function lineText(c: Carrier, i: number): string {
 }
 
 export function carrierText(c: Carrier): string {
+  if (c.kind === 'blueprint') return 'blueprint for the next floor';
   return c.orders.map((_, i) => lineText(c, i)).join(' → ');
 }
 
@@ -110,7 +112,9 @@ export function workerName(s: SimState, id: number | null): string {
 }
 
 export function destText(s: SimState, d: Dest): string {
-  return d.kind === 'board' ? `the board, for ${workerName(s, d.addressee)}` : workerName(s, d.workerId);
+  if (d.kind === 'board') return `the board, for ${workerName(s, d.addressee)}`;
+  if (d.kind === 'tower') return 'the top of the tower';
+  return workerName(s, d.workerId);
 }
 
 /** Gold to set aside when this is composed: notices promise their whole count up front. */
@@ -130,4 +134,11 @@ export function cancelDesign(s: SimState, designId: number): void {
 /** Does this carrier keep someone writing? */
 export function hasWriteLine(c: Carrier): boolean {
   return c.orders.some((o) => o[0].t === 'WRITE');
+}
+
+/** A blueprint for the next floor: no orders on it, just a drawing to carry up the tower. */
+export function newBlueprint(s: SimState): Carrier {
+  const c = newCarrier(s, [], 0, { kind: 'tower' });
+  c.kind = 'blueprint';
+  return c;
 }

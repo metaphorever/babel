@@ -1,7 +1,7 @@
 import { log } from './actions';
-import { boardReserve, cancelDesign, carrierText, destText, newCarrier, queueDesign } from './carriers';
-import { isValidLine, makeOrder, type Noun, type Verb } from './lang';
-import { SCRIBE } from './tuning';
+import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCarrier, queueDesign } from './carriers';
+import { isValidLine, makeOrder, takesPlaces, type Noun, type Place, type Verb } from './lang';
+import { SCRIBE, TOWER } from './tuning';
 import type { Dest, SimState } from './types';
 
 // Every player action is a command. The sim applies commands at the start of
@@ -15,6 +15,9 @@ import type { Dest, SimState } from './types';
 export interface ComposeLine {
   verb: Verb;
   noun: Noun | null;
+  /** Where from and where to (hauling only). */
+  from?: Place | null;
+  to?: Place | null;
   /** Units to finish before moving to the next line (the notice count, for a notice). */
   count: number;
 }
@@ -29,7 +32,8 @@ export type Command =
     }
   | { type: 'cancelDesign'; playerId: number; designId: number }
   | { type: 'removeNotice'; playerId: number; noticeId: number }
-  | { type: 'takeDown'; playerId: number; carrierId: number };
+  | { type: 'takeDown'; playerId: number; carrierId: number }
+  | { type: 'blueprint'; playerId: number };
 
 export interface StampedCommand {
   tick: number;
@@ -48,7 +52,7 @@ function countless(verb: Verb): boolean {
 }
 
 function buildCarrier(s: SimState, cmd: Extract<Command, { type: 'compose' }>) {
-  const lines = cmd.lines.map((l) => ({ order: makeOrder(l.verb, l.noun), count: countless(l.verb) ? 1 : l.count }));
+  const lines = cmd.lines.map((l) => ({ order: makeOrder(l.verb, l.noun, { from: l.from, to: l.to }), count: countless(l.verb) ? 1 : l.count }));
   return newCarrier(s, lines, cmd.wage, cmd.dest);
 }
 
@@ -60,9 +64,14 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       for (const l of cmd.lines) {
         if (!isValidLine(l.verb, l.noun)) return { ok: false, error: 'One of the lines makes no sense.' };
         if (!countless(l.verb) && (!Number.isInteger(l.count) || l.count < 1 || l.count > 999)) return { ok: false, error: 'Counts must be 1 to 999.' };
+        const places = [l.from, l.to].filter((p): p is Place => p !== undefined && p !== null);
+        if (places.length > 0 && !takesPlaces(l.verb)) return { ok: false, error: `"${l.verb.toLowerCase()}" doesn't take a from or to.` };
+        if (places.some((p) => !Number.isInteger(p) || p < 0 || p > TOWER.maxFloors)) return { ok: false, error: 'No such floor.' };
+        if (l.from !== undefined && l.from !== null && l.from === l.to) return { ok: false, error: 'From and to are the same place.' };
       }
       if (cmd.lines[0].verb === 'REPEAT') return { ok: false, error: 'Repeat what? Put it after the lines to repeat.' };
       if (!Number.isInteger(cmd.wage) || cmd.wage < 0 || cmd.wage > 50) return { ok: false, error: 'Wage must be 0 to 50.' };
+      if (cmd.dest.kind === 'tower') return { ok: false, error: 'Only blueprints go to the top of the tower.' };
       const who = cmd.dest.kind === 'board' ? cmd.dest.addressee : cmd.dest.workerId;
       if (who !== null && !s.workers.some((w) => w.id === who)) return { ok: false, error: 'Who is it for?' };
       // what it would promise up front (only notices do)
@@ -79,6 +88,11 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
     case 'takeDown':
       if (!s.boardScrolls.some((c) => c.id === cmd.carrierId)) return { ok: false, error: 'Somebody already took it.' };
       return { ok: true };
+    case 'blueprint': {
+      const planned = s.floors + s.projects.length + s.designs.filter((d) => d.carrier.kind === 'blueprint').length;
+      if (planned >= TOWER.maxFloors) return { ok: false, error: 'The tower is as tall as this world allows.' };
+      return { ok: true };
+    }
   }
 }
 
@@ -110,6 +124,12 @@ export function applyCommand(s: SimState, cmd: Command): CommandResult {
       s.boardScrolls = s.boardScrolls.filter((c) => c.id !== cmd.carrierId);
       log(s, 'Took down a scroll from the board.');
       break;
+    case 'blueprint': {
+      // a drawing for the next floor; a courier has to carry it to the top
+      queueDesign(s, newBlueprint(s));
+      log(s, 'Sent to the scriptorium: a blueprint for the next floor.');
+      break;
+    }
   }
   return { ok: true };
 }

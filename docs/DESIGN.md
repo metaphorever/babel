@@ -369,6 +369,14 @@ All the numbers in this section are placeholders until playtests say otherwise.
 - **A line that can't be done is skipped,** and the holder takes a short breather. A loop that keeps failing doesn't pin a worker in place.
 - **`CHECK BOARD` ends the scroll** and sends the worker to read the board.
 - **With nothing to write but something to deliver,** a scribe moves on to DELIVER, so the outbox never gets stuck.
+
+**How P0 builds the tower (provisional):**
+- **A floor starts with a blueprint.** The scribe draws it, which is slow, and someone with DELIVER carries it to the top finished floor. Only then can anyone build. Blueprints stack: post three and floors 1 to 3 are planned in order.
+- **`[BUILD] [TOWER]`** works on the lowest floor under way. The builder fetches stone (for the walls of the story below) or wood (for the deck) from the highest stockpile below that floor, climbs up, and sets it in place from the story below. Builders count what's already being carried up, so they don't all fetch the same thing. When the last unit is set, a ladder goes in (alternating sides, so every trip up crosses each floor) and the floor gets its own stockpile.
+- **`[HAUL] [STONE] [FROM] [base] [TO] [floor 3]`** moves goods between stockpiles. That's how you keep builders from climbing to the ground for every armload. Without FROM, haul picks up whatever is lying around. Without TO, it goes to the base.
+- **Couriers:** a worker holding `[DELIVER] [REPEAT]` waits at the scriptorium and carries whatever is in the outbox. A scribe whose scroll has no DELIVER line leaves what they write in the outbox. So `[WRITE] [REPEAT]` plus a courier divides the labour.
+- **Starting stock:** the patron's gift is 10 stone and 8 wood in the base stockpile, enough to start floor 1.
+- **Not in yet:** mailboxes and upper job boards, falling, structural load, and acts of god.
 - **Scroll wages come out of the treasury as each line is done.** Nothing is reserved up front, because a loop has no end. If the treasury is empty, the line goes unpaid and the worker's mood drops.
 - **Taking a notice down is immediate.** That's a P0 shortcut, since the ground board sits beside the scriptorium.
 

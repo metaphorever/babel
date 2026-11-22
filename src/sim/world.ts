@@ -70,14 +70,25 @@ export function buildWorld(s: SimState): void {
     x0: d.x0,
     x1: d.x1,
     y: standRow,
+    level: 0,
     store: emptyStore(),
   }));
 }
 
+/** The first site of a kind. For stockpiles that's the base stockpile on the ground. */
 export function siteOf(s: SimState, kind: SiteKind): Site {
   const site = s.sites.find((x) => x.kind === kind);
   if (!site) throw new Error(`missing site ${kind}`);
   return site;
+}
+
+/** The stockpile on a given level (0 = the base stockpile), if there is one. */
+export function stockpileOn(s: SimState, level: number): Site | null {
+  return s.sites.find((x) => x.kind === 'stockpile' && x.level === level) ?? null;
+}
+
+export function stockpiles(s: SimState): Site[] {
+  return s.sites.filter((x) => x.kind === 'stockpile');
 }
 
 /**

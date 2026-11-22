@@ -3,13 +3,14 @@ import { Sim, createState, hashState, replay, step } from '../src/sim/sim';
 import { findPath } from '../src/sim/path';
 import { setTile } from '../src/sim/world';
 import { Tile } from '../src/sim/types';
-import { siteOf } from '../src/sim/world';
+import { siteOf, stockpileOn } from '../src/sim/world';
 import { applyCommand } from '../src/sim/commands';
 import { levelOf } from '../src/sim/skills';
 import { newCarrier, pinNotice } from '../src/sim/carriers';
 import type { Command } from '../src/sim/commands';
 import { giveCarrier } from '../src/sim/scrolls';
-import { makeOrder, type Noun, type Verb, type WorkVerb } from '../src/sim/lang';
+import { makeOrder, orderText, parseOrder, type Noun, type Verb, type WorkVerb } from '../src/sim/lang';
+import { newProject, placeMaterial } from '../src/sim/tower';
 import type { Dest } from '../src/sim/types';
 import { SKILLS } from '../src/sim/tuning';
 
@@ -196,10 +197,11 @@ describe('skills and multi-unit work', () => {
     s.items.push({ id: s.nextId++, type: 'stone', x: w.x, y, reservedBy: null });
     s.items.push({ id: s.nextId++, type: 'stone', x: w.x + 1, y, reservedBy: null });
     const gold = s.gold;
+    const stoneBefore = siteOf(s, 'stockpile').store.stone;
     post(s, 'HAUL', 'STONE', 2, 3, w.id);
     let t = 0;
     while (s.notices.length > 0 && t++ < 4000) step(s);
-    expect(siteOf(s, 'stockpile').store.stone).toBe(2);
+    expect(siteOf(s, 'stockpile').store.stone - stoneBefore).toBe(2);
     expect(w.jobsDone).toBe(1); // one trip
     expect(gold - s.gold).toBe(6);
   });
@@ -349,3 +351,55 @@ describe('the board, hand delivery and the standing charter', () => {
     expect(runUntil(s, () => other.held.some((c) => c.orders[0][0].t === 'CHOP') || s.outbox.length === 0, 20 * 300)).toBe(true);
   });
 });
+
+describe('the tower', () => {
+  it('a blueprint carried up starts a floor; builders finish it with a ladder', () => {
+    const s = createState(7);
+    applyCommand(s, { type: 'blueprint', playerId: 0 });
+    applyCommand(s, noticeCmd('BUILD', 'TOWER', 40, 1));
+    expect(runUntil(s, () => s.projects.length > 0, 3000)).toBe(true);
+    expect(runUntil(s, () => s.floors === 1, 20 * 400)).toBe(true);
+    // the new floor is walkable: there's a path from the ground to its stockpile
+    const top = stockpileOn(s, 1)!;
+    expect(top).not.toBeNull();
+    const ground = siteOf(s, 'beds');
+    expect(findPath(s, { x: ground.x0, y: ground.y }, { x: top.x0, y: top.y })).not.toBeNull();
+  });
+
+  it('nobody builds without a blueprint', () => {
+    const s = createState(7);
+    applyCommand(s, noticeCmd('BUILD', 'TOWER', 40, 5));
+    run(s, 3000);
+    expect(s.floors).toBe(0);
+    expect(s.projects.length).toBe(0);
+  });
+
+  it('haul can move goods between stockpiles', () => {
+    const s = createState(7);
+    // build floor 1 quickly by hand, then haul stone up to it
+    s.projects.push(newProject(s, 1));
+    const p = s.projects[0];
+    for (let i = 0; i < p.needs.stone; i++) placeMaterial(s, p, 'stone');
+    for (let i = 0; i < p.needs.wood; i++) placeMaterial(s, p, 'wood');
+    expect(s.floors).toBe(1);
+    const w = s.workers[2];
+    applyCommand(s, scrollCmdPlaces('HAUL', 'STONE', 0, 1, 3, w.id));
+    expect(runUntil(s, () => (stockpileOn(s, 1)?.store.stone ?? 0) >= 3, 20 * 300)).toBe(true);
+  });
+
+  it('orders with places read back the way they were written', () => {
+    const o = makeOrder('HAUL', 'STONE', { from: 0, to: 3 });
+    expect(orderText(o)).toBe('haul stone from base to floor 3');
+    expect(parseOrder(o)).toEqual({ verb: 'HAUL', noun: 'STONE', from: 0, to: 3 });
+  });
+
+  it('only hauling takes places', () => {
+    const s = createState(7);
+    const r = applyCommand(s, { type: 'compose', playerId: 0, lines: [{ verb: 'MINE', noun: 'STONE', from: 0, to: 1, count: 1 }], wage: 0, dest: { kind: 'board', addressee: null } });
+    expect(r.ok).toBe(false);
+  });
+});
+
+function scrollCmdPlaces(verb: Verb, noun: Noun, from: number, to: number, count: number, workerId: number): Command {
+  return { type: 'compose', playerId: 0, lines: [{ verb, noun, from, to, count }], wage: 0, dest: { kind: 'worker', workerId } };
+}

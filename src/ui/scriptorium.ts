@@ -5,6 +5,7 @@ import {
   SCROLL_LINES,
   VALID_JOBS,
   isWorkVerb,
+  takesPlaces,
   type Dest,
   type Noun,
   type Sim,
@@ -21,7 +22,14 @@ function cap(s: string): string {
 interface DraftLine {
   verb: Verb;
   noun: Noun | null;
+  /** Hauling only: from a stockpile (null = whatever's lying around) and to one (base by default). */
+  from: number | null;
+  to: number | null;
   count: number;
+}
+
+function place(level: number): string {
+  return level === 0 ? 'the base' : `floor ${level}`;
 }
 
 const VERB_LABEL: Record<Verb, string> = {
@@ -30,6 +38,7 @@ const VERB_LABEL: Record<Verb, string> = {
   HARVEST: 'Harvest',
   COOK: 'Cook',
   HAUL: 'Haul',
+  BUILD: 'Build',
   WRITE: 'Write',
   DELIVER: 'Deliver',
   CHECK: 'Check the board',
@@ -45,6 +54,7 @@ function nounsFor(verb: Verb): readonly Noun[] {
 
 const COUNT_HINT: Partial<Record<Verb, string>> = {
   WRITE: 'designs',
+  BUILD: 'materials',
   DELIVER: '',
 };
 
@@ -57,36 +67,43 @@ const VERB_ORDER: Verb[] = [...new Set(SCROLL_LINES.map((l) => l.verb))];
 const PRESETS: { label: string; lines: DraftLine[] }[] = [
   {
     label: 'Notice: mine ×20',
-    lines: [{ verb: 'MINE', noun: 'STONE', count: 20 }],
+    lines: [{ verb: 'MINE', noun: 'STONE', from: null, to: null, count: 20 }],
   },
   {
     label: 'Scribe loop',
     lines: [
-      { verb: 'WRITE', noun: null, count: 1 },
-      { verb: 'DELIVER', noun: null, count: 1 },
-      { verb: 'REPEAT', noun: null, count: 1 },
+      { verb: 'WRITE', noun: null, from: null, to: null, count: 1 },
+      { verb: 'DELIVER', noun: null, from: null, to: null, count: 1 },
+      { verb: 'REPEAT', noun: null, from: null, to: null, count: 1 },
     ],
   },
   {
     label: 'Mine & haul loop',
     lines: [
-      { verb: 'MINE', noun: 'STONE', count: 2 },
-      { verb: 'HAUL', noun: 'STONE', count: 2 },
-      { verb: 'REPEAT', noun: null, count: 1 },
+      { verb: 'MINE', noun: 'STONE', from: null, to: null, count: 2 },
+      { verb: 'HAUL', noun: 'STONE', from: null, to: null, count: 2 },
+      { verb: 'REPEAT', noun: null, from: null, to: null, count: 1 },
     ],
   },
   {
     label: 'Farm & cook loop',
     lines: [
-      { verb: 'HARVEST', noun: 'GRAIN', count: 2 },
-      { verb: 'HAUL', noun: 'GRAIN', count: 2 },
-      { verb: 'COOK', noun: 'BREAD', count: 2 },
-      { verb: 'REPEAT', noun: null, count: 1 },
+      { verb: 'HARVEST', noun: 'GRAIN', from: null, to: null, count: 2 },
+      { verb: 'HAUL', noun: 'GRAIN', from: null, to: null, count: 2 },
+      { verb: 'COOK', noun: 'BREAD', from: null, to: null, count: 2 },
+      { verb: 'REPEAT', noun: null, from: null, to: null, count: 1 },
+    ],
+  },
+  {
+    label: 'Builder loop',
+    lines: [
+      { verb: 'BUILD', noun: 'TOWER', from: null, to: null, count: 3 },
+      { verb: 'REPEAT', noun: null, from: null, to: null, count: 1 },
     ],
   },
   {
     label: 'Release (check the board)',
-    lines: [{ verb: 'CHECK', noun: 'BOARD', count: 1 }],
+    lines: [{ verb: 'CHECK', noun: 'BOARD', from: null, to: null, count: 1 }],
   },
 ];
 
@@ -178,6 +195,8 @@ export class ScriptoriumPanel {
       verbSel.addEventListener('change', () => {
         line.verb = verbSel.value as Verb;
         line.noun = nounsFor(line.verb)[0] ?? null;
+        line.from = null;
+        line.to = null;
         this.renderLines();
       });
       const nouns = nounsFor(line.verb);
@@ -190,6 +209,21 @@ export class ScriptoriumPanel {
         nounEl = nounSel;
       } else if (nouns.length === 1 && line.verb !== 'CHECK') {
         nounEl = h('span', { class: 'slot-fixed' }, nouns[0].toLowerCase());
+      }
+      const placeEls: HTMLElement[] = [];
+      if (takesPlaces(line.verb)) {
+        const floors = this.s.floors;
+        const fromSel = h('select', { 'aria-label': `Line ${i + 1} from` }, h('option', { value: '' }, 'lying around'));
+        const toSel = h('select', { 'aria-label': `Line ${i + 1} to` });
+        for (let k = 0; k <= floors; k++) {
+          fromSel.append(h('option', { value: String(k) }, `from ${place(k)}`));
+          toSel.append(h('option', { value: String(k) }, `to ${place(k)}`));
+        }
+        fromSel.value = line.from === null ? '' : String(line.from);
+        toSel.value = String(line.to ?? 0);
+        fromSel.addEventListener('change', () => ((line.from = fromSel.value === '' ? null : Number(fromSel.value)), this.updateSummary()));
+        toSel.addEventListener('change', () => ((line.to = Number(toSel.value)), this.updateSummary()));
+        placeEls.push(fromSel, toSel);
       }
       let countEl: HTMLElement = h('span', { class: 'slot-empty' });
       if (hasCount(line.verb)) {
@@ -204,6 +238,7 @@ export class ScriptoriumPanel {
           h('span', { class: 'line-no' }, `${i + 1}.`),
           verbSel,
           nounEl,
+          ...placeEls,
           countEl,
           this.lines.length > 1
             ? h('button', { class: 'btn btn-small', title: 'Remove line', onclick: () => (this.lines.splice(i, 1), this.renderLines()) }, '×')
@@ -213,7 +248,7 @@ export class ScriptoriumPanel {
     });
     if (this.lines.length < SCRIBE.maxLines) {
       this.linesEl.append(
-        h('button', { class: 'btn btn-small', onclick: () => (this.lines.push({ verb: 'MINE', noun: 'STONE', count: 1 }), this.renderLines()) }, '+ Add a line'),
+        h('button', { class: 'btn btn-small', onclick: () => (this.lines.push({ verb: 'MINE', noun: 'STONE', from: null, to: null, count: 1 }), this.renderLines()) }, '+ Add a line'),
       );
     }
     this.updateSummary();
@@ -248,8 +283,10 @@ export class ScriptoriumPanel {
       text = `A notice. ${d.addressee === null ? 'Anyone' : name(d.addressee)} can take one job at a time from it until ${first.count} are done. Sets aside ${first.count * wage} gold now.`;
     } else if (d.kind === 'board') {
       text = `A ${this.lines.length > 1 ? 'scroll' : 'card'} on the board. The first ${d.addressee === null ? 'free worker' : name(d.addressee)} to read it takes it down and carries it out${loops ? ', looping until someone hands them something else' : ''}.`;
-    } else {
+    } else if (d.kind === 'worker') {
       text = `Handed straight to ${name(d.workerId)}. It replaces whatever they're doing${loops ? ', and loops until they are handed something else' : ''}.`;
+    } else {
+      text = 'A blueprint, carried to the top of the tower.';
     }
     if (!notice && wage > 0) text += ` Paid from the treasury as the work is done.`;
     this.summary.textContent = text;
@@ -259,15 +296,21 @@ export class ScriptoriumPanel {
     const r = this.sim.enqueue({
       type: 'compose',
       playerId: 0,
-      lines: this.lines.map((l) => ({ verb: l.verb, noun: l.noun, count: l.count })),
+      lines: this.lines.map((l) => ({ verb: l.verb, noun: l.noun, from: takesPlaces(l.verb) ? l.from : null, to: takesPlaces(l.verb) && (l.from !== null || (l.to ?? 0) !== 0) ? l.to ?? 0 : null, count: l.count })),
       wage: Math.floor(Number(this.wageIn.value)),
       dest: this.dest(),
     });
     this.error.textContent = r.ok ? '' : r.error;
   }
 
+  private floorsSeen = -1;
+
   refresh(): void {
     this.syncWho();
+    if (this.floorsSeen !== this.s.floors) {
+      this.floorsSeen = this.s.floors;
+      this.renderLines();
+    }
     const s = this.s;
     clear(this.queue);
     if (s.designs.length === 0) this.queue.append(h('div', { class: 'hint' }, 'Nothing waiting.'));

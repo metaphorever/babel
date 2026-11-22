@@ -15,7 +15,7 @@ import { buildWorld, siteOf } from './world';
 
 export function createState(seed: number): SimState {
   const s: SimState = {
-    version: 3,
+    version: 4,
     seed,
     tick: 0,
     rng: seedRng(seed),
@@ -30,13 +30,19 @@ export function createState(seed: number): SimState {
     designs: [],
     boardScrolls: [],
     outbox: [],
+    projects: [],
+    floors: 0,
     gold: ECONOMY.startingGold,
     reserved: 0,
     events: [],
   };
   buildWorld(s);
   siteOf(s, 'kitchen').store.bread = 16;
-  siteOf(s, 'stockpile').store.grain = 10;
+  // the patron's gift: enough to start
+  const base = siteOf(s, 'stockpile');
+  base.store.grain = 10;
+  base.store.stone = 10;
+  base.store.wood = 8;
   for (let i = 0; i < POPULATION.start; i++) addWorker(s);
 
   // The patron left a few notices up so the ground is busy from the start.

@@ -3,10 +3,32 @@
 
 export const TICKS_PER_SECOND = 20;
 
+/** Tallest tower the world has room for (the patron's goals go beyond this later). */
+const MAX_FLOORS = 30;
+const FLOOR_HEIGHT = 4; // tiles per story: a deck plus three rows of headroom
+
 export const WORLD = {
   width: 128,
-  height: 64,
-  groundRow: 48, // first solid row
+  groundRow: 8 + MAX_FLOORS * FLOOR_HEIGHT, // first solid row
+  height: 8 + MAX_FLOORS * FLOOR_HEIGHT + 16,
+};
+
+export const TOWER = {
+  maxFloors: MAX_FLOORS,
+  floorHeight: FLOOR_HEIGHT,
+  /** Footprint of every floor, in tiles (inside the tower site). */
+  x0: 76,
+  x1: 91,
+  /** Materials to build one floor: stone for the walls of the story below, wood for the deck and ladder. */
+  stonePerFloor: 8,
+  woodPerFloor: 6,
+  /** Work ticks to set one unit of material in place. */
+  buildTicks: 30,
+  /** Writing a blueprint takes this long (in scribe work units). */
+  blueprintCost: 220,
+  /** Each finished floor gets a small stockpile on its deck, this wide. */
+  stockpileX0: 82,
+  stockpileX1: 86,
 };
 
 export const MOVE = {

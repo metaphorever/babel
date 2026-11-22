@@ -31,6 +31,7 @@ const ui = new Ui(document.getElementById('ui')!, sim, {
     if (n > 0) lastSpeed = n;
     speed = n;
   },
+  centerOnTile: (x, y) => renderer.centerOn(x * TILE, y * TILE),
   centerOnWorker: (id) => {
     const w = sim.state.workers.find((x) => x.id === id);
     if (w) renderer.centerOn(w.x * TILE, w.y * TILE);
@@ -107,6 +108,7 @@ canvas.addEventListener('click', (e) => {
   const site = renderer.siteAt(sim.state, p.x, p.y);
   if (site?.kind === 'board') ui.wm.show('board');
   else if (site?.kind === 'scriptorium') ui.wm.show('scriptorium');
+  else if (site?.kind === 'foundation') ui.wm.show('tower');
   else if (site?.kind === 'stockpile' || site?.kind === 'kitchen') ui.wm.show('stores');
   else ui.select(null);
 });

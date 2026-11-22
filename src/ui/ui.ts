@@ -19,6 +19,7 @@ import {
 } from '../sim';
 import { bar, clear, h } from './dom';
 import { ScriptoriumPanel } from './scriptorium';
+import { TowerPanel } from './tower';
 import { WindowManager } from './windows';
 
 const DOING: Record<ActivityKind, string> = {
@@ -56,12 +57,15 @@ export interface UiHooks {
   getSpeed(): number;
   setSpeed(n: number): void;
   centerOnWorker(id: number): void;
+  /** Center the view on a tile. */
+  centerOnTile(x: number, y: number): void;
 }
 
 export class Ui {
   selected: number | null = null;
   wm: WindowManager;
   scriptorium!: ScriptoriumPanel;
+  tower!: TowerPanel;
 
   private gold!: HTMLElement;
   private clock!: HTMLElement;
@@ -81,6 +85,7 @@ export class Ui {
     this.buildMenubar();
     this.buildBoard();
     this.scriptorium = new ScriptoriumPanel(this.wm, this.sim);
+    this.tower = new TowerPanel(this.wm, this.sim, (x, y) => this.hooks.centerOnTile(x, y));
     this.wm.create('inspector', 'Worker', -336, 34, 320);
     this.wm.create('roster', 'Workers', -656, 34, 300);
     this.wm.create('stores', 'Stores', 390, 34, 220);
@@ -116,6 +121,7 @@ export class Ui {
       h('span', { class: 'menu-apple' }, 'Babel'),
       menu('Job Board', 'board'),
       menu('Scriptorium', 'scriptorium'),
+      menu('Tower', 'tower'),
       menu('Workers', 'roster'),
       menu('Stores', 'stores'),
       menu('Log', 'log'),
@@ -306,7 +312,9 @@ export class Ui {
     const win = this.wm.get('stores')!;
     if (!win.open) return;
     clear(win.body);
-    const pile = this.s.sites.find((x) => x.kind === 'stockpile')!;
+    // totals across every stockpile, on the ground and up the tower
+    const pile = { store: { stone: 0, wood: 0, grain: 0, bread: 0 } };
+    for (const sp of this.s.sites) if (sp.kind === 'stockpile') for (const k of ['stone', 'wood', 'grain'] as const) pile.store[k] += sp.store[k];
     const kitchen = this.s.sites.find((x) => x.kind === 'kitchen')!;
     const loose = { stone: 0, wood: 0, grain: 0, bread: 0 };
     for (const it of this.s.items) loose[it.type]++;
@@ -314,7 +322,7 @@ export class Ui {
     t.append(h('tr', {}, h('th', {}, ''), h('th', {}, 'Stored'), h('th', {}, 'Lying around')));
     for (const k of ['stone', 'wood', 'grain'] as const) t.append(h('tr', {}, h('td', {}, cap(k)), h('td', { class: 'num' }, pile.store[k]), h('td', { class: 'num' }, loose[k])));
     t.append(h('tr', {}, h('td', {}, 'Bread'), h('td', { class: 'num' }, kitchen.store.bread), h('td', { class: 'hint' }, 'in the larder')));
-    win.body.append(t);
+    win.body.append(t, h('div', { class: 'hint' }, 'Stored counts every stockpile. The Tower window shows each floor.'));
   }
 
   private lastLogTick = -1;
@@ -363,6 +371,7 @@ export class Ui {
     if (this.mouseDown) return;
     if (this.wm.get('board')!.open) this.refreshBoard();
     if (this.wm.get('scriptorium')!.open) this.scriptorium.refresh();
+    if (this.wm.get('tower')!.open) this.tower.refresh();
     this.refreshInspector();
     this.refreshRoster();
     this.refreshStores();

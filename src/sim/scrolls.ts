@@ -1,9 +1,10 @@
 import { addMoodlet, log, moveTo, releaseReservations } from './actions';
 import { startActivity, train, workOrder, type Result } from './activities';
-import { carrierText, lineText, pinCarrier } from './carriers';
+import { carrierText, hasWriteLine, lineText, pinCarrier } from './carriers';
 import { type Verb } from './lang';
 import { skillLevel } from './skills';
 import { MOOD, SCRIBE } from './tuning';
+import { startFloorFromBlueprint, topSpot } from './tower';
 import type { Carrier, SimState, Worker } from './types';
 import { siteOf, spotFor } from './world';
 
@@ -124,6 +125,10 @@ function removeCarrier(s: SimState, w: Worker, c: Carrier): void {
 
 // ------------------------------------------------------------------ WRITE
 
+function delivers(c: Carrier): boolean {
+  return c.orders.some((o) => o[0].t === 'DELIVER');
+}
+
 function writeSpeed(w: Worker): number {
   return 1 + skillLevel(w, 'writing') * SCRIBE.speedPerLevel;
 }
@@ -144,11 +149,11 @@ function writeLine(s: SimState, w: Worker): Result {
   }
   let d = s.designs.find((x) => x.claimedBy === w.id);
   if (!d) {
-    if (w.bag.length >= SCRIBE.bagSize) return scrollLineFailed(s, w, 'My bag is full.');
+    if (delivers(activeCarrier(w)!) && w.bag.length >= SCRIBE.bagSize) return scrollLineFailed(s, w, 'My bag is full.');
     d = s.designs.find((x) => x.claimedBy === null);
     if (!d) {
       // nothing to write, but things waiting to go out: move on to delivering
-      if (w.bag.some((b) => b.retryAfter <= s.tick) || s.outbox.length > 0) return scrollLineDone(s, w, 0, true);
+      if (delivers(activeCarrier(w)!) && (w.bag.some((b) => b.retryAfter <= s.tick) || s.outbox.length > 0)) return scrollLineDone(s, w, 0, true);
       w.thought = 'Nothing to write. Waiting at the desk.';
       return 'running';
     }
@@ -158,7 +163,9 @@ function writeLine(s: SimState, w: Worker): Result {
   d.progress += writeSpeed(w);
   if (d.progress < d.cost) return 'running';
   s.designs = s.designs.filter((x) => x !== d);
-  w.bag.push(d.carrier);
+  // a scribe who also delivers keeps it in their bag; a pure writer leaves it in the outbox
+  if (delivers(activeCarrier(w)!)) w.bag.push(d.carrier);
+  else s.outbox.push(d.carrier);
   train(s, w, 'writing');
   return scrollLineDone(s, w, 1);
 }
@@ -182,6 +189,12 @@ function deliverLine(s: SimState, w: Worker): Result {
       while (s.outbox.length > 0 && w.bag.length < SCRIBE.bagSize) w.bag.push(s.outbox.shift()!);
       return 'running';
     }
+    // a dedicated courier (no writing to do) waits at the scriptorium for work
+    if (a.timer === 0 && w.bag.length === 0 && !hasWriteLine(activeCarrier(w)!)) {
+      w.thought = 'Waiting at the scriptorium for something to deliver.';
+      moveTo(s, w, spotFor(siteOf(s, 'scriptorium'), w.id));
+      return 'running';
+    }
     if (a.timer === 0) w.thought = w.bag.length ? 'Nobody can take these yet.' : 'Nothing to deliver.';
     return scrollLineDone(s, w, a.timer, true);
   }
@@ -197,6 +210,21 @@ function deliverLine(s: SimState, w: Worker): Result {
     pinCarrier(s, c);
     a.timer++;
     log(s, `${w.name} pinned up: ${carrierText(c)}.`, w.id);
+    return 'running';
+  }
+  if (c.dest.kind === 'tower') {
+    // blueprints are carried all the way up to the top finished floor
+    w.thought = 'Carrying a blueprint up the tower.';
+    const m = moveTo(s, w, topSpot(s));
+    if (m === 'moving') return 'running';
+    if (m === 'unreachable') {
+      c.retryAfter = s.tick + SCRIBE.retryTicks;
+      return 'running';
+    }
+    w.bag = w.bag.filter((x) => x !== c);
+    a.timer++;
+    log(s, `${w.name} carried a blueprint to the top of the tower.`, w.id);
+    startFloorFromBlueprint(s);
     return 'running';
   }
   const dest = c.dest;

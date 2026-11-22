@@ -1,4 +1,5 @@
-import { MOOD, Tile, type SimState, type Site, type Worker } from '../sim';
+import { MOOD, TOWER, Tile, type SimState, type Site, type Worker } from '../sim';
+import { activeProject, deckRow, projectFraction } from '../sim/tower';
 import { INK, PAPER, Patterns, type PatternName } from './patterns';
 import { glyphSprite, itemSprite, propSprite, workerSprite } from './sprites';
 
@@ -101,6 +102,7 @@ export class Renderer {
     g.fillRect(0, 0, bw, bh);
     g.translate(-cx, -cy);
 
+    this.drawSky(s, cy, bh);
     this.drawTiles(s, cx, cy, bw, bh);
     for (const site of s.sites) this.drawSite(s, site);
     this.drawItems(s);
@@ -141,8 +143,15 @@ export class Renderer {
           this.rect(px, py, TILE, TILE, depth >= 3 ? 'checker' : depth >= 1 ? 'light' : 'sparse');
           if (above !== Tile.Dirt) this.rect(px, py, TILE, 1);
         } else if (t === Tile.Deck) {
+          // wooden planks: a dark top edge, grain lines, a plank joint
+          this.rect(px, py, TILE, TILE, 'hstripe');
+          this.rect(px, py, TILE, 2);
+          this.rect(px + ((x * 5) % 7), py + 2, 1, TILE - 2);
+          this.rect(px, py + TILE - 1, TILE, 1);
+        } else if (t === Tile.Wall) {
           this.rect(px, py, TILE, TILE, 'brick');
-          this.rect(px, py, TILE, 1);
+          this.rect(px, py, 1, TILE);
+          this.rect(px + TILE - 1, py, 1, TILE);
         } else if (t === Tile.Ladder) {
           this.rect(px + 1, py, 1, TILE);
           this.rect(px + 6, py, 1, TILE);
@@ -286,6 +295,20 @@ export class Renderer {
     }
   }
 
+  /** Clouds drift in above the first few floors, so height reads at a glance. */
+  private drawSky(s: SimState, cy: number, bh: number): void {
+    const groundPx = s.height * TILE;
+    for (let i = 0; i < 18; i++) {
+      const y = groundPx - 260 - ((i * 131) % (groundPx - 300));
+      if (y < cy - 20 || y > cy + bh + 20) continue;
+      const x = (i * 197 + Math.floor(s.tick / (40 + (i % 5) * 15))) % (s.width * TILE + 80) - 40;
+      const w = 24 + ((i * 7) % 4) * 8;
+      this.rect(x + 6, y, w - 12, 4, 'sparse');
+      this.rect(x, y + 4, w, 5, 'light');
+      this.rect(x, y + 9, w, 1);
+    }
+  }
+
   private tree(x: number, base: number, h: number): void {
     this.rect(x + 4, base - h + 8, 2, h - 8);
     const widths = [3, 5, 7, 9, 9, 9, 7, 5, 3];
@@ -396,7 +419,19 @@ export class Renderer {
     for (const site of s.sites) {
       const mid = ((site.x0 + site.x1 + 1) / 2) * TILE;
       const ground = (site.y + 1) * TILE;
-      tag(site.label, (mid - cx) * z, (ground - cy) * z + 6 * this.dpr);
+      // upper-floor stockpiles get a short label, tucked under their deck
+      tag(site.level > 0 ? 'Stockpile' : site.label, (mid - cx) * z, (ground - cy) * z + 6 * this.dpr);
+    }
+    // floor numbers down the right side of the tower, and the floor under way
+    const right = ((TOWER.x1 + 1) * TILE + 3 - cx) * z;
+    // a tag whose left edge sits at x
+    const tagLeft = (text: string, x: number, y: number) => tag(text, x + (ctx.measureText(text).width + 6 * this.dpr) / 2, y);
+    for (let k = 1; k <= s.floors; k++) {
+      tagLeft(`${k}`, right, (deckRow(k) * TILE - cy) * z - 4 * this.dpr);
+    }
+    const p = activeProject(s);
+    if (p) {
+      tagLeft(`Floor ${p.level}: ${Math.floor(projectFraction(p) * 100)}%`, right, (deckRow(p.level) * TILE - cy) * z - 4 * this.dpr);
     }
     for (const w of s.workers) {
       if (!(this.showNames || w.id === selected || w.id === hover)) continue;

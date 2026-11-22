@@ -12,6 +12,8 @@ export const Tile = {
   Dirt: 1,
   Ladder: 2,
   Deck: 3,
+  /** Stone wall of a tower story. Background only: workers walk past it. */
+  Wall: 4,
 } as const;
 export type Tile = (typeof Tile)[keyof typeof Tile];
 
@@ -42,6 +44,8 @@ export interface Site {
   x1: number; // inclusive
   /** Row workers stand on while using the site. */
   y: number;
+  /** Tower level: 0 on the ground, n on floor n. */
+  level: number;
   /** Stored goods (stockpile, larder). */
   store: Record<ItemType, number>;
 }
@@ -69,6 +73,8 @@ export interface Notice {
 export type Dest =
   /** Pinned on the board, for Anyone (null) or for one worker by name. */
   | { kind: 'board'; addressee: number | null }
+  /** A blueprint, carried to the top of the tower to start the next floor. */
+  | { kind: 'tower' }
   /** Handed straight to a worker. It replaces whatever they were doing. */
   | { kind: 'worker'; workerId: number };
 
@@ -83,7 +89,7 @@ export type Dest =
  */
 export interface Carrier {
   id: number;
-  kind: 'card' | 'scroll';
+  kind: 'card' | 'scroll' | 'blueprint';
   orders: Order[];
   /** Units to finish on each line before moving on. */
   counts: number[];
@@ -113,13 +119,28 @@ export interface Design {
   postedTick: number;
 }
 
+/** Materials that go into a floor. */
+export type BuildMaterial = 'stone' | 'wood';
+
+/**
+ * A floor under construction. It starts when a blueprint reaches the top of
+ * the tower; builders bring materials up and set them in place from the
+ * story below. When it's done, a ladder goes in and the floor is walkable.
+ */
+export interface Project {
+  id: number;
+  level: number;
+  needs: Record<BuildMaterial, number>;
+  placed: Record<BuildMaterial, number>;
+}
+
 export interface Job {
   noticeId: number;
   order: Order;
   wage: number;
 }
 
-export type SkillId = 'mining' | 'woodcutting' | 'farming' | 'cooking' | 'hauling' | 'writing';
+export type SkillId = 'mining' | 'woodcutting' | 'farming' | 'cooking' | 'hauling' | 'writing' | 'building';
 
 export type TraitId =
   | 'strong'
@@ -230,7 +251,7 @@ export interface GameEvent {
 }
 
 export interface SimState {
-  version: 3;
+  version: 4;
   seed: number;
   tick: number;
   rng: RngState;
@@ -249,6 +270,10 @@ export interface SimState {
   boardScrolls: Carrier[];
   /** Written carriers left at the scriptorium for the next courier. */
   outbox: Carrier[];
+  /** Floors being built, lowest first. */
+  projects: Project[];
+  /** Highest finished floor (0 = just the ground). */
+  floors: number;
   /** The scriptorium's writing queue. */
   designs: Design[];
 
