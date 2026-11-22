@@ -84,7 +84,7 @@ A design isn't an order until a **scribe** writes it out. The player composes or
 
 - **The tutorial chokepoint:** you can't write other orders until a scribe is set up on a loop, because a scribe out of orders has nothing to write.
 - **An early specialist:** scribes level up, and a fast scribe is precious. Overwork your best scribe and they may quit, so you either pamper them or spread the writing across several scribes.
-- **Bootstrapping:** the game starts with one scribe already hired by the patron, carrying the **patron's charter**: a single scroll that sets them up on the scribe loop. It's the only order the player doesn't have to have written. Writing it could be the tutorial's first step.
+- **Bootstrapping:** the game starts with one scribe already hired by the patron, carrying the scribe loop. After that, the **patron's standing charter** on the board ([§5.4.2](#542-the-patrons-standing-charter)) makes sure someone is always writing.
 - **Board notices have a count.** A posted notice is addressed to Anyone or to a named worker, and carries a count. `[MINE][STONE] (50)` means 50 stone, mined by one worker or any mix of workers, each taking it as their next task. **Counts and wages are per unit** (per stone, per loaf), and one trip can finish several units (see [§6.2](#62-personality)). If a trip finishes more units than are left, the worker is paid for what was left. **The count goes down when a job is finished, not when it's taken.** The notice comes down when its count runs out. A worker who arrives to finish a job that's already used up doesn't get paid, and gets mad (a mood hit). The mood hit scales with the job's wage. Big public jobs are usually low wage, so missing one of those stings only a little. Scribes write notices once rather than once per job, so the scribe limits throughput without choking the ground economy. Cards and scrolls that workers carry are used up.
 - **A scribe has to know a language to write in it.**
   - **New orders:** writing a new order in a language the scribe knows is fast. Without the language, it's possible but with a severe time penalty.
@@ -111,6 +111,26 @@ The player avoids this by ending a chain with a return order: `CHECK BOARD`, `CH
 - **Upper boards are expensive** and sit higher up the tech tree. Building one near the top automates the upper floors, until the tower grows past it and that top becomes the middle.
 - **Upper boards are stocked and changed by courier.** An upper board's cards are physical stock that a courier delivers in their bag ([§5.2](#52-carriers)). Changing its ratio also takes a delivered notice, because the player can't adjust a distant board directly. This keeps pillar 1 intact.
 
+#### 5.4.1 Notices, cards and scrolls
+
+- **A notice is a single job**, possibly a long one. `[MINE] [STONE] ×20` is a notice. So is `[HAUL] [STONE] [FROM] [base stockpile] [TO] [floor 3 stockpile] ×20`. The extra words are details about who, what or where, not extra steps. A notice stays on the board, and each worker who reads it takes one job from it into memory. `FROM`/`TO` places arrive with the tower.
+- **Cards and scrolls can be posted too.** Anything on the board that isn't a single-job notice is a physical carrier. The first eligible worker to read the board takes it down and carries it. This is how you get "anyone free, run this mining loop" without choosing who.
+- **One current job at a time.** A worker's current job is either the notice they took (held in memory) or the current line of the card or scroll in their hand. A scroll takes up a slot in their inventory, and it lets them chain lines without going back to the board.
+- **Every line has a count:** the units to finish before moving to the next line. A card handed to a worker with `[MINE] [STONE] ×20` means "mine 20, then you're done". On a scroll, `[MINE] [STONE] ×2 → [HAUL] [STONE] ×2 → [REPEAT]` mines two, hauls two, and loops.
+- **A name always wins.** At the board, anything addressed to a worker by name beats anything for Anyone.
+- **Handing someone an order replaces what they're doing.** That covers both their remembered job and any scroll they hold. This is how you reassign people, and how you release a scribe: hand them `[CHECK] [BOARD]`. If a released worker still had undelivered carriers in their bag, those go to the scriptorium's outbox, and the next courier picks them up.
+
+#### 5.4.2 The patron's standing charter
+
+A plaque on the board reads:
+
+> IF no one is writing, THEN post [write] [deliver] [repeat] for Anyone.
+
+It's the only conditional order in P0. It shows that conditionals are coming later, and it means firing or losing your scribes can never leave you with no way to write a new one. The charter's scroll beats anything else for Anyone, but not something addressed to a worker by name.
+
+#### 5.4.3 The composer
+
+The composer builds each line from typed slots. The verb decides what the later slots can hold: `HAUL` takes a material, then (with the tower) a `FROM` stockpile and a `TO` stockpile. `DELIVER` will take a destination: a mailbox, a board or a worker. In P0, the slots are verb, then material or object, then count. The composer also explains in plain words what the order will do once it's delivered.
 ### 5.5 Mailboxes
 
 A mailbox is a delivery point with an address. A courier drops carriers there, and a worker who runs `CHECK MAILBOX` picks up whatever is addressed to them or to that mailbox. A rule-based postal system (routing by address, floor, or language) comes later.
@@ -348,6 +368,7 @@ All the numbers in this section are placeholders until playtests say otherwise.
 - **With nothing queued, a scribe waits at the desk.**
 - **A line that can't be done is skipped,** and the holder takes a short breather. A loop that keeps failing doesn't pin a worker in place.
 - **`CHECK BOARD` ends the scroll** and sends the worker to read the board.
+- **With nothing to write but something to deliver,** a scribe moves on to DELIVER, so the outbox never gets stuck.
 - **Scroll wages come out of the treasury as each line is done.** Nothing is reserved up front, because a loop has no end. If the treasury is empty, the line goes unpaid and the worker's mood drops.
 - **Taking a notice down is immediate.** That's a P0 shortcut, since the ground board sits beside the scriptorium.
 

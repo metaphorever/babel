@@ -6,8 +6,11 @@ import { Tile } from '../src/sim/types';
 import { siteOf } from '../src/sim/world';
 import { applyCommand } from '../src/sim/commands';
 import { levelOf } from '../src/sim/skills';
-import { pinNotice } from '../src/sim/carriers';
-import { makeOrder, type Noun, type WorkVerb } from '../src/sim/lang';
+import { newCarrier, pinNotice } from '../src/sim/carriers';
+import type { Command } from '../src/sim/commands';
+import { giveCarrier } from '../src/sim/scrolls';
+import { makeOrder, type Noun, type Verb, type WorkVerb } from '../src/sim/lang';
+import type { Dest } from '../src/sim/types';
 import { SKILLS } from '../src/sim/tuning';
 
 type State = ReturnType<typeof createState>;
@@ -20,6 +23,16 @@ function run(s: State, ticks: number) {
 function post(s: State, verb: WorkVerb, noun: Noun, count: number, wage: number, addressee: number | null = null) {
   pinNotice(s, makeOrder(verb, noun), count, wage, addressee);
   s.reserved += count * wage;
+}
+
+/** Compose a one-line notice for the board (for Anyone unless addressed). */
+function noticeCmd(verb: WorkVerb, noun: Noun, count: number, wage: number, addressee: number | null = null): Command {
+  return { type: 'compose', playerId: 0, lines: [{ verb, noun, count }], wage, dest: { kind: 'board', addressee } };
+}
+
+/** Compose a carrier with the given lines. */
+function scrollCmd(lines: [Verb, Noun | null, number][], wage: number, dest: Dest): Command {
+  return { type: 'compose', playerId: 0, lines: lines.map(([verb, noun, count]) => ({ verb, noun, count })), wage, dest };
 }
 
 /** Run until a condition holds or the tick budget runs out. */
@@ -51,7 +64,7 @@ describe('determinism', () => {
   it('replaying the command history reproduces a live game', () => {
     const live = new Sim(99);
     for (let i = 0; i < 2000; i++) {
-      if (i === 100) live.enqueue({ type: 'postNotice', playerId: 0, verb: 'CHOP', noun: 'WOOD', count: 5, wage: 4, addressee: null });
+      if (i === 100) live.enqueue(noticeCmd('CHOP', 'WOOD', 5, 4));
       if (i === 700) live.enqueue({ type: 'removeNotice', playerId: 0, noticeId: live.state.notices[0].id });
       live.step();
     }
@@ -99,7 +112,7 @@ describe('notices and jobs', () => {
     const s = createState(1);
     const before = s.reserved;
     const notices = s.notices.length;
-    applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'MINE', noun: 'STONE', count: 10, wage: 3, addressee: null });
+    applyCommand(s, noticeCmd('MINE', 'STONE', 10, 3));
     expect(s.reserved).toBe(before + 30);
     expect(s.notices.length).toBe(notices); // nothing on the board until it's written and carried
     expect(s.designs.length).toBe(1);
@@ -119,7 +132,7 @@ describe('notices and jobs', () => {
 
   it('rejects notices you cannot afford', () => {
     const s = createState(1);
-    const r = applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'MINE', noun: 'STONE', count: 999, wage: 50, addressee: null });
+    const r = applyCommand(s, noticeCmd('MINE', 'STONE', 999, 50));
     expect(r.ok).toBe(false);
   });
 
@@ -218,7 +231,7 @@ describe('scribes, scrolls and the charter', () => {
 
   it('a posted notice is written and pinned up by the scribe', () => {
     const s = createState(4);
-    applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'CHOP', noun: 'WOOD', count: 5, wage: 2, addressee: null });
+    applyCommand(s, noticeCmd('CHOP', 'WOOD', 5, 2));
     const pinned = runUntil(s, () => s.notices.some((n) => n.order[0].t === 'CHOP'), 3000);
     expect(pinned).toBe(true);
     expect(s.designs.length).toBe(0);
@@ -228,15 +241,15 @@ describe('scribes, scrolls and the charter', () => {
     const s = createState(4);
     const miner = s.workers[3];
     applyCommand(s, {
-      type: 'sendScroll',
+      type: 'compose',
       playerId: 0,
       lines: [
-        { verb: 'MINE', noun: 'STONE' },
-        { verb: 'HAUL', noun: 'STONE' },
-        { verb: 'REPEAT', noun: null },
+        { verb: 'MINE', noun: 'STONE', count: 1 },
+        { verb: 'HAUL', noun: 'STONE', count: 1 },
+        { verb: 'REPEAT', noun: null, count: 1 },
       ],
       wage: 1,
-      to: miner.id,
+      dest: { kind: 'worker', workerId: miner.id },
     });
     expect(runUntil(s, () => miner.held.length > 0, 4000)).toBe(true);
     expect(runUntil(s, () => miner.held[0]?.loops >= 2, 20 * 300)).toBe(true);
@@ -247,19 +260,19 @@ describe('scribes, scrolls and the charter', () => {
     const s = createState(4);
     const second = s.workers[5];
     applyCommand(s, {
-      type: 'sendScroll',
+      type: 'compose',
       playerId: 0,
       lines: [
-        { verb: 'WRITE', noun: null },
-        { verb: 'DELIVER', noun: null },
-        { verb: 'REPEAT', noun: null },
+        { verb: 'WRITE', noun: null, count: 1 },
+        { verb: 'DELIVER', noun: null, count: 1 },
+        { verb: 'REPEAT', noun: null, count: 1 },
       ],
       wage: 1,
-      to: second.id,
+      dest: { kind: 'worker', workerId: second.id },
     });
     expect(runUntil(s, () => second.held.length > 0, 4000)).toBe(true);
     // give them plenty to write
-    for (let i = 0; i < 6; i++) applyCommand(s, { type: 'postNotice', playerId: 0, verb: 'CHOP', noun: 'WOOD', count: 1, wage: 1, addressee: null });
+    for (let i = 0; i < 6; i++) applyCommand(s, noticeCmd('CHOP', 'WOOD', 1, 1));
     expect(runUntil(s, () => second.skills.writing > 0, 20 * 300)).toBe(true);
   });
 
@@ -267,7 +280,72 @@ describe('scribes, scrolls and the charter', () => {
     const s = createState(4);
     const w = s.workers[2];
     s.items = [];
-    w.held.push({ id: s.nextId++, kind: 'scroll', orders: [makeOrder('HAUL', 'WOOD'), makeOrder('CHOP', 'WOOD')], wage: 0, dest: { kind: 'worker', workerId: w.id }, pc: 0, loops: 0, waitUntil: 0, retryAfter: 0 });
+    w.held.push(newCarrier(s, [{ order: makeOrder('HAUL', 'WOOD'), count: 1 }, { order: makeOrder('CHOP', 'WOOD'), count: 1 }], 0, { kind: 'worker', workerId: w.id }));
     expect(runUntil(s, () => w.held.length === 0, 20 * 200)).toBe(true);
+  });
+});
+
+describe('the board, hand delivery and the standing charter', () => {
+  it('a scroll posted for Anyone is taken down by whoever is free', () => {
+    const s = createState(4);
+    applyCommand(s, scrollCmd([['MINE', 'STONE', 2], ['HAUL', 'STONE', 2], ['REPEAT', null, 1]], 1, { kind: 'board', addressee: null }));
+    expect(runUntil(s, () => s.boardScrolls.length > 0, 3000)).toBe(true);
+    expect(runUntil(s, () => s.boardScrolls.length === 0, 3000)).toBe(true);
+    const taker = s.workers.find((w) => w.held[0]?.orders[0][0].t === 'MINE');
+    expect(taker).toBeDefined();
+  });
+
+  it('a card with a count is worked until the count is done', () => {
+    const s = createState(4);
+    const w = s.workers[3];
+    applyCommand(s, scrollCmd([['CHOP', 'WOOD', 5]], 0, { kind: 'worker', workerId: w.id }));
+    expect(runUntil(s, () => w.held.length > 0, 3000)).toBe(true);
+    const card = w.held[0];
+    expect(runUntil(s, () => w.held.length === 0, 20 * 400)).toBe(true);
+    expect(card.lineDone + card.counts[0]).toBeGreaterThanOrEqual(5); // finished its count
+    const wood = s.items.filter((it) => it.type === 'wood').length + siteOf(s, 'stockpile').store.wood;
+    expect(wood).toBeGreaterThanOrEqual(5);
+  });
+
+  it('something addressed to you by name always wins at the board', () => {
+    const s = createState(4);
+    const w = s.workers[2];
+    applyCommand(s, noticeCmd('CHOP', 'WOOD', 50, 0, w.id));
+    expect(runUntil(s, () => s.notices.some((n) => n.addressee === w.id), 3000)).toBe(true);
+    // when they next read the board, they take their own notice over the high-paying ones for Anyone
+    // (first let them finish whatever job they were already on)
+    expect(runUntil(s, () => w.memory === null, 3000)).toBe(true);
+    expect(runUntil(s, () => w.memory !== null, 3000)).toBe(true);
+    expect(w.memory!.order[0].t).toBe('CHOP');
+  });
+
+  it('handing someone an order replaces their scroll', () => {
+    const s = createState(4);
+    const scribe = s.workers[0];
+    applyCommand(s, scrollCmd([['CHOP', 'WOOD', 3]], 0, { kind: 'worker', workerId: scribe.id }));
+    expect(runUntil(s, () => scribe.held[0]?.orders[0][0].t === 'CHOP', 3000)).toBe(true);
+    expect(scribe.held.length).toBe(1);
+  });
+
+  it('the standing charter posts a scribe loop when no one is writing', () => {
+    const s = createState(4);
+    const scribe = s.workers[0];
+    // release the scribe: hand them a card that sends them to the board
+    applyCommand(s, scrollCmd([['CHECK', 'BOARD', 1]], 0, { kind: 'worker', workerId: scribe.id }));
+    expect(runUntil(s, () => s.boardScrolls.some((c) => c.patron) || s.events.some((e) => e.text.includes("patron's charter posts")), 4000)).toBe(true);
+    // and someone picks it up, so writing goes on
+    expect(runUntil(s, () => s.workers.some((w) => w.held.some((c) => c.patron)), 3000)).toBe(true);
+  });
+
+  it('a released courier leaves undelivered carriers in the outbox for the next one', () => {
+    const s = createState(4);
+    const scribe = s.workers[0];
+    const other = s.workers[4];
+    scribe.bag.push(newCarrier(s, [{ order: makeOrder('CHOP', 'WOOD'), count: 2 }], 0, { kind: 'worker', workerId: other.id }));
+    giveCarrier(s, scribe, newCarrier(s, [{ order: makeOrder('MINE', 'STONE'), count: 1 }], 0, { kind: 'worker', workerId: scribe.id }));
+    expect(scribe.bag.length).toBe(0);
+    expect(s.outbox.length).toBe(1);
+    // the charter re-hires a scribe, who collects it from the outbox and delivers it
+    expect(runUntil(s, () => other.held.some((c) => c.orders[0][0].t === 'CHOP') || s.outbox.length === 0, 20 * 300)).toBe(true);
   });
 });

@@ -541,3 +541,51 @@ p {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+.charter {
+  border: 3px double var(--ink);
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  text-align: center;
+  cursor: help;
+}
+
+.charter-title {
+  font: bold 11px var(--font-title);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.charter-text {
+  font-size: 11px;
+  font-style: italic;
+}
+
+.notice-scroll {
+  border-radius: 8px 8px 2px 2px;
+}
+
+.notice-patron {
+  border-width: 2px;
+}
+
+.compose-summary {
+  font-size: 11px;
+  border-left: 3px solid var(--ink);
+  padding: 2px 6px;
+  margin: 6px 0;
+}
+
+.slot-fixed {
+  font-size: 11px;
+  padding: 0 4px;
+}
+
+.slot-count input[type='number'] {
+  width: 48px;
+  margin: 0 2px;
+}
+
+.presets {
+  gap: 4px;
+}

@@ -67,23 +67,35 @@ export interface Notice {
 
 /** Where a written carrier is headed. */
 export type Dest =
-  | { kind: 'board'; count: number; addressee: number | null }
+  /** Pinned on the board, for Anyone (null) or for one worker by name. */
+  | { kind: 'board'; addressee: number | null }
+  /** Handed straight to a worker. It replaces whatever they were doing. */
   | { kind: 'worker'; workerId: number };
 
 /**
  * A physical object with orders written on it. A card holds one order; a
- * scroll holds several, carried out top to bottom.
+ * scroll holds several, carried out top to bottom. Each line has a count:
+ * the units to finish before moving to the next line.
+ *
+ * A one-line card pinned on the board becomes a notice: anyone can read it
+ * and take one job at a time from it, and it stays up until its count runs
+ * out. Anything else on the board is taken down by whoever takes it.
  */
 export interface Carrier {
   id: number;
   kind: 'card' | 'scroll';
   orders: Order[];
-  /** Gold per unit of work for each order carried out (or per notice unit). */
+  /** Units to finish on each line before moving on. */
+  counts: number[];
+  /** Gold per unit of work. */
   wage: number;
   dest: Dest;
-  /** Next line to carry out. */
+  /** Next line to carry out, and units done on it so far. */
   pc: number;
+  lineDone: number;
   loops: number;
+  /** Posted by the patron's standing charter rather than written by a scribe. */
+  patron: boolean;
   /** After a failed line, the holder takes a breather before carrying on. */
   waitUntil: number;
   /** A courier who couldn't hand it over waits until then to try again. */
@@ -218,7 +230,7 @@ export interface GameEvent {
 }
 
 export interface SimState {
-  version: 2;
+  version: 3;
   seed: number;
   tick: number;
   rng: RngState;
@@ -233,6 +245,10 @@ export interface SimState {
   items: Item[];
   workers: Worker[];
   notices: Notice[];
+  /** Cards and scrolls pinned on the board for someone to take (notices live in `notices`). */
+  boardScrolls: Carrier[];
+  /** Written carriers left at the scriptorium for the next courier. */
+  outbox: Carrier[];
   /** The scriptorium's writing queue. */
   designs: Design[];
 

@@ -56,8 +56,6 @@ export const SCRIBE = {
   speedPerLevel: 0.15,
   /** Carriers a courier's bag holds. */
   bagSize: 10,
-  /** Cards and scrolls a worker can hold to carry out. */
-  holdSize: 2,
   /** A courier hands over from this many tiles away (calling out the name). */
   handRange: 2,
   /** After a failed handover, wait this long before trying again. */
@@ -67,6 +65,11 @@ export const SCRIBE = {
   maxLines: 6,
   /** Extra pull of a scroll in hand over free time (it's an obligation). */
   duty: 8,
+};
+
+export const PATRON = {
+  /** How often the standing charter checks whether anyone is writing. */
+  charterCheckTicks: 100,
 };
 
 export const ECONOMY = {

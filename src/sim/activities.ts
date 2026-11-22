@@ -1,10 +1,11 @@
 import { addMoodlet, dropCarried, log, moveTo, settle } from './actions';
-import { orderText, type Noun, type Order, type Verb, type WorkVerb } from './lang';
-import { runScroll, scrollLineDone, scrollLineFailed } from './scrolls';
+import { isWorkVerb, orderText, type Noun, type Order, type Verb, type WorkVerb } from './lang';
+import { carrierText } from './carriers';
+import { giveCarrier, runScroll, scrollLineDone, scrollLineFailed } from './scrolls';
 import { rand, randInt } from './rng';
 import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_OF_VERB, skillLevel } from './skills';
 import { ECONOMY, MOOD, NEEDS, POPULATION, SKILLS, WORK } from './tuning';
-import type { ActivityKind, Item, ItemType, Notice, SimState, SiteKind, SkillId, Worker } from './types';
+import type { ActivityKind, Carrier, Item, ItemType, Notice, SimState, SiteKind, SkillId, Worker } from './types';
 import { siteOf, spotFor, standable } from './world';
 
 export type Result = 'running' | 'done' | 'failed';
@@ -199,34 +200,65 @@ function readBoard(s: SimState, w: Worker): Result {
     a.timer = WORK.readBoardTicks;
   }
   if (--a.timer > 0) return 'running';
-  const options = eligibleNotices(s, w);
+  const options = boardOptions(s, w);
   if (options.length === 0) {
     w.thought = 'Nothing on the board for me.';
     return 'failed';
   }
-  const best = pickNotice(s, w, options);
-  w.memory = { noticeId: best.id, order: best.order.map((t) => ({ ...t })), wage: best.wage };
-  w.thought = `I'll ${orderText(best.order)}.`;
+  const best = pickFromBoard(s, w, options);
+  if (best.kind === 'notice') {
+    // a notice stays up: the reader takes one job from it, in memory
+    w.memory = { noticeId: best.n.id, order: best.n.order.map((t) => ({ ...t })), wage: best.n.wage };
+    w.thought = `I'll ${orderText(best.n.order)}.`;
+  } else {
+    // a card or scroll is taken down and carried
+    s.boardScrolls = s.boardScrolls.filter((x) => x !== best.c);
+    giveCarrier(s, w, best.c);
+    w.thought = `I'll take this ${best.c.kind}: ${carrierText(best.c)}.`;
+    log(s, `${w.name} took a ${best.c.kind} from the board: ${carrierText(best.c)}.`, w.id);
+  }
   return 'done';
+}
+
+export type BoardItem = { kind: 'notice'; n: Notice } | { kind: 'scroll'; c: Carrier };
+
+export function eligibleScrolls(s: SimState, w: Worker): Carrier[] {
+  return s.boardScrolls.filter((c) => c.dest.kind === 'board' && (c.dest.addressee === null || c.dest.addressee === w.id));
+}
+
+/** Everything on the board this worker could take, notices and scrolls alike. */
+export function boardOptions(s: SimState, w: Worker): BoardItem[] {
+  return [
+    ...eligibleNotices(s, w).map((n) => ({ kind: 'notice' as const, n })),
+    ...eligibleScrolls(s, w).map((c) => ({ kind: 'scroll' as const, c })),
+  ];
+}
+
+function addresseeOf(item: BoardItem): number | null {
+  if (item.kind === 'notice') return item.n.addressee;
+  return item.c.dest.kind === 'board' ? item.c.dest.addressee : null;
+}
+
+/** How appealing a piece of work is: pay per trip, plus liking what you're good at. */
+function appealOf(w: Worker, order: Order, wage: number): number {
+  const verb = order[0].t;
+  if (!isWorkVerb(verb)) return WORK.boardWeightBase + wage * w.p.greed;
+  return WORK.boardWeightBase + wage * w.p.greed * expectedUnits(w, verb) + skillLevel(w, SKILL_OF_VERB[verb]) * SKILLS.pickPerLevel;
 }
 
 /**
  * Weighted random pick. Better pay is more likely, never certain, so
- * low-wage jobs still get done. Notices addressed to the worker by name
- * always win: a worker always recognizes their own name.
+ * low-wage jobs still get done. Anything addressed to the worker by name
+ * always wins: a worker always recognizes their own name. Next comes the
+ * patron's charter, then everything for Anyone.
  */
-export function pickNotice(s: SimState, w: Worker, options: Notice[]): Notice {
-  const named = options.filter((n) => n.addressee === w.id);
-  const pool = named.length > 0 ? named : options;
+export function pickFromBoard(s: SimState, w: Worker, options: BoardItem[]): BoardItem {
+  const named = options.filter((o) => addresseeOf(o) === w.id);
+  const patron = options.filter((o) => o.kind === 'scroll' && o.c.patron);
+  const pool = named.length > 0 ? named : patron.length > 0 ? patron : options;
   let total = 0;
-  const weights = pool.map((n) => {
-    // wages are per unit, so a skilled worker earns more per trip at their
-    // specialty, and likes doing what they're good at besides
-    const verb = n.order[0].t as WorkVerb;
-    const appeal =
-      WORK.boardWeightBase +
-      n.wage * w.p.greed * expectedUnits(w, verb) +
-      skillLevel(w, SKILL_OF_VERB[verb]) * SKILLS.pickPerLevel;
+  const weights = pool.map((o) => {
+    const appeal = o.kind === 'notice' ? appealOf(w, o.n.order, o.n.wage) : appealOf(w, o.c.orders.find((x) => isWorkVerb(x[0].t)) ?? o.c.orders[0], o.c.wage);
     const wt = appeal * appeal;
     total += wt;
     return wt;

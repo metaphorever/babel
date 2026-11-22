@@ -1,5 +1,5 @@
 import { log } from './actions';
-import { orderText, type Order } from './lang';
+import { isWorkVerb, makeOrder, orderText, type Order } from './lang';
 import { SCRIBE } from './tuning';
 import type { Carrier, Design, Dest, Notice, SimState } from './types';
 
@@ -7,18 +7,49 @@ import type { Carrier, Design, Dest, Notice, SimState } from './types';
 // scriptorium's queue until a scribe writes it out; then someone has to
 // carry it to the board or into a worker's hands before it does anything.
 
-export function newCarrier(s: SimState, orders: Order[], wage: number, dest: Dest): Carrier {
+export interface Line {
+  order: Order;
+  count: number;
+}
+
+export function newCarrier(s: SimState, lines: Line[], wage: number, dest: Dest, patron = false): Carrier {
   return {
     id: s.nextId++,
-    kind: orders.length > 1 ? 'scroll' : 'card',
-    orders: orders.map((o) => o.map((t) => ({ ...t }))),
+    kind: lines.length > 1 ? 'scroll' : 'card',
+    orders: lines.map((l) => l.order.map((t) => ({ ...t }))),
+    counts: lines.map((l) => Math.max(1, l.count)),
     wage,
     dest,
     pc: 0,
+    lineDone: 0,
     loops: 0,
+    patron,
     waitUntil: 0,
     retryAfter: 0,
   };
+}
+
+/** The scribe loop: write, deliver, repeat. */
+export function scribeLoop(s: SimState, dest: Dest, patron: boolean): Carrier {
+  return newCarrier(
+    s,
+    [
+      { order: makeOrder('WRITE'), count: 1 },
+      { order: makeOrder('DELIVER'), count: 1 },
+      { order: makeOrder('REPEAT'), count: 1 },
+    ],
+    1,
+    dest,
+    patron,
+  );
+}
+
+/**
+ * A one-line work card pinned on the board is a notice: it stays up, and
+ * each reader takes one job from it until its count runs out.
+ */
+export function isNoticeCard(c: Carrier): boolean {
+  return c.dest.kind === 'board' && c.orders.length === 1 && isWorkVerb(c.orders[0][0].t);
 }
 
 export function writingCost(c: Carrier): number {
@@ -39,7 +70,7 @@ export function queueDesign(s: SimState, carrier: Carrier): Design {
   return d;
 }
 
-/** Put a notice up on the board (a scribe pinning a written card, or the patron's starters). */
+/** Put a notice up on the board. */
 export function pinNotice(s: SimState, order: Order, count: number, wage: number, addressee: number | null): Notice {
   const n: Notice = {
     id: s.nextId++,
@@ -53,21 +84,38 @@ export function pinNotice(s: SimState, order: Order, count: number, wage: number
   return n;
 }
 
+/** A courier arrives at the board: notices go up as notices, anything else hangs there to be taken. */
+export function pinCarrier(s: SimState, c: Carrier): void {
+  if (c.dest.kind !== 'board') return;
+  if (isNoticeCard(c)) pinNotice(s, c.orders[0], c.counts[0], c.wage, c.dest.addressee);
+  else {
+    c.pc = 0;
+    c.lineDone = 0;
+    s.boardScrolls.push(c);
+  }
+}
+
+export function lineText(c: Carrier, i: number): string {
+  const text = orderText(c.orders[i]);
+  return c.counts[i] > 1 ? `${text} ×${c.counts[i]}` : text;
+}
+
 export function carrierText(c: Carrier): string {
-  return c.orders.map((o) => orderText(o)).join(' → ');
+  return c.orders.map((_, i) => lineText(c, i)).join(' → ');
+}
+
+export function workerName(s: SimState, id: number | null): string {
+  if (id === null) return 'Anyone';
+  return s.workers.find((w) => w.id === id)?.name ?? 'someone who left';
 }
 
 export function destText(s: SimState, d: Dest): string {
-  if (d.kind === 'board') {
-    const to = d.addressee === null ? 'Anyone' : s.workers.find((w) => w.id === d.addressee)?.name ?? '?';
-    return `the board (×${d.count}, for ${to})`;
-  }
-  return s.workers.find((w) => w.id === d.workerId)?.name ?? 'someone who left';
+  return d.kind === 'board' ? `the board, for ${workerName(s, d.addressee)}` : workerName(s, d.workerId);
 }
 
-/** Gold still promised by a board-bound carrier that hasn't been pinned yet. */
+/** Gold to set aside when this is composed: notices promise their whole count up front. */
 export function boardReserve(c: Carrier): number {
-  return c.dest.kind === 'board' ? c.dest.count * c.wage : 0;
+  return isNoticeCard(c) ? c.counts[0] * c.wage : 0;
 }
 
 /** Take back a design that hasn't been written yet, refunding any promised gold. */
@@ -77,4 +125,9 @@ export function cancelDesign(s: SimState, designId: number): void {
   s.reserved -= boardReserve(d.carrier);
   s.designs = s.designs.filter((x) => x.id !== designId);
   log(s, `Scrapped before writing: ${carrierText(d.carrier)}.`);
+}
+
+/** Does this carrier keep someone writing? */
+export function hasWriteLine(c: Carrier): boolean {
+  return c.orders.some((o) => o[0].t === 'WRITE');
 }

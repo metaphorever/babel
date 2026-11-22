@@ -1,5 +1,5 @@
 import { releaseReservations } from './actions';
-import { eligibleNotices, runActivity, startActivity } from './activities';
+import { boardOptions, runActivity, startActivity } from './activities';
 import { rand } from './rng';
 import { AI, ECONOMY, MOOD, NEEDS, SCRIBE } from './tuning';
 import type { ActivityKind, Score, SimState, Worker } from './types';
@@ -43,16 +43,19 @@ export function scoreOptions(s: SimState, w: Worker, inProgress: boolean): Score
     const line = labelOf(scroll.orders[scroll.pc]);
     add('scroll', `${scroll.kind === 'card' ? 'Card' : 'Scroll'}: ${line}`, AI.workBase * w.p.work + wageAppeal(scroll.wage) + SCRIBE.duty);
   }
+  // one current job at a time: a remembered notice, or the line of the
+  // scroll in hand. Only someone with neither goes to read the board.
   if (w.memory) {
     add('job', `Work: ${labelOf(w.memory.order)}`, AI.workBase * w.p.work + wageAppeal(w.memory.wage));
-  } else {
-    const options = eligibleNotices(s, w);
+  } else if (w.held.length === 0) {
+    const options = boardOptions(s, w);
     if (options.length > 0) {
       let best = 0;
       let named = false;
-      for (const n of options) {
-        best = Math.max(best, n.wage);
-        if (n.addressee === w.id) named = true;
+      for (const o of options) {
+        best = Math.max(best, o.kind === 'notice' ? o.n.wage : o.c.wage);
+        const to = o.kind === 'notice' ? o.n.addressee : o.c.dest.kind === 'board' ? o.c.dest.addressee : null;
+        if (to === w.id || (o.kind === 'scroll' && o.c.patron)) named = true;
       }
       add('readBoard', 'Check the board', AI.workBase * w.p.work * 0.9 + wageAppeal(best) + (named ? 30 : 0));
     }

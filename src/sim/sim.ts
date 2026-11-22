@@ -1,7 +1,8 @@
 import { updateWorker } from './ai';
 import { startActivity } from './activities';
 import { log } from './actions';
-import { newCarrier, pinNotice } from './carriers';
+import { pinNotice, scribeLoop } from './carriers';
+import { checkCharter } from './patron';
 import { applyCommand, validateCommand, type Command, type CommandResult, type StampedCommand } from './commands';
 import { makeOrder, type Noun, type WorkVerb } from './lang';
 import { makeName } from './names';
@@ -14,7 +15,7 @@ import { buildWorld, siteOf } from './world';
 
 export function createState(seed: number): SimState {
   const s: SimState = {
-    version: 2,
+    version: 3,
     seed,
     tick: 0,
     rng: seedRng(seed),
@@ -27,6 +28,8 @@ export function createState(seed: number): SimState {
     workers: [],
     notices: [],
     designs: [],
+    boardScrolls: [],
+    outbox: [],
     gold: ECONOMY.startingGold,
     reserved: 0,
     events: [],
@@ -55,7 +58,7 @@ export function createState(seed: number): SimState {
   scribe.knack = 'writing';
   scribe.skills = emptySkills();
   scribe.skills.writing = SKILLS.knackStartXp;
-  const charter = newCarrier(s, [makeOrder('WRITE'), makeOrder('DELIVER'), makeOrder('REPEAT')], 1, { kind: 'worker', workerId: scribe.id });
+  const charter = scribeLoop(s, { kind: 'worker', workerId: scribe.id }, true);
   scribe.held.push(charter);
   s.events = [];
   log(s, `The patron's charter names ${scribe.name} your scribe. Their loop: write, deliver, repeat.`, scribe.id);
@@ -106,6 +109,7 @@ export function addWorker(s: SimState): Worker {
 /** Advance one tick, applying any commands first. */
 export function step(s: SimState, cmds: readonly Command[] = []): CommandResult[] {
   const results = cmds.map((c) => applyCommand(s, c));
+  checkCharter(s);
   for (const w of s.workers) updateWorker(s, w);
   s.tick++;
   return results;
