@@ -124,6 +124,7 @@ export class ScriptoriumPanel {
   private summary: HTMLElement;
   private error: HTMLElement;
   private whoCount = -1;
+  private bpError = h('span', { class: 'error', role: 'alert' });
 
   constructor(
     private wm: WindowManager,
@@ -152,6 +153,14 @@ export class ScriptoriumPanel {
       this.queue,
       h('div', { class: 'section-label' }, 'Written, on the way'),
       this.transit,
+      h('div', { class: 'section-label' }, 'Blueprints'),
+      h(
+        'div',
+        { class: 'row' },
+        h('button', { class: 'btn', onclick: () => this.blueprint() }, 'Draw a blueprint for the next floor'),
+        this.bpError,
+      ),
+      h('div', { class: 'hint' }, 'Someone with DELIVER carries it to the top of the tower; then builders can start.'),
       h('div', { class: 'section-label' }, 'Compose'),
       presets,
       this.linesEl,
@@ -179,6 +188,11 @@ export class ScriptoriumPanel {
 
   open(): void {
     this.wm.show('scriptorium');
+  }
+
+  private blueprint(): void {
+    const r = this.sim.enqueue({ type: 'blueprint', playerId: 0 });
+    this.bpError.textContent = r.ok ? '' : r.error;
   }
 
   private usePreset(lines: DraftLine[]): void {
