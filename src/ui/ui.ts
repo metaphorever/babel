@@ -1,6 +1,8 @@
 import {
   availableGold,
   carrierText,
+  currentStipend,
+  QUIT,
   langName,
   sayingFor,
   speakingLang,
@@ -76,6 +78,8 @@ export class Ui {
   languages!: LanguagesPanel;
 
   private gold!: HTMLElement;
+  private patron!: HTMLElement;
+  private alerts!: HTMLButtonElement;
   private clock!: HTMLElement;
   private speedBtns: HTMLButtonElement[] = [];
   private noticeList!: HTMLElement;
@@ -118,6 +122,8 @@ export class Ui {
       h('button', { class: 'menu-item', onclick: () => this.wm.toggle(id) }, label);
     this.gold = h('span', { class: 'menu-stat' });
     this.clock = h('span', { class: 'menu-stat' });
+    this.patron = h('span', { class: 'menu-stat', title: "The patron's patience. It drains steadily; every finished floor wins some back. The stipend shrinks with it." });
+    this.alerts = h('button', { class: 'menu-item menu-alert', onclick: () => this.wm.show('roster') });
     const speeds = h('span', { class: 'speeds' });
     ['❚❚', '▶', '▶▶', '▶▶▶'].forEach((label, i) => {
       const b = h('button', { class: 'speed', title: i === 0 ? 'Pause (Space)' : `Speed ${i} (${i})`, onclick: () => this.hooks.setSpeed(i) }, label);
@@ -137,6 +143,8 @@ export class Ui {
       menu('Log', 'log'),
       menu('Help', 'help'),
       h('span', { class: 'menu-spacer' }),
+      this.alerts,
+      this.patron,
       this.gold,
       this.clock,
       speeds,
@@ -271,6 +279,11 @@ export class Ui {
       kv('Carrying', `${holding} (holds ${carryCapacity(w)})`),
       kv('Purse', `${w.purse} gold`),
       kv('Jobs done', String(w.jobsDone)),
+      w.leaving
+        ? kv('Leaving', 'Walking home for good')
+        : w.noticeUntil !== null
+          ? kv('Giving notice', `Leaves in ${formatTime(Math.max(0, w.noticeUntil - this.s.tick))} unless their mood rises above ${QUIT.stayAbove}`)
+          : '',
       w.bag.length ? kv('Bag', `${w.bag.length} to deliver`) : '',
       w.held.length ? h('div', { class: 'section-label' }, 'In hand') : '',
       w.held.length ? inHand : '',
@@ -338,7 +351,7 @@ export class Ui {
         'tr',
         { class: w.id === this.selected ? 'sel' : '', onclick: () => this.select(w.id) },
         h('td', {}, w.name),
-        h('td', {}, this.doingShort(w)),
+        h('td', {}, w.leaving ? 'Going home' : w.noticeUntil !== null ? `Notice: ${formatTime(Math.max(0, w.noticeUntil - this.s.tick))}` : this.doingShort(w)),
         h('td', {}, bar(w.mood)),
       );
       t.append(row);
@@ -408,6 +421,10 @@ export class Ui {
     const s = this.s;
     const free = availableGold(s);
     this.gold.textContent = `Gold ${free}${s.reserved ? ` (+${s.reserved} promised)` : ''}`;
+    this.patron.textContent = `Patron ${Math.round(s.patience)}% · +${currentStipend(s)}g/min`;
+    const notice = s.workers.filter((w) => w.noticeUntil !== null || w.leaving).length;
+    this.alerts.textContent = s.workers.length === 0 ? 'Everyone has gone home' : notice ? `${notice} giving notice` : '';
+    this.alerts.style.display = notice || s.workers.length === 0 ? '' : 'none';
     this.clock.textContent = formatTime(s.tick);
     const speed = this.hooks.getSpeed();
     this.speedBtns.forEach((b, i) => b.classList.toggle('on', i === speed));

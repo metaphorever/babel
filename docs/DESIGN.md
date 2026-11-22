@@ -391,6 +391,13 @@ All the numbers in this section are placeholders until playtests say otherwise.
 - **Says:** the inspector shows what a worker wants, or their current job, word by word, each word in whatever language they still know it in. Words you've learned get a small English gloss. Mixed languages are the early warning.
 - **Translation:** `[TEACH] [name] ×N` and `[LEARN] [name] ×N` run at the scriptorium. The translator calls the student by name, and the student only hears it if they're on the ground. TEACH gives the student the translator's words back, common tongue first. LEARN takes the student's foreign words, and each one goes into your lexicon. A translator who knows more languages works faster.
 - **Lexicon and writing:** the composer has a "Written in" choice. You can only write words in your lexicon for that language, and there's a preview of exactly how the order will read. A scribe writes words they don't know 4× slower.
+
+**How P0 handles the patron and quitting (provisional; see PATRON / QUIT / ARRIVALS in `tuning.ts`):**
+- **Patience** runs from 0 to 100 and drains steadily. Difficulty sets how fast: about 30 / 17 / 10 minutes from full to empty on easy / normal / hard. Each finished floor wins back 35 patience, plus a gold bonus of 40 + 10 × the floor number.
+- **The stipend** is 50 gold a minute at full patience, scaled down as patience drops. At zero it stops until the tower grows again.
+- **Newcomers:** while patience is 50 or more, a newcomer arrives on the road home every 2 minutes, as long as the colony is below 8 + 1 per finished floor (capped at 30).
+- **Quitting:** a worker whose mood stays below 30 for a minute gives notice, which shows as a bindle-on-a-stick cloud, a menubar alert and a countdown in the inspector. If their mood climbs above 40 within 2 minutes, they decide to stay. Otherwise they drop what they're carrying, leave their scrolls behind, send undelivered carriers to the outbox, and walk home with their purse.
+- **Desperation:** a need above 90 (starving, parched, exhausted) adds a big mood penalty on top of the usual one. A colony with no food falls apart in about 10 minutes.
 - **Scroll wages come out of the treasury as each line is done.** Nothing is reserved up front, because a loop has no end. If the treasury is empty, the line goes unpaid and the worker's mood drops.
 - **Taking a notice down is immediate.** That's a P0 shortcut, since the ground board sits beside the scriptorium.
 

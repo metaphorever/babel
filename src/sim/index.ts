@@ -8,7 +8,7 @@ export * from './lang';
 export * from './tuning';
 export { TRAITS } from './traits';
 export { carrierText, destText, lineText, workerName } from './carriers';
-export { CHARTER_TEXT } from './patron';
+export { CHARTER_TEXT, currentStipend } from './patron';
 export { driftPool, levelOfRow, sayingFor, speakingLang, vocabSummary } from './drift';
 export { SKILL_IDS, SKILL_LABEL, skillLevel, carryCapacity, bonusChance } from './skills';
 export { standable, tileAt, siteOf } from './world';

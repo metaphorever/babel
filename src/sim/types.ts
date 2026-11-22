@@ -1,5 +1,6 @@
 import type { LangId, Order, TokenId } from './lang';
 import type { RngState } from './rng';
+import type { Difficulty } from './tuning';
 
 // Everything in SimState must be plain JSON (no Maps, Sets, classes or
 // functions) so it can be saved, hashed and replayed.
@@ -251,6 +252,12 @@ export interface Worker {
   thought: string;
 
   jobsDone: number;
+  /** Ticks spent in a low mood (resets when mood recovers). */
+  lowMoodTicks: number;
+  /** When their notice runs out, if they've given notice. */
+  noticeUntil: number | null;
+  /** On their way home for good. */
+  leaving: boolean;
   /** Look seed for the procedural sprite later. */
   look: number;
 }
@@ -262,7 +269,7 @@ export interface GameEvent {
 }
 
 export interface SimState {
-  version: 5;
+  version: 6;
   seed: number;
   tick: number;
   rng: RngState;
@@ -291,6 +298,14 @@ export interface SimState {
   designs: Design[];
 
   gold: number;
+  /** The patron's patience, 0..100. Finished floors win it back. */
+  patience: number;
+  difficulty: Difficulty;
+  nextStipend: number;
+  nextArrival: number;
+  /** Running totals, for the books (and the tests). */
+  income: number;
+  leftWith: number;
   /** Gold promised to posted notices but not yet paid. */
   reserved: number;
 

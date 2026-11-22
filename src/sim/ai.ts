@@ -4,6 +4,7 @@ import { rand } from './rng';
 import { AI, CONFUSION, ECONOMY, LESSON, MOOD, NEEDS, SCRIBE } from './tuning';
 import { levelOfRow, updateDrift } from './drift';
 import { lessonFor } from './scrolls';
+import { updateMorale, walkHome } from './morale';
 import type { ActivityKind, Score, SimState, Worker } from './types';
 import { siteOf } from './world';
 
@@ -112,18 +113,26 @@ export function updateNeeds(s: SimState, w: Worker): void {
   if (w.hunger > 70) target -= MOOD.hungryPenalty;
   if (w.thirst > 70) target -= MOOD.thirstyPenalty;
   if (w.fatigue > 70) target -= MOOD.tiredPenalty;
+  if (w.hunger > 90) target -= MOOD.desperatePenalty.hunger;
+  if (w.thirst > 90) target -= MOOD.desperatePenalty.thirst;
+  if (w.fatigue > 90) target -= MOOD.desperatePenalty.fatigue;
   if (w.confusion > CONFUSION.moodAbove) target -= CONFUSION.moodPenalty;
   target = Math.max(0, Math.min(100, target));
   w.mood += (target - w.mood) * MOOD.smoothing;
 }
 
-export function updateWorker(s: SimState, w: Worker): void {
+/** Advance one worker. Returns true if they've walked off home for good. */
+export function updateWorker(s: SimState, w: Worker): boolean {
+  if (w.leaving) return walkHome(s, w);
   updateNeeds(s, w);
   updateDrift(s, w);
+  updateMorale(s, w);
+  if (w.leaving) return false;
   if (s.tick >= w.nextThink) think(s, w, true);
   const r = runActivity(s, w);
   if (r !== 'running') {
     releaseReservations(s, w);
     think(s, w, false);
   }
+  return false;
 }

@@ -15,7 +15,8 @@ import { makeOrder, orderText, parseOrder, type Noun, type Verb, type WorkVerb }
 import { deckRow, newProject, placeMaterial } from '../src/sim/tower';
 
 import type { Dest } from '../src/sim/types';
-import { SKILLS, TOWER, WORLD } from '../src/sim/tuning';
+import { ARRIVALS, PATRON, QUIT, SKILLS, TOWER, WORLD } from '../src/sim/tuning';
+import { currentStipend, patronFloorDone } from '../src/sim/patron';
 
 type State = ReturnType<typeof createState>;
 
@@ -161,7 +162,7 @@ describe('notices and jobs', () => {
     expect(s.reserved).toBe(0);
     // anyone who also took it and finishes later gets nothing
     for (let i = 0; i < 2000; i++) step(s);
-    expect(startGold - s.gold).toBe(5); // paid exactly once
+    expect(startGold + s.income - s.gold).toBe(5); // paid exactly once (the patron's stipend aside)
   });
 
   it('gold is conserved: treasury + purses + tavern spending', () => {
@@ -169,7 +170,8 @@ describe('notices and jobs', () => {
     const start = s.gold;
     run(s, 4000);
     const purses = s.workers.reduce((a, w) => a + w.purse, 0);
-    const spent = start - s.gold - purses;
+    // gold comes in from the patron, and leaves with workers who go home or at the tavern
+    const spent = start + s.income - s.gold - purses - s.leftWith;
     expect(spent).toBeGreaterThanOrEqual(0);
     expect(spent % 5).toBe(0); // only the tavern takes gold out, 5 at a time
   });
@@ -512,3 +514,61 @@ describe('language drift', () => {
 function scrollLearn(verb: 'TEACH' | 'LEARN', studentId: number, translatorId: number): Command {
   return { type: 'compose', playerId: 0, lines: [{ verb, noun: null, who: studentId, count: 3 }], wage: 0, dest: { kind: 'worker', workerId: translatorId } };
 }
+
+describe('the patron and quitting', () => {
+  it('the stipend shrinks with patience, and a finished floor wins patience back', () => {
+    const s = createState(12, 'normal');
+    expect(currentStipend(s)).toBe(PATRON.stipendBase);
+    s.patience = 50;
+    expect(currentStipend(s)).toBe(Math.round(PATRON.stipendBase / 2));
+    const gold = s.gold;
+    patronFloorDone(s, 1);
+    expect(s.patience).toBe(50 + PATRON.floorPatience);
+    expect(s.gold).toBe(gold + PATRON.floorBonusBase + PATRON.floorBonusPerLevel);
+  });
+
+  it('patience drains faster on hard', () => {
+    const easy = createState(12, 'easy');
+    const hard = createState(12, 'hard');
+    run(easy, 3000);
+    run(hard, 3000);
+    expect(hard.patience).toBeLessThan(easy.patience);
+  });
+
+  it('a miserable worker gives notice, walks home and is gone', () => {
+    const s = createState(12);
+    const w = s.workers[3];
+    w.moodlets.push({ kind: 'test', label: 'Miserable', value: -60, until: 1e9 });
+    w.mood = 0;
+    expect(runUntil(s, () => w.noticeUntil !== null, QUIT.sustainTicks + 200)).toBe(true);
+    expect(runUntil(s, () => w.leaving, QUIT.noticeTicks + 200)).toBe(true);
+    expect(runUntil(s, () => !s.workers.includes(w), 20 * 120)).toBe(true);
+  });
+
+  it('a worker on notice who cheers up decides to stay', () => {
+    const s = createState(12);
+    const w = s.workers[3];
+    w.noticeUntil = s.tick + QUIT.noticeTicks;
+    w.lowMoodTicks = QUIT.sustainTicks;
+    w.moodlets.push({ kind: 'test', label: 'Delighted', value: 40, until: 1e9 });
+    w.mood = 90;
+    step(s);
+    expect(w.noticeUntil).toBeNull();
+    expect(w.leaving).toBe(false);
+  });
+
+  it('while the patron is pleased and the tower grows, newcomers arrive', () => {
+    const s = createState(12);
+    s.floors = 3; // room for a few more workers
+    const before = s.workers.length;
+    run(s, ARRIVALS.every + 10);
+    expect(s.workers.length).toBe(before + 1);
+    // an impatient patron sends nobody
+    const t = createState(12);
+    t.floors = 3;
+    t.patience = PATRON.recruitAbove - 1;
+    t.difficulty = 'easy';
+    run(t, ARRIVALS.every + 10);
+    expect(t.workers.length).toBe(before);
+  });
+});

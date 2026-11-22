@@ -3,20 +3,21 @@ import { startActivity } from './activities';
 import { log } from './actions';
 import { pinNotice, scribeLoop } from './carriers';
 import { allWords } from './drift';
-import { checkCharter } from './patron';
+import { checkCharter, updatePatron } from './patron';
+import { removeDeparted } from './morale';
 import { applyCommand, validateCommand, type Command, type CommandResult, type StampedCommand } from './commands';
 import { makeOrder, type Noun, type WorkVerb } from './lang';
 import { makeName } from './names';
 import { nextU32, pick, rand, seedRng } from './rng';
 import { emptySkills, SKILL_IDS } from './skills';
 import { rollPersonality } from './traits';
-import { AI, ECONOMY, POPULATION, SKILLS } from './tuning';
+import { AI, ARRIVALS, ECONOMY, PATRON, POPULATION, SKILLS, type Difficulty } from './tuning';
 import type { SimState, Worker } from './types';
 import { buildWorld, siteOf } from './world';
 
-export function createState(seed: number): SimState {
+export function createState(seed: number, difficulty: Difficulty = 'normal'): SimState {
   const s: SimState = {
-    version: 5,
+    version: 6,
     seed,
     tick: 0,
     rng: seedRng(seed),
@@ -35,6 +36,12 @@ export function createState(seed: number): SimState {
     projects: [],
     floors: 0,
     gold: ECONOMY.startingGold,
+    patience: PATRON.patienceStart,
+    difficulty,
+    nextStipend: PATRON.stipendEvery,
+    nextArrival: ARRIVALS.every,
+    income: 0,
+    leftWith: 0,
     reserved: 0,
     events: [],
   };
@@ -110,6 +117,9 @@ export function addWorker(s: SimState): Worker {
     lastScores: [],
     thought: '',
     jobsDone: 0,
+    lowMoodTicks: 0,
+    noticeUntil: null,
+    leaving: false,
     look: nextU32(s.rng),
   };
   w.skills[w.knack] = SKILLS.knackStartXp;
@@ -122,7 +132,10 @@ export function addWorker(s: SimState): Worker {
 export function step(s: SimState, cmds: readonly Command[] = []): CommandResult[] {
   const results = cmds.map((c) => applyCommand(s, c));
   checkCharter(s);
-  for (const w of s.workers) updateWorker(s, w);
+  updatePatron(s);
+  const departed: Worker[] = [];
+  for (const w of s.workers) if (updateWorker(s, w)) departed.push(w);
+  removeDeparted(s, departed);
   s.tick++;
   return results;
 }
@@ -147,8 +160,8 @@ export class Sim {
   history: StampedCommand[] = [];
   private pending: Command[] = [];
 
-  constructor(seed: number) {
-    this.state = createState(seed);
+  constructor(seed: number, difficulty: Difficulty = 'normal') {
+    this.state = createState(seed, difficulty);
   }
 
   /** Check a command now so the UI can show errors, then queue it. */
@@ -167,8 +180,8 @@ export class Sim {
 }
 
 /** Rebuild a game from its seed and command history. */
-export function replay(seed: number, history: readonly StampedCommand[], ticks: number): SimState {
-  const s = createState(seed);
+export function replay(seed: number, history: readonly StampedCommand[], ticks: number, difficulty: Difficulty = 'normal'): SimState {
+  const s = createState(seed, difficulty);
   let i = 0;
   while (s.tick < ticks) {
     const cmds: Command[] = [];

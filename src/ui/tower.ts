@@ -1,4 +1,4 @@
-import { TOWER, type Sim, type SimState } from '../sim';
+import { TOWER, currentStipend, type Sim, type SimState } from '../sim';
 import { activeProject, projectFraction, standRow } from '../sim/tower';
 import { bar, clear, h } from './dom';
 import type { WindowManager } from './windows';
@@ -46,6 +46,13 @@ export class TowerPanel {
     const kv = (k: string, v: Node | string) => h('div', { class: 'kv' }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v));
     this.body.append(kv('Height', s.floors === 0 ? 'Just the foundation' : `${s.floors} ${s.floors === 1 ? 'floor' : 'floors'}`));
     this.body.append(kv('Patron’s goal', 'Floor 30: catch a cloud in a jar'));
+    this.body.append(
+      h('div', { class: 'section-label' }, 'The patron'),
+      h('div', { class: 'need' }, h('span', { class: 'k' }, 'Patience'), bar(s.patience), h('span', { class: 'num' }, `${Math.round(s.patience)}%`)),
+      kv('Stipend', s.patience > 0 ? `${currentStipend(s)} gold a minute` : 'Stopped until the tower grows'),
+      kv('Difficulty', s.difficulty),
+      h('div', { class: 'hint' }, 'Patience drains steadily. Each finished floor wins some back and brings a bonus. While the patron is pleased, newcomers arrive on the road.'),
+    );
 
     const p = activeProject(s);
     this.body.append(h('div', { class: 'section-label' }, 'Under construction'));

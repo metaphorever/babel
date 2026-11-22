@@ -22,6 +22,17 @@ npm test
 
 runs the simulation tests, including the check that the same seed and the same commands always produce the same game.
 
+
+## Putting it online
+
+```bash
+npm run build
+```
+
+This writes a static site to `dist/`: an `index.html` plus an `assets/` folder. Every path in it is relative, so you can upload the contents of `dist/` to any folder on any web host and open `index.html` there. Options in the URL:
+
+- `?seed=123` replays a particular starting world.
+- `?difficulty=easy|normal|hard` sets how fast the patron loses patience.
 ## Layout
 
 - `src/sim/`: the simulation. Pure TypeScript, deterministic, no browser APIs. All balance numbers are in `tuning.ts`.
@@ -42,4 +53,4 @@ In the browser console, `babel.sim.state` holds the live game state, for poking 
 - [x] Tower floors from blueprints, builders, floor stockpiles, HAUL FROM/TO, couriers ([DELIVER] [REPEAT])
 - [ ] Mailboxes and upper job boards
 - [x] Language drift (French, Greek), confusion, misreads, TEACH/LEARN, lexicon, writing in other languages
-- [ ] Patron stipend and quitting
+- [x] Patron stipend, patience and floor bonuses; difficulty; quitting; newcomers

@@ -124,9 +124,40 @@ export const LESSON = {
   pull: 48,
 };
 
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
 export const PATRON = {
   /** How often the standing charter checks whether anyone is writing. */
   charterCheckTicks: 100,
+  /** The patron pays a stipend this often, scaled by their patience. */
+  stipendEvery: 1200,
+  stipendBase: 50,
+  /** Patience runs 0..100 and drains steadily; difficulty is how fast. */
+  patienceStart: 100,
+  patienceDrain: { easy: 0.0035, normal: 0.006, hard: 0.01 } as Record<Difficulty, number>,
+  /** A finished floor wins back this much patience, plus a gold bonus. */
+  floorPatience: 35,
+  floorBonusBase: 40,
+  floorBonusPerLevel: 10,
+  /** Below this patience, the patron stops sending newcomers. */
+  recruitAbove: 50,
+};
+
+export const QUIT = {
+  /** Mood below this for long enough and a worker gives notice. */
+  lowMood: 30,
+  sustainTicks: 1200,
+  /** Notice period before they walk home. */
+  noticeTicks: 2400,
+  /** During their notice, mood above this and they decide to stay. */
+  stayAbove: 40,
+};
+
+export const ARRIVALS = {
+  /** How often a newcomer may turn up on the road. */
+  every: 2400,
+  /** Population the patron aims for: start + this many per finished floor (up to the cap). */
+  perFloor: 1,
 };
 
 export const ECONOMY = {
@@ -172,6 +203,8 @@ export const MOOD = {
   hungryPenalty: 12, // need above 70
   thirstyPenalty: 12,
   tiredPenalty: 10,
+  /** Extra once a need passes 90: starving, parched, exhausted. */
+  desperatePenalty: { hunger: 22, thirst: 22, fatigue: 12 },
   ateBread: { value: 6, ticks: 2400 },
   sleptInBed: { value: 6, ticks: 3000 },
   sleptOnGround: { value: -8, ticks: 3000 },

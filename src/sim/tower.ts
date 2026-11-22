@@ -1,4 +1,5 @@
 import { log } from './actions';
+import { patronFloorDone } from './patron';
 import { TOWER, WORLD } from './tuning';
 import { Tile, type BuildMaterial, type Pt, type Project, type SimState, type Site } from './types';
 import { emptyStore, setTile, tileAt } from './world';
@@ -107,6 +108,7 @@ function completeFloor(s: SimState, p: Project): void {
   s.floors = p.level;
   s.projects = s.projects.filter((x) => x !== p);
   s.sites.push(floorStockpile(s, p.level));
+  patronFloorDone(s, p.level);
   log(s, `Floor ${p.level} is finished! The tower stands ${p.level} ${p.level === 1 ? 'floor' : 'floors'} tall.`);
 }
 

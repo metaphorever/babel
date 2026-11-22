@@ -661,3 +661,10 @@ p {
     padding: 0 6px;
   }
 }
+
+.menu-alert {
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  background: var(--paper);
+  font-weight: bold;
+}

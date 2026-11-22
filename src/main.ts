@@ -1,12 +1,14 @@
 import './ui/style.css';
-import { Sim, TICKS_PER_SECOND } from './sim';
+import { Sim, TICKS_PER_SECOND, type Difficulty } from './sim';
 import { Renderer, TILE } from './render/renderer';
 import { Ui } from './ui/ui';
 
 // Seed from the URL (?seed=123) so a playtest can be reproduced exactly.
 const params = new URLSearchParams(location.search);
 const seed = Number(params.get('seed')) || 1 + Math.floor(Math.random() * 1e9);
-const sim = new Sim(seed);
+const diffParam = params.get('difficulty');
+const difficulty: Difficulty = diffParam === 'easy' || diffParam === 'hard' ? diffParam : 'normal';
+const sim = new Sim(seed, difficulty);
 
 const canvas = document.getElementById('world') as HTMLCanvasElement;
 const renderer = new Renderer(canvas);
