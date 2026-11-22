@@ -442,10 +442,12 @@ export class Renderer {
     const lying = w.activity.kind === 'sleep' && w.activity.stage >= 1;
     const moving = w.stepProgress > 0;
     const frame = moving ? (Math.floor(s.tick / 4) % 2) : 0;
-    const spr = workerSprite(w.look, frame, w.facing, lying);
-    const sx = x - Math.floor(spr.width / 2);
-    const sy = y - spr.height;
-    g.drawImage(spr, sx, sy);
+    const ws = workerSprite(w.look, frame, w.facing, lying);
+    const spr = ws.canvas;
+    const sx = x - ws.anchorX;
+    // standing frames have two clear rows above the head; things drawn "above the head" use sy
+    const sy = y - spr.height + (lying ? 0 : 2);
+    g.drawImage(spr, sx, y - spr.height);
     if (w.carrying && !lying) {
       const it = itemSprite(w.carrying);
       // an armload stacks up over their head

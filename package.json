@@ -9,11 +9,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "art:export": "vite-node tools/export-art.ts"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
     "vite": "^7.3.8",
+    "vite-node": "^3.2.4",
     "vitest": "^3.2.7"
   }
 }

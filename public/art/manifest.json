@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "note": "Sprite sheets for Babel. See docs/SPRITES.md. Black = ink, white = paper, transparent = clear, pure red = anchor.",
+  "sheets": {
+    "body": {
+      "file": "workers-body.png",
+      "cell": [
+        16,
+        16
+      ],
+      "layout": "rows = body variants, columns = walk frames (2); one red pixel marks the neck"
+    },
+    "head": {
+      "file": "workers-head.png",
+      "cell": [
+        16,
+        16
+      ],
+      "layout": "rows = head variants, drawn with the neck at (7,7), facing right"
+    },
+    "beard": {
+      "file": "workers-beard.png",
+      "cell": [
+        16,
+        16
+      ],
+      "layout": "rows = beard variants, drawn over the head"
+    },
+    "hat": {
+      "file": "workers-hat.png",
+      "cell": [
+        16,
+        16
+      ],
+      "layout": "rows = hat variants, drawn over the head"
+    },
+    "items": {
+      "file": "items.png",
+      "cell": [
+        8,
+        8
+      ],
+      "names": [
+        "stone",
+        "wood",
+        "grain",
+        "bread"
+      ]
+    },
+    "props": {
+      "file": "props.png",
+      "cell": [
+        8,
+        8
+      ],
+      "names": [
+        "scroll",
+        "bag",
+        "sheet"
+      ]
+    },
+    "glyphs": {
+      "file": "glyphs.png",
+      "cell": [
+        8,
+        8
+      ],
+      "names": [
+        "z",
+        "!",
+        "?",
+        "$",
+        "b"
+      ]
+    }
+  }
+}

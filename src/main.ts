@@ -2,6 +2,7 @@ import './ui/style.css';
 import { Sim, TICKS_PER_SECOND, type Difficulty } from './sim';
 import { Renderer, TILE } from './render/renderer';
 import { Ui } from './ui/ui';
+import { loadArt } from './render/artLoader';
 
 // Seed from the URL (?seed=123) so a playtest can be reproduced exactly.
 const params = new URLSearchParams(location.search);
@@ -169,6 +170,12 @@ function frame(now: number) {
 }
 ui.refresh();
 requestAnimationFrame(frame);
+
+// Sprite sheets from public/art/ replace the built-in art when present. While
+// the dev server is running, coming back to the window reloads them, so you
+// can save in an image editor, switch back, and see the change.
+void loadArt();
+if (import.meta.env.DEV) window.addEventListener('focus', () => void loadArt());
 
 // handy in the console while tuning: babel.sim.state, babel.seed
 (window as unknown as { babel: unknown }).babel = { sim, seed, renderer, ui };

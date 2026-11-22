@@ -35,6 +35,17 @@ To build it yourself, the command above writes a static site to `dist/`: an `ind
 
 - `?seed=123` replays a particular starting world.
 - `?difficulty=easy|normal|hard` sets how fast the patron loses patience.
+
+
+## Drawing sprites
+
+Sprites are PNG sheets in `public/art/`: black for ink, white for paper, transparent for clear. Workers are layered parts (bodies, heads, beards, hats), so every row you add is a new variant. Edit them in any pixel editor; with the dev server running, switching back to the browser reloads them. The full guide is [docs/SPRITES.md](docs/SPRITES.md).
+
+```bash
+npm run art:export
+```
+
+regenerates template sheets from the built-in art (it won't overwrite sheets you've changed).
 ## Layout
 
 - `src/sim/`: the simulation. Pure TypeScript, deterministic, no browser APIs. All balance numbers are in `tuning.ts`.

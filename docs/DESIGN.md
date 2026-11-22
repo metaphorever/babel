@@ -398,6 +398,16 @@ All the numbers in this section are placeholders until playtests say otherwise.
 - **Newcomers:** while patience is 50 or more, a newcomer arrives on the road home every 2 minutes, as long as the colony is below 8 + 1 per finished floor (capped at 30).
 - **Quitting:** a worker whose mood stays below 30 for a minute gives notice, which shows as a bindle-on-a-stick cloud, a menubar alert and a countdown in the inspector. If their mood climbs above 40 within 2 minutes, they decide to stay. Otherwise they drop what they're carrying, leave their scrolls behind, send undelivered carriers to the outbox, and walk home with their purse.
 - **Desperation:** a need above 90 (starving, parched, exhausted) adds a big mood penalty on top of the usual one. A colony with no food falls apart in about 10 minutes.
+
+**Later: building floors tile by tile.** The automatic stockpile on each finished floor is a P0 stand-in. In the full game, every floor is built empty, and the player chooses what goes on each tile: individual stockpiles (stone only, wood only and so on), beds, kitchens, larders, wells, workshops, mailboxes and boards. Placing one is a blueprint like any other, carried up and built by workers. This is what makes each floor's layout a logistics decision.
+
+**Also in P0, from the first playtests:**
+- **Counts can be "all" or "forever"** ([§5.4.1](#541-notices-cards-and-scrolls)). "All" keeps going while there's something to do and finishes when the source runs dry: hauling, building, cooking, writing, teaching, learning. "Forever" never finishes. Neither promises gold up front; both pay from the treasury as the work is done.
+- **The composer puts "who is it for" on top** as a three-way switch: Board · Anyone, Board · by name, Hand to. Each mode looks different: a thin border, a double border, or a thick border with a hatched banner.
+- **Day and night.** A day is 5 real minutes at 1×. The patron pays at dawn. The sky goes through dusk to a starry night and back, but only the open sky: the ground and the tower's column stay paper-white for legibility. Night doesn't change behavior yet. A natural next step is workers preferring to sleep at night.
+- **Drifted scribes.** The patron's charter only counts a scribe who can still read "write". A worker who keeps hitting unreadable lines (three strikes) gives up on the scroll, so a drifted scribe can't lock up the game.
+- **Panning** moves in steps of the 4-pixel dither tile, so patterns never shimmer.
+- **Sprites** are PNG sheets; see [SPRITES.md](SPRITES.md).
 - **Scroll wages come out of the treasury as each line is done.** Nothing is reserved up front, because a loop has no end. If the treasury is empty, the line goes unpaid and the worker's mood drops.
 - **Taking a notice down is immediate.** That's a P0 shortcut, since the ground board sits beside the scriptorium.
 
