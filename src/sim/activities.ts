@@ -1,7 +1,7 @@
 import { addMoodlet, dropCarried, log, moveTo, settle } from './actions';
 import { isWorkVerb, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
 import { carrierText } from './carriers';
-import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed } from './scrolls';
+import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed, unreadableLine } from './scrolls';
 import { addConfusion, knows, readOrder } from './drift';
 import { rand, randInt } from './rng';
 import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_OF_VERB, skillLevel } from './skills';
@@ -312,7 +312,10 @@ export function workOrder(s: SimState, w: Worker, order: Order): Result {
   if (!a.read) {
     const reading = readOrder(s, w, order);
     addConfusion(w, reading);
-    if (!reading.order) return failWork(s, w, `Can't read this: «${orderText(order)}».`);
+    if (!reading.order) {
+      if (a.kind === 'scroll' && w.held[0]) return unreadableLine(s, w, w.held[0], order);
+      return failWork(s, w, `Can't read this: «${orderText(order)}».`);
+    }
     if (reading.guesses > 0 && orderText(reading.order) !== orderText(order)) log(s, `${w.name} read «${orderText(order)}» as "${orderText(reading.order)}".`, w.id);
     a.read = reading.order;
   }

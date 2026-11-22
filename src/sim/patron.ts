@@ -1,9 +1,11 @@
 import { log } from './actions';
 import { hasWriteLine, scribeLoop } from './carriers';
+import { knows, knowsWord } from './drift';
+import { LANGS, langName, type LangId } from './lang';
 import { addWorker } from './sim';
 import { ARRIVALS, PATRON, POPULATION } from './tuning';
 import { siteOf } from './world';
-import type { SimState } from './types';
+import type { Carrier, SimState } from './types';
 
 // The patron's charter is a standing order nailed to the board:
 //
@@ -15,22 +17,65 @@ import type { SimState } from './types';
 
 export const CHARTER_TEXT = 'IF no one is writing, THEN post [write] [deliver] [repeat] for Anyone';
 
-/** Is anyone writing, or about to be? */
+/** The WRITE word on a carrier, if it has one. */
+function writeToken(c: Carrier) {
+  return c.orders.find((o) => o[0].t === 'WRITE')?.[0] ?? null;
+}
+
+/** Could any worker read this scribe loop? */
+function someoneCanRead(s: SimState, c: Carrier): boolean {
+  const tok = writeToken(c);
+  return !!tok && s.workers.some((w) => !w.leaving && knows(w, tok));
+}
+
+/**
+ * Is anyone writing, or about to be? Holding a scribe loop only counts if
+ * you can still read "write" on it: a scribe whose word for it has drifted
+ * away is no scribe at all.
+ */
 export function someoneIsWriting(s: SimState): boolean {
   for (const w of s.workers) {
-    if (w.held.some(hasWriteLine)) return true;
+    if (w.leaving) continue;
+    if (
+      w.held.some((c) => {
+        const tok = writeToken(c);
+        return !!tok && knows(w, tok);
+      })
+    )
+      return true;
     // a scribe loop in the bag of someone who will deliver it
     const delivers = w.held.some((c) => c.orders.some((o) => o[0].t === 'DELIVER'));
-    if (delivers && w.bag.some(hasWriteLine)) return true;
+    if (delivers && w.bag.some((c) => hasWriteLine(c) && someoneCanRead(s, c))) return true;
   }
-  return s.boardScrolls.some(hasWriteLine);
+  return s.boardScrolls.some((c) => hasWriteLine(c) && someoneCanRead(s, c));
+}
+
+/**
+ * The language to post a new scribe loop in: the one the most workers can
+ * read all three words of. The patron's clerk knows them all.
+ */
+function bestScribeLanguage(s: SimState): LangId | null {
+  let best: LangId | null = null;
+  let bestCount = 0;
+  for (const l of LANGS) {
+    const n = s.workers.filter((w) => !w.leaving && (['WRITE', 'DELIVER', 'REPEAT'] as const).every((t) => knowsWord(w, t, l.id))).length;
+    if (n > bestCount) {
+      best = l.id;
+      bestCount = n;
+    }
+  }
+  return best;
 }
 
 export function checkCharter(s: SimState): void {
   if (s.tick % PATRON.charterCheckTicks !== 0) return;
   if (someoneIsWriting(s)) return;
-  s.boardScrolls.push(scribeLoop(s, { kind: 'board', addressee: null }, true));
-  log(s, "No one is writing. The patron's charter posts a scribe loop on the board for Anyone.");
+  const lang = bestScribeLanguage(s);
+  if (!lang) return; // nobody left who could read it in any language
+  // take down any patron's scribe loop nobody can read before posting a fresh one
+  s.boardScrolls = s.boardScrolls.filter((c) => !(c.patron && hasWriteLine(c)));
+  s.boardScrolls.push(scribeLoop(s, { kind: 'board', addressee: null }, true, lang));
+  log(s, `No one is writing. The patron's charter posts a scribe loop on the board for Anyone${lang === 'en' ? '' : `, in ${langName(lang)}`}.`);
 }
 
 // ----------------------------------------------------------- the stipend

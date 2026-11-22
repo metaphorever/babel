@@ -1,5 +1,5 @@
 import { log } from './actions';
-import { isWorkVerb, makeOrder, orderText, type Order } from './lang';
+import { isWorkVerb, makeOrder, orderText, type LangId, type Order } from './lang';
 import { SCRIBE, TOWER } from './tuning';
 import type { Carrier, Design, Dest, Notice, SimState } from './types';
 
@@ -24,19 +24,20 @@ export function newCarrier(s: SimState, lines: Line[], wage: number, dest: Dest,
     lineDone: 0,
     loops: 0,
     patron,
+    strikes: 0,
     waitUntil: 0,
     retryAfter: 0,
   };
 }
 
 /** The scribe loop: write, deliver, repeat. */
-export function scribeLoop(s: SimState, dest: Dest, patron: boolean): Carrier {
+export function scribeLoop(s: SimState, dest: Dest, patron: boolean, lang: LangId = 'en'): Carrier {
   return newCarrier(
     s,
     [
-      { order: makeOrder('WRITE'), count: 1 },
-      { order: makeOrder('DELIVER'), count: 1 },
-      { order: makeOrder('REPEAT'), count: 1 },
+      { order: makeOrder('WRITE', null, {}, lang), count: 1 },
+      { order: makeOrder('DELIVER', null, {}, lang), count: 1 },
+      { order: makeOrder('REPEAT', null, {}, lang), count: 1 },
     ],
     1,
     dest,

@@ -2,7 +2,7 @@ import { addMoodlet, log, moveTo, releaseReservations } from './actions';
 import { startActivity, train, workOrder, type Result } from './activities';
 import { carrierText, hasWriteLine, lineText, pinCarrier, writingCost } from './carriers';
 import { addConfusion, knows, knowsWord } from './drift';
-import { DRIFTABLE, LANGS, isWorkVerb, langName, orderText, parseOrder, word, type LangId, type TokenId, type Verb } from './lang';
+import { DRIFTABLE, LANGS, isWorkVerb, langName, orderText, parseOrder, word, type LangId, type Order, type TokenId, type Verb } from './lang';
 import { skillLevel } from './skills';
 import { LESSON, MOOD, SCRIBE } from './tuning';
 import { startFloorFromBlueprint, topSpot } from './tower';
@@ -52,7 +52,7 @@ export function runScroll(s: SimState, w: Worker): Result {
   // a line they can't read is skipped; work lines are read word by word in workOrder
   if (!isWorkVerb(verb) && !knows(w, line[0])) {
     addConfusion(w, { order: null, guesses: 0 });
-    return scrollLineFailed(s, w, `Can't read this line: «${orderText(line)}».`);
+    return unreadableLine(s, w, c, line);
   }
   switch (verb) {
     case 'REPEAT':
@@ -361,4 +361,25 @@ export function attendLesson(s: SimState, w: Worker): Result {
   if (close(w, teacher)) return 'running';
   const m = moveTo(s, w, { x: teacher.x + (teacher.x > 0 ? -1 : 1), y: teacher.y });
   return m === 'unreachable' ? 'failed' : 'running';
+}
+
+/**
+ * A line the holder can't read. They skip it, and if they keep hitting
+ * lines they can't read, they give up on the scroll altogether rather than
+ * stew in confusion: they set it aside, leave anything undelivered at the
+ * scriptorium, and go back to the board like anyone else.
+ */
+export function unreadableLine(s: SimState, w: Worker, c: Carrier, line: Order): Result {
+  c.strikes++;
+  if (c.strikes >= SCRIBE.giveUpAfter) {
+    w.held = w.held.filter((x) => x !== c);
+    if (w.bag.length > 0) {
+      s.outbox.push(...w.bag);
+      w.bag = [];
+    }
+    w.thought = "I can't make sense of this anymore.";
+    log(s, `${w.name} gave up on their ${c.kind}: they can't read «${orderText(line)}» anymore.`, w.id);
+    return 'failed';
+  }
+  return scrollLineFailed(s, w, `Can't read this line: «${orderText(line)}».`);
 }

@@ -87,6 +87,8 @@ export const SCRIBE = {
   /** After a failed line, the holder waits this long before going on. */
   lineRetryTicks: 300,
   maxLines: 6,
+  /** Hit this many unreadable lines on a scroll and the holder gives up on it. */
+  giveUpAfter: 3,
   /** Extra pull of a scroll in hand over free time (it's an obligation). */
   duty: 8,
 };

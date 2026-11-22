@@ -103,6 +103,8 @@ export interface Carrier {
   loops: number;
   /** Posted by the patron's standing charter rather than written by a scribe. */
   patron: boolean;
+  /** Times the holder has hit a line they can't read. Too many and they give up on it. */
+  strikes: number;
   /** After a failed line, the holder takes a breather before carrying on. */
   waitUntil: number;
   /** A courier who couldn't hand it over waits until then to try again. */

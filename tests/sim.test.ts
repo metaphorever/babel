@@ -572,3 +572,23 @@ describe('the patron and quitting', () => {
     expect(t.workers.length).toBe(before);
   });
 });
+
+describe('recovering from a drifted scribe', () => {
+  it('when the scribe can no longer read "write", the charter posts a new scribe loop and someone takes it', () => {
+    const s = createState(5);
+    const scribe = s.workers[0];
+    scribe.vocab.en = scribe.vocab.en!.filter((t) => t !== 'WRITE');
+    scribe.vocab.fr = ['WRITE'];
+    scribe.driftTongue = 'fr';
+    expect(runUntil(s, () => s.boardScrolls.some((c) => c.patron), PATRON.charterCheckTicks + 5)).toBe(true);
+    // a worker who can read it becomes the new scribe
+    expect(runUntil(s, () => s.workers.some((w) => w !== scribe && w.held.some((c) => c.patron)), 4000)).toBe(true);
+  });
+
+  it('a worker who keeps failing to read their scroll gives up on it', () => {
+    const s = createState(5);
+    const scribe = s.workers[0];
+    scribe.vocab.en = scribe.vocab.en!.filter((t) => t !== 'WRITE');
+    expect(runUntil(s, () => !scribe.held.some((c) => c.orders[0][0].t === 'WRITE' && c !== s.boardScrolls[0]), 20 * 300)).toBe(true);
+  });
+});
