@@ -102,7 +102,7 @@ export const SCRIBE = {
 
 export const DRIFT = {
   /** Workers on this floor or higher build up exposure. */
-  lineFloor: 2,
+  lineFloor: 3,
   /** Exposure per tick at the drift line, and extra per floor above it. */
   rate: 0.08,
   ratePerFloor: 0.03,

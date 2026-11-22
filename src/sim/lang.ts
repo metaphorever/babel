@@ -17,7 +17,7 @@ export interface LangInfo {
 
 export const LANGS: readonly LangInfo[] = [
   { id: 'en', name: 'English', fromFloor: Infinity },
-  { id: 'fr', name: 'French', fromFloor: 2 },
+  { id: 'fr', name: 'French', fromFloor: 3 },
   { id: 'el', name: 'Greek', fromFloor: 5 },
 ];
 

@@ -379,8 +379,8 @@ All the numbers in this section are placeholders until playtests say otherwise.
 - **Not in yet:** mailboxes and upper job boards, falling, structural load, and acts of god.
 
 **How P0 handles language (provisional; the numbers are in `tuning.ts`, DRIFT / CONFUSION / LESSON):**
-- **Languages:** English (the common tongue), French (opens once the tower is 2 floors tall) and Greek (opens at 5). Greek is a different script, so a foreign word stands out at a glance.
-- **Drift:** workers on floor 2 or higher build up hidden exposure, faster the higher they are. It fades on the ground. Each time it fills, one random word moves from the language they knew it in to their drift tongue. The drift tongue is picked from the open languages the first time they drift, then stays fixed for that worker.
+- **Languages:** English (the common tongue), French (opens once the tower is 3 floors tall) and Greek (opens at 5). Greek is a different script, so a foreign word stands out at a glance.
+- **Drift:** workers on floor 3 or higher build up hidden exposure, faster the higher they are. It fades on the ground. Each time it fills, one random word moves from the language they knew it in to their drift tongue. The drift tongue is picked from the open languages the first time they drift, then stays fixed for that worker.
 - **Reading an order:**
   - An unknown verb means they can't read the order at all, and they skip it.
   - An unknown object gets a guess: a hauler hauls whatever comes to mind; a miner can only mine stone anyway.
@@ -438,6 +438,92 @@ Fights, metalwork, cordage, the full tech tree, contraptions (crane, bucket brig
 - **Gold:** how does mining gold actually work: an ore, a resource node, something else?
 - **Force retrieval:** how many workers does carrying someone down take, how is it done, and what does it cost?
 - **The name.**
+
+## 15. P1 spec: the new game, the map and buildings
+
+*Decided 2026-11-22, after the first playtests. Not built yet; this is the next big piece of work. It replaces P0's fixed ground strip with a map the player lays out.*
+
+### 15.1 The map
+
+- **Random natural features:** the forest, quarry, field and well are placed randomly on each new map, along with an **abandoned shack holding a broken oven**. The shack is always there: the demolition tutorial uses it, and experienced players will probably clear it first.
+- **The road home is always on the left edge.** The right edge is reserved for something not yet decided.
+- **The patron's starting supplies** sit at a random spot (possibly the far side of the scriptorium) until there's somewhere to store them.
+- **Workers sleep rough** until beds are built. That costs mood, which is the reason for the bed tutorial.
+
+### 15.2 Opening text
+
+The game opens on this text. The words in [brackets] are flavor adjectives, each shown in a random language from all the languages in the game (nothing is unlocked yet at the start). They aren't translated and nothing depends on them: the sentence stays understandable without them.
+
+> Your [benevolent] patron has entrusted you with a [legendary] commission: Build a tower that reaches all the way up to heaven! To complete this task you will be provided many [industrious] workers, [plentiful] land and natural resources, and a generous stipend — as long as your progress pleases your patron.
+>
+> Although the [heavy] burden of this project's success lies on your shoulders, your hands will not touch a single brick. To give jobs to your [trusted] workers you must dictate them to a scribe at the scriptorium, and then have a worker post the order on a job board or deliver it to a worker to be carried out.
+>
+> To begin, please select a location to build your scriptorium and first job board.
+
+**[Build Scriptorium]**
+
+### 15.3 Placing buildings
+
+- **Placement mode:** after **[Build Scriptorium]**, the player is in placement mode. The building's outline follows the cursor, partly shaded, with its bounding box outlined. Over occupied land (a field, the well, another building) it shows an **XXXXX** marker.
+- **Confirming:** clicking asks "Are you sure you want to place this building here?" with **Cancel Build / Change Placement / Build [Building Name] Here**.
+- **The first two buildings:** the scriptorium and the first job board are **separate buildings, placed together** in that one step, with the board beside the scriptorium's door. That keeps the intro simple and makes for a short walk. Experienced players can build a new board and demolish the old one later.
+- **Who builds them:** once placed, workers are automatically given the build jobs (pre-written orders, like the patron's charter) and build from the starting supplies.
+
+When both are finished:
+
+> The Scriptorium and job board are now complete. To ensure that you will always be able to issue orders, the "Patron's Charter" has been permanently decreed. The fate of this [monumental] undertaking depends on you. [Good luck!]
+
+**[Continue Tutorial] [Skip Tutorials]**
+
+### 15.4 Buildings
+
+- **Placed only once, never moved or demolished:** the **scriptorium** and the **tower**. The player gets one shot at each. Everything else can be built any number of times and demolished.
+- **Generic buildings** are empty wooden shells, **one or two stories tall at most**. Since language confusion starts at the third story, ordinary buildings never trigger it.
+  - **Naming:** the player names each one, and its label lists what's inside, for example "Dormitory (Bed, Bed, Pantry)".
+  - **Art:** they all share the same basic art.
+  - **Width:** likely customizable, so a kitchen can be 2 tiles and a dorm 4. Simple fixed sizes are fine to start.
+- **The scriptorium** has its own special art; the user is drawing it.
+- **The tower site** is chosen in its own placement step, after the scriptorium. It can't be moved, so the tutorial warns the player to choose wisely.
+
+### 15.5 Fixtures
+
+Fixtures are permanently fixed in place inside a building. The word covers amenities and tools: beds, ovens, pantries, brewing stations, bars, stockpiles, and later tables.
+- **Ovens** bake bread; **pantries** store it (the pantry replaces P0's "larder").
+- **Drink:** grain is brewed into beer at a **brewing station** and stored at a **bar**, where workers drink. The bar is a fixture and takes over from P0's ready-made tavern. Workers still spend their wages there.
+- **Tables** (later) give extra mood when eating, drinking and socializing.
+- **Stockpiles** can go outside or inside buildings. Workers can only use resources that have been stored. Stockpiles inside buildings hold more. P0's stockpiles have no limit yet.
+
+### 15.6 Demolishing
+
+- **What you can demolish:** fixtures, and then the empty building.
+- **Rules:** a pantry, bar or stockpile can only be demolished once it's emptied, and a building only once it has nothing in it.
+- **Salvage:** demolishing gives back **half** the original materials.
+
+### 15.7 The patron's grace period
+
+- **The deadline:** the patron gives **2 in-game days to finish the first floor**. After that, normal patience drain applies.
+- **Other building counts too:** construction on other buildings wins back patience at about **half** the rate of tower floors. That gives some cushion for building the base, without letting it replace the tower.
+
+### 15.8 Tutorials (outline, not written yet)
+
+1. **The stipend:** how it's paid, the grace period at the start, what pace of progress keeps patience at 100%, how patience drops, and how to win it back.
+2. **The tower:** restate the goal (height, or another goal, depending on game mode). The tower site can't be moved once chosen, so choose wisely. The patron wants real progress by the end of the grace period, so don't forget it.
+3. **Buildings:** fixtures must go inside a finished building. **[Build an empty building]**
+   1. When the first building is done: workers need food to stay happy. **[Build oven]**, then a place to keep bread: **[Build pantry]**.
+   2. Workers need rest. **Build some beds.**
+   3. Many workers enjoy a drink now and then: consider a **brewing station** and a **bar**.
+   4. **Stockpiles:** workers can only use stored resources. Stockpiles can go outside or inside buildings; inside ones hold more.
+   5. **Demolishing:**
+      1. Click **[Demolish]** and select the broken oven in the abandoned shack.
+      2. The shack is empty now, so demolish it too. Demolishing gives back half the materials.
+      3. A pantry, bar or stockpile can only be demolished once it's emptied; a building only once it's empty.
+   6. **A warning about language.** The real tutorial comes when drift first happens.
+   7. **Possibly more scroll and order hand-holding**, earlier on.
+
+### 15.9 Also decided
+
+- **Drift starts on the third story.** Floors 1 and 2 are safe, and French joins the drift pool once the tower is 3 floors tall. *(Changed in code on 2026-11-22.)*
+- **Art pipeline:** working sheets are MacPaint documents, edited on a System 7 Mac in an emulator (Infinite Mac). Each sprite has a mask beside it, and converters go both ways. See [SPRITES.md](SPRITES.md).
 
 ## Glossary
 
