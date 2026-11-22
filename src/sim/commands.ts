@@ -1,6 +1,6 @@
 import { log } from './actions';
 import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCarrier, queueDesign } from './carriers';
-import { isValidLine, langName, makeOrder, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
+import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isValidLine, langName, makeOrder, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
 import { SCRIBE, TOWER } from './tuning';
 import type { Dest, SimState } from './types';
 
@@ -77,7 +77,9 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       if (cmd.lines.length > SCRIBE.maxLines) return { ok: false, error: `A scroll holds at most ${SCRIBE.maxLines} lines.` };
       for (const l of cmd.lines) {
         if (!isValidLine(l.verb, l.noun)) return { ok: false, error: 'One of the lines makes no sense.' };
-        if (!countless(l.verb) && (!Number.isInteger(l.count) || l.count < 1 || l.count > 999)) return { ok: false, error: 'Counts must be 1 to 999.' };
+        if (l.count === ALL && !allowsAll(l.verb)) return { ok: false, error: `"All" doesn't work for ${l.verb.toLowerCase()}: it never runs out.` };
+        if (l.count === FOREVER && !allowsForever(l.verb)) return { ok: false, error: `"Forever" doesn't work for ${l.verb.toLowerCase()}.` };
+        if (!countless(l.verb) && !isSpecialCount(l.count) && (!Number.isInteger(l.count) || l.count < 1 || l.count > 999)) return { ok: false, error: 'Counts must be 1 to 999, all, or forever.' };
         const places = [l.from, l.to].filter((p): p is Place => p !== undefined && p !== null);
         if (places.length > 0 && !takesPlaces(l.verb)) return { ok: false, error: `"${l.verb.toLowerCase()}" doesn't take a from or to.` };
         if (places.some((p) => !Number.isInteger(p) || p < 0 || p > TOWER.maxFloors)) return { ok: false, error: 'No such floor.' };
@@ -98,7 +100,7 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       const who = cmd.dest.kind === 'board' ? cmd.dest.addressee : cmd.dest.workerId;
       if (who !== null && !s.workers.some((w) => w.id === who)) return { ok: false, error: 'Who is it for?' };
       // what it would promise up front (only notices do)
-      const promise = cmd.dest.kind === 'board' && cmd.lines.length === 1 && !['WRITE', 'DELIVER', 'REPEAT', 'CHECK'].includes(cmd.lines[0].verb) ? cmd.lines[0].count * cmd.wage : 0;
+      const promise = cmd.dest.kind === 'board' && cmd.lines.length === 1 && !['WRITE', 'DELIVER', 'REPEAT', 'CHECK', 'TEACH', 'LEARN'].includes(cmd.lines[0].verb) && !isSpecialCount(cmd.lines[0].count) ? cmd.lines[0].count * cmd.wage : 0;
       if (promise > availableGold(s)) return { ok: false, error: `Needs ${promise} gold; only ${availableGold(s)} available.` };
       return { ok: true };
     }

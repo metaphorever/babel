@@ -208,3 +208,30 @@ export const SCROLL_LINES: readonly LineOption[] = [
 export function isValidLine(verb: Verb, noun: Noun | null): boolean {
   return SCROLL_LINES.some((l) => l.verb === verb && l.noun === noun);
 }
+
+/**
+ * Special counts. ALL keeps going while there's anything to do and is done
+ * once the source runs dry (everything lying around, every word to teach).
+ * FOREVER never finishes. Both are stored as negative numbers so state stays
+ * plain JSON.
+ */
+export const ALL = -1;
+export const FOREVER = -2;
+
+export function isSpecialCount(n: number): boolean {
+  return n === ALL || n === FOREVER;
+}
+
+export function countText(n: number): string {
+  return n === ALL ? 'all' : n === FOREVER ? '∞' : String(n);
+}
+
+/** "All" only makes sense where the work can run out. */
+export function allowsAll(verb: Verb): boolean {
+  return verb === 'HAUL' || verb === 'BUILD' || verb === 'COOK' || verb === 'WRITE' || verb === 'TEACH' || verb === 'LEARN';
+}
+
+/** "Forever" is for work that can go on indefinitely. */
+export function allowsForever(verb: Verb): boolean {
+  return isWorkVerb(verb) || verb === 'WRITE';
+}

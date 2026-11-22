@@ -668,3 +668,7 @@ p {
   background: var(--paper);
   font-weight: bold;
 }
+
+.count-mode {
+  padding: 1px 0;
+}

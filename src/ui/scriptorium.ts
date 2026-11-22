@@ -5,6 +5,12 @@ import {
   SCROLL_LINES,
   VALID_JOBS,
   isWorkVerb,
+  ALL,
+  FOREVER,
+  allowsAll,
+  allowsForever,
+  countText,
+  isSpecialCount,
   LANGS,
   langName,
   takesPlaces,
@@ -299,9 +305,22 @@ export class ScriptoriumPanel {
       }
       let countEl: HTMLElement = h('span', { class: 'slot-empty' });
       if (hasCount(line.verb)) {
-        const inp = h('input', { type: 'number', min: 1, max: 999, value: line.count, 'aria-label': `Line ${i + 1} count` });
+        // a number, or "all" (until it runs out) / "forever", where those make sense
+        if (line.count === ALL && !allowsAll(line.verb)) line.count = 1;
+        if (line.count === FOREVER && !allowsForever(line.verb)) line.count = 1;
+        const special = isSpecialCount(line.count);
+        const inp = h('input', { type: 'number', min: 1, max: 999, value: special ? 1 : line.count, 'aria-label': `Line ${i + 1} count` });
+        inp.style.display = special ? 'none' : '';
         inp.addEventListener('input', () => ((line.count = Math.floor(Number(inp.value)) || 1), this.updateSummary()));
-        countEl = h('label', { class: 'slot-count' }, '×', inp, COUNT_HINT[line.verb] ? h('span', { class: 'hint' }, COUNT_HINT[line.verb]) : '');
+        const mode = h('select', { 'aria-label': `Line ${i + 1} how many`, class: 'count-mode' }, h('option', { value: 'n' }, '×'));
+        if (allowsAll(line.verb)) mode.append(h('option', { value: 'all' }, '× all'));
+        if (allowsForever(line.verb)) mode.append(h('option', { value: 'forever' }, '× ∞ forever'));
+        mode.value = line.count === ALL ? 'all' : line.count === FOREVER ? 'forever' : 'n';
+        mode.addEventListener('change', () => {
+          line.count = mode.value === 'all' ? ALL : mode.value === 'forever' ? FOREVER : Math.floor(Number(inp.value)) || 1;
+          this.renderLines();
+        });
+        countEl = h('label', { class: 'slot-count' }, mode, inp, COUNT_HINT[line.verb] ? h('span', { class: 'hint' }, COUNT_HINT[line.verb]) : '');
       }
       this.linesEl.append(
         h(
@@ -352,7 +371,7 @@ export class ScriptoriumPanel {
     const loops = this.lines.some((l) => l.verb === 'REPEAT');
     let text: string;
     if (notice) {
-      text = `A notice. ${d.addressee === null ? 'Anyone' : name(d.addressee)} can take one job at a time from it until ${first.count} are done. Sets aside ${first.count * wage} gold now.`;
+      text = `A notice. ${d.addressee === null ? 'Anyone' : name(d.addressee)} can take one job at a time from it ${first.count === ALL ? 'until there is nothing left to do' : first.count === FOREVER ? 'forever' : `until ${first.count} are done`}.${isSpecialCount(first.count) ? ' Paid from the treasury as the work is done.' : ` Sets aside ${first.count * wage} gold now.`}`;
     } else if (d.kind === 'board') {
       text = `A ${this.lines.length > 1 ? 'scroll' : 'card'} on the board. The first ${d.addressee === null ? 'free worker' : name(d.addressee)} to read it takes it down and carries it out${loops ? ', looping until someone hands them something else' : ''}.`;
     } else if (d.kind === 'worker') {
@@ -373,7 +392,7 @@ export class ScriptoriumPanel {
       if (l.verb === 'CHECK') words.push(wordIn('BOARD', this.lang));
       if (takesPlaces(l.verb) && l.from !== null) words.push(wordIn('FROM', this.lang), l.from === 0 ? wordIn('BASE', this.lang) : wordIn('FLOOR', this.lang, l.from));
       if (takesPlaces(l.verb) && ((l.to ?? 0) !== 0 || l.from !== null)) words.push(wordIn('TO', this.lang), (l.to ?? 0) === 0 ? wordIn('BASE', this.lang) : wordIn('FLOOR', this.lang, l.to ?? 0));
-      return words.join(' ') + (hasCount(l.verb) && l.count > 1 ? ` ×${l.count}` : '');
+      return words.join(' ') + (hasCount(l.verb) && (l.count > 1 || isSpecialCount(l.count)) ? ` ×${countText(l.count)}` : '');
     });
     this.preview.textContent = `«${lineWords.join(' → ')}»`;
   }

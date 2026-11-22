@@ -2,7 +2,7 @@ import { addMoodlet, log, moveTo, releaseReservations } from './actions';
 import { startActivity, train, workOrder, type Result } from './activities';
 import { carrierText, hasWriteLine, lineText, pinCarrier, writingCost } from './carriers';
 import { addConfusion, knows, knowsWord } from './drift';
-import { DRIFTABLE, LANGS, isWorkVerb, langName, orderText, parseOrder, word, type LangId, type Order, type TokenId, type Verb } from './lang';
+import { ALL, DRIFTABLE, LANGS, isSpecialCount, isWorkVerb, langName, orderText, parseOrder, word, type LangId, type Order, type TokenId, type Verb } from './lang';
 import { skillLevel } from './skills';
 import { LESSON, MOOD, SCRIBE } from './tuning';
 import { startFloorFromBlueprint, topSpot } from './tower';
@@ -100,7 +100,8 @@ export function scrollLineDone(s: SimState, w: Worker, units: number, finish = f
   }
   if (units > 0) w.jobsDone++;
   c.lineDone += units;
-  if (finish || c.lineDone >= c.counts[c.pc]) {
+  const target = c.counts[c.pc];
+  if (finish || (!isSpecialCount(target) && c.lineDone >= target)) {
     c.pc++;
     c.lineDone = 0;
   }
@@ -163,6 +164,8 @@ function writeLine(s: SimState, w: Worker): Result {
     if (!d) {
       // nothing to write, but things waiting to go out: move on to delivering
       if (delivers(activeCarrier(w)!) && (w.bag.some((b) => b.retryAfter <= s.tick) || s.outbox.length > 0)) return scrollLineDone(s, w, 0, true);
+      // "write all": the queue is empty, so this line is done
+      if (activeCarrier(w)!.counts[activeCarrier(w)!.pc] === ALL) return scrollLineDone(s, w, 0, true);
       w.thought = 'Nothing to write. Waiting at the desk.';
       return 'running';
     }
@@ -326,7 +329,8 @@ function lessonLine(s: SimState, w: Worker, c: Carrier, verb: 'TEACH' | 'LEARN')
   }
   const done = a.ref ?? 0;
   const pair = verb === 'TEACH' ? nextWord(w, student, false) : nextWord(student, w, true);
-  if (!pair || done >= c.counts[c.pc]) {
+  const limit = c.counts[c.pc];
+  if (!pair || (!isSpecialCount(limit) && done >= limit)) {
     w.thought = done > 0 ? `Lesson done: ${done} ${done === 1 ? 'word' : 'words'}.` : `Nothing to ${verb === 'TEACH' ? 'teach' : 'learn from'} ${student.name}.`;
     return scrollLineDone(s, w, done, true);
   }

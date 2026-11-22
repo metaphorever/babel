@@ -11,7 +11,7 @@ import type { Command } from '../src/sim/commands';
 import { giveCarrier, writingCostFor } from '../src/sim/scrolls';
 import { addConfusion, allWords, readOrder, updateDrift } from '../src/sim/drift';
 import { eligibleNotices } from '../src/sim/activities';
-import { makeOrder, orderText, parseOrder, type Noun, type Verb, type WorkVerb } from '../src/sim/lang';
+import { ALL, FOREVER, makeOrder, orderText, parseOrder, type Noun, type Verb, type WorkVerb } from '../src/sim/lang';
 import { deckRow, newProject, placeMaterial } from '../src/sim/tower';
 
 import type { Dest } from '../src/sim/types';
@@ -590,5 +590,48 @@ describe('recovering from a drifted scribe', () => {
     const scribe = s.workers[0];
     scribe.vocab.en = scribe.vocab.en!.filter((t) => t !== 'WRITE');
     expect(runUntil(s, () => !scribe.held.some((c) => c.orders[0][0].t === 'WRITE' && c !== s.boardScrolls[0]), 20 * 300)).toBe(true);
+  });
+});
+
+describe('all and forever counts', () => {
+  it('"all" isn’t allowed for work that never runs out', () => {
+    const s = createState(6);
+    expect(applyCommand(s, noticeCmd('MINE', 'STONE', ALL, 1)).ok).toBe(false);
+    expect(applyCommand(s, noticeCmd('MINE', 'STONE', FOREVER, 1)).ok).toBe(true);
+    expect(applyCommand(s, noticeCmd('HAUL', 'STONE', ALL, 1)).ok).toBe(true);
+  });
+
+  it('a haul-all notice moves everything lying around, then comes down', () => {
+    const s = createState(6);
+    s.notices = [];
+    s.reserved = 0;
+    const y = siteOf(s, 'beds').y;
+    for (let i = 0; i < 4; i++) s.items.push({ id: s.nextId++, type: 'stone', x: 60 + i, y, reservedBy: null });
+    pinNotice(s, makeOrder('HAUL', 'STONE'), ALL, 1, null);
+    const before = siteOf(s, 'stockpile').store.stone;
+    expect(runUntil(s, () => s.notices.length === 0, 20 * 300)).toBe(true);
+    expect(siteOf(s, 'stockpile').store.stone - before).toBe(4);
+  });
+
+  it('a scroll line set to all finishes when there is nothing left, with no hard feelings', () => {
+    const s = createState(6);
+    const w = s.workers[3];
+    s.items = [];
+    const y = siteOf(s, 'beds').y;
+    s.items.push({ id: s.nextId++, type: 'wood', x: w.x, y, reservedBy: null });
+    giveCarrier(s, w, newCarrier(s, [{ order: makeOrder('HAUL', 'WOOD'), count: ALL }, { order: makeOrder('CHOP', 'WOOD'), count: 1 }], 0, { kind: 'worker', workerId: w.id }));
+    const card = w.held[0];
+    expect(runUntil(s, () => card.pc === 1, 20 * 200)).toBe(true);
+    expect(w.moodlets.some((m) => m.kind === 'failed')).toBe(false);
+  });
+
+  it('teach all passes on every missing word', () => {
+    const s = createState(6);
+    const translator = s.workers[1];
+    const student = s.workers[4];
+    const lost = ['STONE', 'WOOD', 'HAUL', 'MINE'] as const;
+    student.vocab.en = student.vocab.en!.filter((t) => !(lost as readonly string[]).includes(t));
+    applyCommand(s, { type: 'compose', playerId: 0, lines: [{ verb: 'TEACH', noun: null, who: student.id, count: ALL }], wage: 0, dest: { kind: 'worker', workerId: translator.id } });
+    expect(runUntil(s, () => lost.every((t) => student.vocab.en!.includes(t)), 20 * 600)).toBe(true);
   });
 });

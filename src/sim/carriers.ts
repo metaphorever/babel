@@ -1,5 +1,5 @@
 import { log } from './actions';
-import { isWorkVerb, makeOrder, orderText, type LangId, type Order } from './lang';
+import { countText, isSpecialCount, isWorkVerb, makeOrder, orderText, type LangId, type Order } from './lang';
 import { SCRIBE, TOWER } from './tuning';
 import type { Carrier, Design, Dest, Notice, SimState } from './types';
 
@@ -17,7 +17,7 @@ export function newCarrier(s: SimState, lines: Line[], wage: number, dest: Dest,
     id: s.nextId++,
     kind: lines.length > 1 ? 'scroll' : 'card',
     orders: lines.map((l) => l.order.map((t) => ({ ...t }))),
-    counts: lines.map((l) => Math.max(1, l.count)),
+    counts: lines.map((l) => (isSpecialCount(l.count) ? l.count : Math.max(1, l.count))),
     wage,
     dest,
     pc: 0,
@@ -99,7 +99,8 @@ export function pinCarrier(s: SimState, c: Carrier): void {
 
 export function lineText(c: Carrier, i: number): string {
   const text = orderText(c.orders[i]);
-  return c.counts[i] > 1 ? `${text} ×${c.counts[i]}` : text;
+  const n = c.counts[i];
+  return isSpecialCount(n) || n > 1 ? `${text} ×${countText(n)}` : text;
 }
 
 export function carrierText(c: Carrier): string {
@@ -120,7 +121,8 @@ export function destText(s: SimState, d: Dest): string {
 
 /** Gold to set aside when this is composed: notices promise their whole count up front. */
 export function boardReserve(c: Carrier): number {
-  return isNoticeCard(c) ? c.counts[0] * c.wage : 0;
+  // "all" and "forever" can't promise a total; they pay as they go
+  return isNoticeCard(c) && !isSpecialCount(c.counts[0]) ? c.counts[0] * c.wage : 0;
 }
 
 /** Take back a design that hasn't been written yet, refunding any promised gold. */

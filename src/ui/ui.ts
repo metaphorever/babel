@@ -1,5 +1,7 @@
 import {
   availableGold,
+  ALL,
+  FOREVER,
   carrierText,
   currentStipend,
   QUIT,
@@ -208,7 +210,7 @@ export class Ui {
           'div',
           { class: 'notice' },
           h('span', { class: 'notice-order' }, cap(orderText(n.order))),
-          h('span', { class: 'notice-meta' }, `Notice · ${n.remaining} left · ${n.wage}g each · for ${workerName(s, n.addressee)}${working ? ` · ${working} on it` : ''}`),
+          h('span', { class: 'notice-meta' }, `Notice · ${n.remaining === FOREVER ? 'forever' : n.remaining === ALL ? 'all of it' : `${n.remaining} left`} · ${n.wage}g each · for ${workerName(s, n.addressee)}${working ? ` · ${working} on it` : ''}`),
           h('button', { class: 'btn btn-small', title: 'Take down (refunds unpaid wages)', onclick: () => this.sim.enqueue({ type: 'removeNotice', playerId: 0, noticeId: n.id }) }, '×'),
         ),
       );

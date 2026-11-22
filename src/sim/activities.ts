@@ -1,11 +1,11 @@
 import { addMoodlet, dropCarried, log, moveTo, settle } from './actions';
-import { isWorkVerb, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
+import { ALL, FOREVER, isSpecialCount, isWorkVerb, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
 import { carrierText } from './carriers';
 import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed, unreadableLine } from './scrolls';
 import { addConfusion, knows, readOrder } from './drift';
 import { rand, randInt } from './rng';
 import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_OF_VERB, skillLevel } from './skills';
-import { ECONOMY, MOOD, NEEDS, POPULATION, SKILLS, TOWER, WORK } from './tuning';
+import { ECONOMY, MOOD, NEEDS, POPULATION, SCRIBE, SKILLS, TOWER, WORK } from './tuning';
 import type { ActivityKind, BuildMaterial, Carrier, Item, ItemType, Notice, SimState, SiteKind, SkillId, Worker } from './types';
 import { siteOf, spotFor, standable, stockpileOn, stockpiles } from './world';
 import { activeProject, buildSpot, placeMaterial } from './tower';
@@ -176,7 +176,7 @@ function tavern(s: SimState, w: Worker): Result {
 export function eligibleNotices(s: SimState, w: Worker) {
   return s.notices.filter(
     (n) =>
-      n.remaining > 0 &&
+      (n.remaining > 0 || isSpecialCount(n.remaining)) &&
       (n.addressee === null || n.addressee === w.id) &&
       // they can't take what they can't read, unless their name is on it
       (n.addressee === w.id || knows(w, n.order[0])) &&
@@ -189,10 +189,22 @@ export function eligibleNotices(s: SimState, w: Worker) {
  * On the ground, workers can see whether there's anything lying around, so
  * they don't take a haul job for an empty field.
  */
-function nothingToHaul(s: SimState, n: Notice): boolean {
+/**
+ * An "all" notice is finished when there's nothing left to do and nobody
+ * is still in the middle of it (claimed loads count as not done yet).
+ */
+function allDone(s: SimState, n: Notice): boolean {
+  if (s.workers.some((w) => w.memory?.noticeId === n.id)) return false;
+  const o = parseOrder(n.order);
+  if (o.verb === 'HAUL' && o.from === null) return !s.items.some((it) => it.type === nounItem(o.noun as Noun));
+  return nothingToHaul(s, n);
+}
+
+export function nothingToHaul(s: SimState, n: Notice): boolean {
   const o = parseOrder(n.order);
   // the tower is in plain sight: no project, nothing to build
   if (o.verb === 'BUILD') return activeProject(s) === null;
+  if (o.verb === 'COOK') return siteOf(s, 'stockpile').store.grain <= 0;
   if (o.verb !== 'HAUL') return false;
   const type = nounItem(o.noun as Noun);
   if (o.from !== null) return (stockpileOn(s, o.from)?.store[type] ?? 0) <= 0;
@@ -335,8 +347,28 @@ function finishWork(s: SimState, w: Worker, units: number): Result {
   return w.activity.kind === 'scroll' ? scrollLineDone(s, w, units) : completeJob(s, w, units);
 }
 
-function failWork(s: SimState, w: Worker, why: string): Result {
-  return w.activity.kind === 'scroll' ? scrollLineFailed(s, w, why) : failJob(s, w, why);
+/**
+ * The job couldn't be done. `empty` means there was simply nothing left to
+ * do (nothing to haul, no grain, no floor to build): for a scroll line set
+ * to "all" that's the line finished, and for "forever" it's a breather
+ * before trying again, with no hard feelings either way.
+ */
+function failWork(s: SimState, w: Worker, why: string, empty = false): Result {
+  if (w.activity.kind === 'scroll') {
+    const c = w.held[0];
+    const n = c?.counts[c.pc];
+    if (empty && c && n === ALL) {
+      w.thought = 'All done.';
+      return scrollLineDone(s, w, 0, true);
+    }
+    if (empty && c && n === FOREVER) {
+      w.thought = `${why} I'll check again soon.`;
+      c.waitUntil = s.tick + SCRIBE.lineRetryTicks;
+      return 'failed';
+    }
+    return scrollLineFailed(s, w, why);
+  }
+  return failJob(s, w, why);
 }
 
 function produceJob(s: SimState, w: Worker, verb: WorkVerb, site: SiteKind, ticks: number, doing: string, out: ItemType): Result {
@@ -410,7 +442,7 @@ function haulJob(s: SimState, w: Worker, type: ItemType, toLevel: Place): Result
       a.stage = 2;
     } else {
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
-      if (claimLoad(s, w, type, carryCapacity(w)) === 0) return failWork(s, w, `No ${type} lying around to haul.`);
+      if (claimLoad(s, w, type, carryCapacity(w)) === 0) return failWork(s, w, `No ${type} lying around to haul.`, true);
       a.stage = 1;
       w.thought = `Fetching ${type}.`;
     }
@@ -464,7 +496,7 @@ function haulBetween(s: SimState, w: Worker, type: ItemType, fromLevel: Place, t
     if (w.carrying === type) a.stage = 2;
     else {
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
-      if (src.store[type] <= 0) return failWork(s, w, `No ${type} in the stockpile on ${placeName(fromLevel)}.`);
+      if (src.store[type] <= 0) return failWork(s, w, `No ${type} in the stockpile on ${placeName(fromLevel)}.`, true);
       w.thought = `Fetching ${type} from ${placeName(fromLevel)}.`;
       const m = moveTo(s, w, spotFor(src, w.id));
       if (m === 'moving') return 'running';
@@ -516,7 +548,7 @@ function buildJob(s: SimState, w: Worker): Result {
   const a = w.activity;
   const p = activeProject(s);
   if (a.stage === 0) {
-    if (!p) return failWork(s, w, 'Nothing to build. Waiting on a blueprint.');
+    if (!p) return failWork(s, w, 'Nothing to build. Waiting on a blueprint.', true);
     if (w.carrying === 'stone' || w.carrying === 'wood') a.stage = 2;
     else {
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
@@ -600,7 +632,7 @@ function cookJob(s: SimState, w: Worker): Result {
     if (w.carrying === 'grain') a.stage = 2;
     else {
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
-      if (pile.store.grain <= 0) return failWork(s, w, 'No grain in the stockpile.');
+      if (pile.store.grain <= 0) return failWork(s, w, 'No grain in the stockpile.', true);
       w.thought = 'Fetching grain.';
       const m = moveTo(s, w, spotFor(pile, w.id));
       if (m === 'moving') return 'running';
@@ -650,7 +682,23 @@ function completeJob(s: SimState, w: Worker, units: number): Result {
   w.memory = null;
   w.jobsDone++;
   const notice = s.notices.find((n) => n.id === mem.noticeId);
-  if (notice && notice.remaining > 0) {
+  if (notice && isSpecialCount(notice.remaining)) {
+    // "all" and "forever" notices pay from the treasury as they go
+    const pay = units * notice.wage;
+    if (pay > 0 && s.gold - s.reserved >= pay) {
+      s.gold -= pay;
+      w.purse += pay;
+      addMoodlet(s, w, 'paid', `Paid ${pay} gold`, MOOD.gotPaid.value, MOOD.gotPaid.ticks);
+    } else if (pay > 0) {
+      addMoodlet(s, w, 'unpaid', 'Treasury was empty', -6, MOOD.missedJobTicks);
+    }
+    w.thought = `Done: ${units} ${mem.order[1]?.t.toLowerCase() ?? ''}.`;
+    // "all" is finished once there's nothing left to do
+    if (notice.remaining === ALL && units > 0 && allDone(s, notice)) {
+      s.notices = s.notices.filter((n) => n.id !== notice.id);
+      log(s, `Notice finished: ${orderText(notice.order)} (all done).`);
+    }
+  } else if (notice && notice.remaining > 0) {
     const counted = Math.min(units, notice.remaining);
     const pay = counted * notice.wage;
     notice.remaining -= counted;
