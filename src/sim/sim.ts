@@ -12,12 +12,20 @@ import { nextU32, pick, rand, seedRng } from './rng';
 import { emptySkills, SKILL_IDS } from './skills';
 import { rollPersonality } from './traits';
 import { AI, ARRIVALS, ECONOMY, PATRON, POPULATION, SKILLS, TIME, type Difficulty } from './tuning';
-import type { SimState, Worker } from './types';
-import { buildWorld, siteOf } from './world';
+import type { FixtureKind, SimState, StartMode, Worker } from './types';
+import { fixedMap, generateMap, groundRow, sitesOf } from './world';
+import { applyPlace, campJobs, finishNow, type PlaceRequest } from './build';
 
-export function createState(seed: number, difficulty: Difficulty = 'normal'): SimState {
+/**
+ * A new game. 'opening' is the real start (P1): a fresh random map with
+ * nothing built, the patron's supplies, and workers waiting by the road.
+ * 'prebuilt' lays out a working colony the way P0 had it, for the tests and
+ * for quick playtests (?start=prebuilt).
+ */
+export function createState(seed: number, difficulty: Difficulty = 'normal', start: StartMode = 'prebuilt'): SimState {
   const s: SimState = {
-    version: 6,
+    version: 7,
+    start,
     seed,
     tick: 0,
     rng: seedRng(seed),
@@ -26,6 +34,9 @@ export function createState(seed: number, difficulty: Difficulty = 'normal'): Si
     height: 0,
     tiles: [],
     sites: [],
+    buildings: [],
+    tower: null,
+    charter: false,
     items: [],
     workers: [],
     notices: [],
@@ -38,20 +49,28 @@ export function createState(seed: number, difficulty: Difficulty = 'normal'): Si
     gold: ECONOMY.startingGold,
     patience: PATRON.patienceStart,
     difficulty,
+    graceUntil: start === 'opening' ? TIME.dayTicks * PATRON.graceDays : 0,
     nextStipend: TIME.dayTicks,
     nextArrival: ARRIVALS.every,
     income: 0,
     leftWith: 0,
+    takings: 0,
     reserved: 0,
     events: [],
   };
-  buildWorld(s);
-  siteOf(s, 'kitchen').store.bread = 16;
-  // the patron's gift: enough to start
-  const base = siteOf(s, 'stockpile');
-  base.store.grain = 10;
-  base.store.stone = 10;
-  base.store.wood = 8;
+  if (start === 'opening') {
+    generateMap(s);
+    for (let i = 0; i < POPULATION.start; i++) addWorker(s);
+    // the first worker has a gift for letters: they'll be your first scribe
+    const scribe = s.workers[0];
+    scribe.knack = 'writing';
+    scribe.skills = emptySkills();
+    scribe.skills.writing = SKILLS.knackStartXp;
+    s.events = [];
+    log(s, 'Your workers have arrived. Choose where to build the scriptorium.');
+    return s;
+  }
+  prebuild(s);
   for (let i = 0; i < POPULATION.start; i++) addWorker(s);
 
   // The patron left a few notices up so the ground is busy from the start.
@@ -80,6 +99,50 @@ export function createState(seed: number, difficulty: Difficulty = 'normal'): Si
   return s;
 }
 
+/**
+ * The prebuilt colony, laid out much as P0 had it: a kitchen (oven and
+ * pantry), a bunkhouse with six beds, the scriptorium and board, two
+ * stockpiles with the patron's gift, the tower site, and a bar with a
+ * brewing station. Everything is finished from the start.
+ */
+function prebuild(s: SimState): void {
+  fixedMap(s);
+  s.charter = true; // set before the scriptorium finishes, so it doesn't decree it again
+  const place = (p: PlaceRequest) => applyPlace(s, p);
+  const fixture = (fixture: FixtureKind, x0: number) => place({ what: 'fixture', fixture, x0, story: 0 });
+  const finishAll = () => {
+    for (let guard = 0; guard < 100; guard++) {
+      const j = campJobs(s).find((x) => !x.demolish);
+      if (!j) break;
+      finishNow(s, j);
+    }
+  };
+  place({ what: 'scriptorium', x0: 58 });
+  place({ what: 'tower', x0: 74 });
+  place({ what: 'house', x0: 38, width: 6, stories: 1, name: 'Kitchen' });
+  place({ what: 'house', x0: 45, width: 12, stories: 1, name: 'Bunkhouse' });
+  place({ what: 'house', x0: 92, width: 6, stories: 1, name: 'Tavern' });
+  finishAll();
+  fixture('oven', 38);
+  fixture('pantry', 40);
+  for (let i = 0; i < 6; i++) fixture('bed', 45 + i * 2);
+  fixture('stockpile', 68);
+  fixture('stockpile', 70);
+  fixture('brewery', 92);
+  fixture('bar', 94);
+  finishAll();
+  sitesOf(s, 'pantry')[0].store.bread = 16;
+  sitesOf(s, 'bar')[0].store.beer = 12;
+  // the patron's gift: enough to start
+  const [a, b] = sitesOf(s, 'stockpile');
+  a.store.stone = 10;
+  a.store.grain = 10;
+  b.store.wood = 8;
+  // the patron's builders from placing the scriptorium aren't needed: it's already built
+  for (const w of s.workers) w.held = [];
+  s.events = [];
+}
+
 export function addWorker(s: SimState): Worker {
   const { traits, p } = rollPersonality(s.rng);
   const w: Worker = {
@@ -87,8 +150,8 @@ export function addWorker(s: SimState): Worker {
     name: makeName(s.rng, s.workers.map((o) => o.name)),
     traits,
     p,
-    x: 44 + Math.floor(rand(s.rng) * 16),
-    y: siteOf(s, 'beds').y,
+    x: spawnX(s),
+    y: groundRow(),
     path: [],
     pathGoal: null,
     stepProgress: 0,
@@ -112,7 +175,7 @@ export function addWorker(s: SimState): Worker {
     held: [],
     bag: [],
     avoid: [],
-    activity: { kind: 'idle', stage: 0, timer: 0, target: null, ref: null, read: null },
+    activity: { kind: 'idle', stage: 0, timer: 0, target: null, ref: null, read: null, aim: null },
     nextThink: Math.floor(rand(s.rng) * AI.thinkInterval),
     lastScores: [],
     thought: '',
@@ -126,6 +189,13 @@ export function addWorker(s: SimState): Worker {
   startActivity(w, 'idle');
   s.workers.push(w);
   return w;
+}
+
+/** Where a worker first appears: near the patron's supplies at the opening, by the bunkhouse when prebuilt. */
+function spawnX(s: SimState): number {
+  const pile = s.sites.find((x) => x.supplies);
+  if (pile) return Math.max(0, Math.min(s.width - 1, pile.x0 - 6 + Math.floor(rand(s.rng) * 16)));
+  return 44 + Math.floor(rand(s.rng) * 16);
 }
 
 /** Advance one tick, applying any commands first. */
@@ -160,8 +230,8 @@ export class Sim {
   history: StampedCommand[] = [];
   private pending: Command[] = [];
 
-  constructor(seed: number, difficulty: Difficulty = 'normal') {
-    this.state = createState(seed, difficulty);
+  constructor(seed: number, difficulty: Difficulty = 'normal', start: StartMode = 'opening') {
+    this.state = createState(seed, difficulty, start);
   }
 
   /** Check a command now so the UI can show errors, then queue it. */
@@ -180,8 +250,8 @@ export class Sim {
 }
 
 /** Rebuild a game from its seed and command history. */
-export function replay(seed: number, history: readonly StampedCommand[], ticks: number, difficulty: Difficulty = 'normal'): SimState {
-  const s = createState(seed, difficulty);
+export function replay(seed: number, history: readonly StampedCommand[], ticks: number, difficulty: Difficulty = 'normal', start: StartMode = 'opening'): SimState {
+  const s = createState(seed, difficulty, start);
   let i = 0;
   while (s.tick < ticks) {
     const cmds: Command[] = [];

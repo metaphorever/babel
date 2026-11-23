@@ -10,6 +10,17 @@ Moving MacPaint files in and out of the emulator turned out to be a pain, so **a
 - **Set pieces can be one big picture.** The forest, for example, may be a single large drawing rather than one tree repeated. (The forest never runs out of wood, so it doesn't need to show trees being cut down.)
 - **Clouds will be built from parts,** the way workers are, so the sky varies. Not built yet.
 
+### Reference pictures to draw over
+
+`npm run art:reference` writes these into `art-src/` (each also at 4x, as `…@4x.png`, for looking at on a modern screen):
+
+| File | What it is |
+|---|---|
+| `forest-current.png` | The forest exactly as the game draws it now: 96x34, twelve tiles wide. Redraw it as one picture, the same width (height is up to you). |
+| `portrait-template.png` | The worker portrait template: a 64x64 frame, head and shoulders, with the guide rows (top of head 14, eyes 28, mouth 37, chin 42, shoulders 50; rows 0 to 13 are room for hats and hair) and the middle between columns 31 and 32. Below it, a few example parts for each layer and some put together. |
+
+**Portraits** are built from layers, drawn back to front: **body, hair (behind the head), head (with neck, ears and face), beard, hat.** Each part is drawn in its own 64x64 frame, lined up on the same guides. White touching the edge of a part is see-through; anything with a see-through hole in the middle, like a hood around the face, needs a mask. Draw as many variants of each layer as you like: each worker's look is picked from them.
+
 The rest of this document describes the MacPaint sheets and the `.bin`/`.pntg` round trip. They still work and remain the reference for box sizes and layouts, but they're no longer the main route.
 
 ## The MacPaint sheets
@@ -21,6 +32,8 @@ All of the game's art lives on three **MacPaint documents** in [`art-src/`](../a
 | `Babel Workers` | Worker bodies (with a walking frame), heads, beards, hats; items; props; thought symbols |
 | `Babel World` | Terrain and tower tiles, the tree, crops, quarry rock, well, old shack, road sign, supply wagon, sky (cloud, sun, moon) |
 | `Babel Buildings` | Generic building parts (walls, door, window, roof), the scriptorium, the job board, fixtures (bed, oven, broken oven, pantry, brewing station, bar, table, stockpile) |
+
+Items now include **beer** (a mug), next to stone, wood, grain and bread. Pages exported before 2026-11-23 don't have a box for it; `npm run art:export -- --force` adds one (and starts the page over).
 
 Each page comes in three files:
 
@@ -90,7 +103,8 @@ It won't overwrite a page that already exists. Add `-- --force` to start a page 
 | Art | In the game? |
 |---|---|
 | Workers, items, props, thought symbols | Yes, now |
-| World tiles, buildings, fixtures and sky | Not yet. They're converted into `public/art/world.png`, but the renderer still draws these in code. Switching it to the sheet art comes with the P1 building work (see [HANDOFF.md](HANDOFF.md)), and the placeholder fixtures are there for that work. |
+| Buildings and fixtures | Yes, from the built-in world art: generic buildings are assembled from the wall, door, window and roof parts (one 8-pixel tile each, so any width works), plus the scriptorium, the old shack, the supply wagon and every fixture. Two-story buildings stack two stories of wall with the deck between. New art for these replaces the built-in grids. |
+| Terrain, nature, the tower and the sky | Not yet: still drawn in code. |
 
 ## Changing the layout
 

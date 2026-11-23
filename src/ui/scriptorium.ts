@@ -44,7 +44,7 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-interface DraftLine {
+export interface DraftLine {
   verb: Verb;
   noun: Noun | null;
   /** Hauling only: from a stockpile (null = whatever's lying around) and to one (base by default). */
@@ -64,6 +64,7 @@ const VERB_LABEL: Record<Verb, string> = {
   CHOP: 'Chop',
   HARVEST: 'Harvest',
   COOK: 'Cook',
+  BREW: 'Brew',
   HAUL: 'Haul',
   BUILD: 'Build',
   WRITE: 'Write',
@@ -100,6 +101,10 @@ const PRESETS: { label: string; lines: DraftLine[] }[] = [
   {
     label: 'Notice: mine ×20',
     lines: [{ verb: 'MINE', noun: 'STONE', from: null, to: null, count: 20 }],
+  },
+  {
+    label: 'Notice: build camp, all',
+    lines: [{ verb: 'BUILD', noun: 'CAMP', from: null, to: null, count: ALL }],
   },
   {
     label: 'Scribe loop',
@@ -277,6 +282,13 @@ export class ScriptoriumPanel {
   }
 
   open(): void {
+    this.wm.show('scriptorium');
+  }
+
+  /** Open the composer with these lines filled in, as a notice for Anyone. */
+  openDraft(lines: DraftLine[]): void {
+    this.setMode('anyone');
+    this.usePreset(lines);
     this.wm.show('scriptorium');
   }
 

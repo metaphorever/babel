@@ -1,12 +1,11 @@
 import { releaseReservations } from './actions';
-import { boardOptions, runActivity, startActivity } from './activities';
+import { barsWithBeer, boardOptions, breadAvailable, runActivity, startActivity } from './activities';
 import { rand } from './rng';
 import { AI, CONFUSION, ECONOMY, LESSON, MOOD, NEEDS, SCRIBE } from './tuning';
 import { levelOfRow, updateDrift } from './drift';
 import { lessonFor } from './scrolls';
 import { updateMorale, walkHome } from './morale';
 import type { ActivityKind, Score, SimState, Worker } from './types';
-import { siteOf } from './world';
 
 // Utility AI. Each think, a worker scores everything they could be doing and
 // does the highest. Wages compete directly with needs and personality, which
@@ -26,8 +25,7 @@ export function scoreOptions(s: SimState, w: Worker, inProgress: boolean): Score
     out.push({ kind, label, score: Math.round(score * 10) / 10 });
   };
 
-  const kitchen = siteOf(s, 'kitchen');
-  if (w.hunger >= NEEDS.noticeThreshold && (kitchen.store.bread > 0 || cur === 'eat')) {
+  if (w.hunger >= NEEDS.noticeThreshold && (breadAvailable(s) || cur === 'eat')) {
     add('eat', 'Eat', urgency(w.hunger));
   }
   if (w.thirst >= NEEDS.noticeThreshold) add('drink', 'Drink', urgency(w.thirst));
@@ -67,10 +65,10 @@ export function scoreOptions(s: SimState, w: Worker, inProgress: boolean): Score
   // a translator on the ground is calling this worker's name
   if (levelOfRow(w.y) === 0 && lessonFor(s, w)) add('lesson', 'Answer the call to a lesson', LESSON.pull);
 
-  if (w.purse >= ECONOMY.tavernCost) {
-    const gold = Math.min(AI.tavernCap, w.purse * AI.tavernPerGold * w.p.spend);
-    const blues = Math.max(0, 60 - w.mood) * AI.tavernMoodWeight;
-    add('tavern', 'Go to the tavern', gold + blues);
+  if (w.purse >= ECONOMY.beerPrice && (cur === 'bar' || barsWithBeer(s).length > 0)) {
+    const gold = Math.min(AI.barCap, w.purse * AI.barPerGold * w.p.spend);
+    const blues = Math.max(0, 60 - w.mood) * AI.barMoodWeight;
+    add('bar', 'Go to the bar', gold + blues);
   }
 
   add('wander', 'Wander', AI.wanderBase);

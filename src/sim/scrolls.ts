@@ -7,7 +7,7 @@ import { skillLevel } from './skills';
 import { LESSON, MOOD, SCRIBE } from './tuning';
 import { startFloorFromBlueprint, topSpot } from './tower';
 import type { Carrier, SimState, Worker } from './types';
-import { siteOf, spotFor } from './world';
+import { findSite, spotFor } from './world';
 
 // A worker holding a card or scroll carries it out line by line; the
 // current line is their current job. Needs can still pull them away, but the
@@ -149,7 +149,8 @@ function writeSpeed(w: Worker): number {
  */
 function writeLine(s: SimState, w: Worker): Result {
   const a = w.activity;
-  const desk = siteOf(s, 'scriptorium');
+  const desk = findSite(s, 'scriptorium');
+  if (!desk) return scrollLineFailed(s, w, 'There is no scriptorium yet.');
   if (a.stage === 0) {
     w.thought = 'Off to the scriptorium.';
     const m = moveTo(s, w, spotFor(desk, w.id));
@@ -195,17 +196,18 @@ function deliverLine(s: SimState, w: Worker): Result {
   const a = w.activity;
   const c = w.bag.find((b) => b.retryAfter <= s.tick);
   if (!c) {
-    if (s.outbox.length > 0 && w.bag.length < SCRIBE.bagSize) {
+    const desk = findSite(s, 'scriptorium');
+    if (s.outbox.length > 0 && w.bag.length < SCRIBE.bagSize && desk) {
       w.thought = 'Collecting from the scriptorium outbox.';
-      const m = moveTo(s, w, spotFor(siteOf(s, 'scriptorium'), w.id));
+      const m = moveTo(s, w, spotFor(desk, w.id));
       if (m === 'moving') return 'running';
       while (s.outbox.length > 0 && w.bag.length < SCRIBE.bagSize) w.bag.push(s.outbox.shift()!);
       return 'running';
     }
     // a dedicated courier (no writing to do) waits at the scriptorium for work
-    if (a.timer === 0 && w.bag.length === 0 && !hasWriteLine(activeCarrier(w)!)) {
+    if (a.timer === 0 && w.bag.length === 0 && !hasWriteLine(activeCarrier(w)!) && desk) {
       w.thought = 'Waiting at the scriptorium for something to deliver.';
-      moveTo(s, w, spotFor(siteOf(s, 'scriptorium'), w.id));
+      moveTo(s, w, spotFor(desk, w.id));
       return 'running';
     }
     if (a.timer === 0) w.thought = w.bag.length ? 'Nobody can take these yet.' : 'Nothing to deliver.';
@@ -213,7 +215,8 @@ function deliverLine(s: SimState, w: Worker): Result {
   }
   if (c.dest.kind === 'board') {
     w.thought = 'Taking something to the board.';
-    const m = moveTo(s, w, spotFor(siteOf(s, 'board'), w.id));
+    const board = findSite(s, 'board');
+    const m = board ? moveTo(s, w, spotFor(board, w.id)) : 'unreachable';
     if (m === 'moving') return 'running';
     if (m === 'unreachable') {
       c.retryAfter = s.tick + SCRIBE.retryTicks;
@@ -228,7 +231,7 @@ function deliverLine(s: SimState, w: Worker): Result {
   if (c.dest.kind === 'tower') {
     // blueprints are carried all the way up to the top finished floor
     w.thought = 'Carrying a blueprint up the tower.';
-    const m = moveTo(s, w, topSpot(s));
+    const m = s.tower ? moveTo(s, w, topSpot(s)) : 'unreachable';
     if (m === 'moving') return 'running';
     if (m === 'unreachable') {
       c.retryAfter = s.tick + SCRIBE.retryTicks;
@@ -320,7 +323,9 @@ function lessonLine(s: SimState, w: Worker, c: Carrier, verb: 'TEACH' | 'LEARN')
   if (!student || student === w) return scrollLineFailed(s, w, 'Who am I meant to be teaching?');
   if (a.stage === 0) {
     w.thought = 'Off to the scriptorium for a lesson.';
-    const m = moveTo(s, w, spotFor(siteOf(s, 'scriptorium'), w.id));
+    const desk = findSite(s, 'scriptorium');
+    if (!desk) return scrollLineFailed(s, w, 'There is no scriptorium yet.');
+    const m = moveTo(s, w, spotFor(desk, w.id));
     if (m === 'moving') return 'running';
     if (m === 'unreachable') return scrollLineFailed(s, w, "Can't reach the scriptorium.");
     a.stage = 1;

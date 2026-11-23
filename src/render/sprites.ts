@@ -12,6 +12,7 @@ import {
   type ArtSet,
   type Grid,
 } from './spriteData';
+import { allWorldArt } from './worldArt';
 
 // Turns art (grids) into canvases, cached. The art starts as the built-in
 // placeholder set; loadArt() swaps in PNG sheets from public/art/ if they
@@ -87,4 +88,15 @@ export function propSprite(name: 'scroll' | 'bag' | 'sheet'): HTMLCanvasElement 
 /** A reaction glyph (? ! $ z b) inside a thought cloud. */
 export function thoughtSprite(ch: string): HTMLCanvasElement {
   return cached(`t${ch}`, () => thoughtGrid(art.glyphs[ch] ?? art.glyphs['?'] ?? ['1']));
+}
+
+const WORLD_ART = new Map(allWorldArt().map((a) => [a.name, a.grid]));
+
+/**
+ * A piece of world art (buildings, fixtures, nature) by name, e.g.
+ * 'building.wall-left'. These are the built-in grids that also go onto the
+ * MacPaint sheets; when the user's art arrives it replaces them here.
+ */
+export function worldSprite(name: string): HTMLCanvasElement {
+  return cached(`world:${name}`, () => WORLD_ART.get(name) ?? ['1']);
 }

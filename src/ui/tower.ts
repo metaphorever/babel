@@ -1,4 +1,4 @@
-import { TOWER, currentStipend, type Sim, type SimState } from '../sim';
+import { currentStipend, type Sim, type SimState } from '../sim';
 import { activeProject, projectFraction, standRow } from '../sim/tower';
 import { bar, clear, h } from './dom';
 import type { WindowManager } from './windows';
@@ -25,7 +25,7 @@ export class TowerPanel {
         'div',
         { class: 'row row-end' },
         this.error,
-        h('button', { class: 'btn', onclick: () => this.goTo((TOWER.x0 + TOWER.x1) / 2, standRow(this.s.floors)) }, 'Go to the top'),
+        h('button', { class: 'btn', onclick: () => this.s.tower && this.goTo((this.s.tower.x0 + this.s.tower.x1) / 2, standRow(this.s.floors)) }, 'Go to the top'),
         h('button', { class: 'btn btn-default', onclick: () => this.blueprint() }, 'Draw a blueprint'),
       ),
     );

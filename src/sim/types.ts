@@ -5,8 +5,8 @@ import type { Difficulty } from './tuning';
 // Everything in SimState must be plain JSON (no Maps, Sets, classes or
 // functions) so it can be saved, hashed and replayed.
 
-export type ItemType = 'stone' | 'wood' | 'grain' | 'bread';
-export const ITEM_TYPES: readonly ItemType[] = ['stone', 'wood', 'grain', 'bread'];
+export type ItemType = 'stone' | 'wood' | 'grain' | 'bread' | 'beer';
+export const ITEM_TYPES: readonly ItemType[] = ['stone', 'wood', 'grain', 'bread', 'beer'];
 
 export const Tile = {
   Air: 0,
@@ -23,19 +23,30 @@ export interface Pt {
   y: number;
 }
 
-export type SiteKind =
-  | 'home'
-  | 'forest'
-  | 'field'
-  | 'well'
-  | 'kitchen'
-  | 'beds'
-  | 'board'
-  | 'stockpile'
-  | 'foundation'
-  | 'tavern'
-  | 'quarry'
-  | 'scriptorium';
+/** Natural features: placed when the map is made, never built or removed. */
+export type NatureKind = 'home' | 'forest' | 'field' | 'well' | 'quarry';
+/** Fixtures: fixed in place inside a building (stockpiles can also stand outside). */
+export type FixtureKind = 'bed' | 'oven' | 'pantry' | 'brewery' | 'bar' | 'stockpile';
+export const FIXTURE_KINDS: readonly FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile'];
+
+export type SiteKind = NatureKind | FixtureKind | 'board' | 'foundation' | 'scriptorium';
+
+/** Materials that go into anything built. */
+export type BuildMaterial = 'stone' | 'wood';
+
+/**
+ * Something being built, or taken down. Builders bring materials and set
+ * them in place one unit at a time; demolishers take it apart one unit at a
+ * time and leave half the materials on the ground.
+ */
+export interface Works {
+  needs: Record<BuildMaterial, number>;
+  placed: Record<BuildMaterial, number>;
+  /** Work units done taking it apart (demolition only). */
+  undone: number;
+  /** When it was planned (or marked for demolition): builders work oldest first. */
+  since: number;
+}
 
 export interface Site {
   id: number;
@@ -45,10 +56,34 @@ export interface Site {
   x1: number; // inclusive
   /** Row workers stand on while using the site. */
   y: number;
-  /** Tower level: 0 on the ground, n on floor n. */
+  /** As a place in orders: 0 is the base (anywhere off the tower), n is tower floor n. */
   level: number;
-  /** Stored goods (stockpile, larder). */
+  /** Stored goods (stockpile, pantry, bar). */
   store: Record<ItemType, number>;
+  /** Most goods it can hold, all kinds together. null = no limit; 0 = it never takes deliveries. */
+  capacity: number | null;
+  /** The building it stands in, or null outdoors. */
+  buildingId: number | null;
+  /** Still being built (null once finished). */
+  build: Works | null;
+  /** Marked for demolition. */
+  demolish: Works | null;
+  /** Broken and useless, like the oven in the old shack. */
+  broken: boolean;
+  /** The patron's starting supplies: a pile to take from, never to add to. */
+  supplies: boolean;
+}
+
+/** A building: an empty shell that fixtures go in. One or two stories. */
+export interface Building {
+  id: number;
+  kind: 'house' | 'shack';
+  name: string;
+  x0: number;
+  x1: number;
+  stories: 1 | 2;
+  build: Works | null;
+  demolish: Works | null;
 }
 
 export interface Item {
@@ -122,9 +157,6 @@ export interface Design {
   postedTick: number;
 }
 
-/** Materials that go into a floor. */
-export type BuildMaterial = 'stone' | 'wood';
-
 /**
  * A floor under construction. It starts when a blueprint reaches the top of
  * the tower; builders bring materials up and set them in place from the
@@ -162,7 +194,7 @@ export interface Personality {
   greed: number; // multiplier on wage appeal
   hunger: number; // multiplier on hunger rate
   fatigue: number; // multiplier on fatigue rate
-  spend: number; // multiplier on tavern appeal
+  spend: number; // multiplier on the bar's appeal
   moodBias: number; // flat mood offset
 }
 
@@ -183,7 +215,7 @@ export type ActivityKind =
   | 'job'
   | 'scroll'
   | 'lesson'
-  | 'tavern';
+  | 'bar';
 
 export interface Activity {
   kind: ActivityKind;
@@ -194,6 +226,8 @@ export interface Activity {
   read: Order | null;
   /** Item id or site id, depending on the activity. */
   ref: number | null;
+  /** What a builder is working toward (a building or site id), so others can see what's on its way. */
+  aim: number | null;
 }
 
 export interface Score {
@@ -270,8 +304,12 @@ export interface GameEvent {
   workerId: number | null;
 }
 
+/** How a new game starts: the P1 opening (nothing built yet), or a colony already laid out (tests, quick playtests). */
+export type StartMode = 'opening' | 'prebuilt';
+
 export interface SimState {
-  version: 6;
+  version: 7;
+  start: StartMode;
   seed: number;
   tick: number;
   rng: RngState;
@@ -283,6 +321,11 @@ export interface SimState {
   tiles: number[];
 
   sites: Site[];
+  buildings: Building[];
+  /** The tower's footprint, once the player has chosen it. It never moves. */
+  tower: { x0: number; x1: number } | null;
+  /** The patron's charter, decreed once the scriptorium and first board are built. */
+  charter: boolean;
   items: Item[];
   workers: Worker[];
   notices: Notice[];
@@ -303,11 +346,15 @@ export interface SimState {
   /** The patron's patience, 0..100. Finished floors win it back. */
   patience: number;
   difficulty: Difficulty;
+  /** Until this tick the patron's patience doesn't drain, unless floor 1 is finished sooner. */
+  graceUntil: number;
   nextStipend: number;
   nextArrival: number;
   /** Running totals, for the books (and the tests). */
   income: number;
   leftWith: number;
+  /** Gold workers have spent at the bar, back into the treasury. */
+  takings: number;
   /** Gold promised to posted notices but not yet paid. */
   reserved: number;
 

@@ -69,6 +69,8 @@ function bestScribeLanguage(s: SimState): LangId | null {
 }
 
 export function checkCharter(s: SimState): void {
+  // the charter is decreed once the scriptorium and first board stand
+  if (!s.charter) return;
   if (s.tick % PATRON.charterCheckTicks !== 0) return;
   if (someoneIsWriting(s)) return;
   const lang = bestScribeLanguage(s);
@@ -88,7 +90,10 @@ export function checkCharter(s: SimState): void {
  */
 export function updatePatron(s: SimState): void {
   const before = s.patience;
-  s.patience = Math.max(0, s.patience - PATRON.patienceDrain[s.difficulty]);
+  // the grace period: nothing drains until it's over, or floor 1 is done
+  if (inGrace(s)) {
+    if (s.tick === s.graceUntil - 1) log(s, "The patron's grace period is over. Their patience will start to wear thin.");
+  } else s.patience = Math.max(0, s.patience - PATRON.patienceDrain[s.difficulty]);
   if (before > 0 && s.patience === 0) log(s, 'The patron has run out of patience. No more stipend until the tower grows again.');
   else if (before >= 25 && s.patience < 25) log(s, 'The patron is growing impatient. Finish a floor soon.');
 
@@ -124,6 +129,11 @@ export function patronFloorDone(s: SimState, level: number): void {
   s.gold += bonus;
   s.income += bonus;
   log(s, `The patron is pleased with floor ${level} and sends ${bonus} gold.`);
+}
+
+/** The patron gives the colony a few days to get started (until floor 1 is finished). */
+export function inGrace(s: SimState): boolean {
+  return s.floors === 0 && s.tick < s.graceUntil;
 }
 
 /** Gold per day's stipend at the current patience. */

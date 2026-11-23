@@ -25,6 +25,7 @@ export const SKILL_OF_VERB: Record<WorkVerb, SkillId> = {
   CHOP: 'woodcutting',
   HARVEST: 'farming',
   COOK: 'cooking',
+  BREW: 'cooking',
   HAUL: 'hauling',
   BUILD: 'building',
 };

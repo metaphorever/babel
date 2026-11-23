@@ -3,7 +3,7 @@ import { Sim, createState, hashState, replay, step } from '../src/sim/sim';
 import { findPath } from '../src/sim/path';
 import { setTile } from '../src/sim/world';
 import { Tile } from '../src/sim/types';
-import { siteOf, stockpileOn, tileAt } from '../src/sim/world';
+import { groundRow, stockpileOn, tileAt } from '../src/sim/world';
 import { applyCommand } from '../src/sim/commands';
 import { levelOf } from '../src/sim/skills';
 import { newCarrier, pinNotice } from '../src/sim/carriers';
@@ -19,6 +19,11 @@ import { ARRIVALS, PATRON, QUIT, SKILLS, TOWER, WORLD } from '../src/sim/tuning'
 import { currentStipend, patronFloorDone } from '../src/sim/patron';
 
 type State = ReturnType<typeof createState>;
+
+/** Everything stored at the base (not counting the patron's supplies). */
+function baseStore(s: State, type: 'stone' | 'wood' | 'grain'): number {
+  return s.sites.filter((x) => x.kind === 'stockpile' && x.level === 0 && !x.supplies).reduce((n, x) => n + x.store[type], 0);
+}
 
 function run(s: State, ticks: number) {
   for (let i = 0; i < ticks; i++) step(s);
@@ -67,13 +72,13 @@ describe('determinism', () => {
   });
 
   it('replaying the command history reproduces a live game', () => {
-    const live = new Sim(99);
+    const live = new Sim(99, 'normal', 'prebuilt');
     for (let i = 0; i < 2000; i++) {
       if (i === 100) live.enqueue(noticeCmd('CHOP', 'WOOD', 5, 4));
       if (i === 700) live.enqueue({ type: 'removeNotice', playerId: 0, noticeId: live.state.notices[0].id });
       live.step();
     }
-    const again = replay(99, live.history, live.state.tick);
+    const again = replay(99, live.history, live.state.tick, 'normal', 'prebuilt');
     expect(hashState(again)).toBe(hashState(live.state));
   });
 
@@ -90,7 +95,7 @@ describe('determinism', () => {
 describe('pathfinding', () => {
   it('walks along the ground', () => {
     const s = createState(1);
-    const y = siteOf(s, 'beds').y;
+    const y = groundRow();
     const p = findPath(s, { x: 10, y }, { x: 20, y });
     expect(p).not.toBeNull();
     expect(p!.length).toBe(10);
@@ -98,7 +103,7 @@ describe('pathfinding', () => {
 
   it('climbs a ladder through a deck', () => {
     const s = createState(1);
-    const ground = siteOf(s, 'beds').y; // standing row
+    const ground = groundRow(); // standing row
     const deckRow = ground - 4;
     for (let x = 76; x <= 90; x++) setTile(s, x, deckRow, Tile.Deck);
     // ladder from the ground up through a hole in the deck
@@ -144,8 +149,7 @@ describe('notices and jobs', () => {
   it('workers mine stone and haul it to the stockpile', () => {
     const s = createState(7);
     run(s, 20 * 120); // two minutes at 1x
-    const pile = siteOf(s, 'stockpile');
-    expect(pile.store.stone).toBeGreaterThan(0);
+    expect(baseStore(s, 'stone')).toBeGreaterThan(10);
     expect(s.workers.reduce((a, w) => a + w.jobsDone, 0)).toBeGreaterThan(5);
   });
 
@@ -162,18 +166,17 @@ describe('notices and jobs', () => {
     expect(s.reserved).toBe(0);
     // anyone who also took it and finishes later gets nothing
     for (let i = 0; i < 2000; i++) step(s);
-    expect(startGold + s.income - s.gold).toBe(5); // paid exactly once (the patron's stipend aside)
+    expect(startGold + s.income + s.takings - s.gold).toBe(5); // paid exactly once (the stipend and bar takings aside)
   });
 
-  it('gold is conserved: treasury + purses + tavern spending', () => {
+  it('gold is conserved: treasury + purses + what left with workers', () => {
     const s = createState(11);
     const start = s.gold;
     run(s, 4000);
     const purses = s.workers.reduce((a, w) => a + w.purse, 0);
-    // gold comes in from the patron, and leaves with workers who go home or at the tavern
-    const spent = start + s.income - s.gold - purses - s.leftWith;
-    expect(spent).toBeGreaterThanOrEqual(0);
-    expect(spent % 5).toBe(0); // only the tavern takes gold out, 5 at a time
+    // gold comes in from the patron and leaves only with workers who go home;
+    // what they spend at the bar comes back to the treasury
+    expect(start + s.income).toBe(s.gold + purses + s.leftWith);
   });
 });
 
@@ -198,15 +201,15 @@ describe('skills and multi-unit work', () => {
     if (!w.traits.includes('strong')) w.traits.push('strong');
     w.skills.hauling = 0;
     w.hunger = w.thirst = w.fatigue = 0;
-    const y = siteOf(s, 'beds').y;
+    const y = groundRow();
     s.items.push({ id: s.nextId++, type: 'stone', x: w.x, y, reservedBy: null });
     s.items.push({ id: s.nextId++, type: 'stone', x: w.x + 1, y, reservedBy: null });
     const gold = s.gold;
-    const stoneBefore = siteOf(s, 'stockpile').store.stone;
+    const stoneBefore = baseStore(s, 'stone');
     post(s, 'HAUL', 'STONE', 2, 3, w.id);
     let t = 0;
     while (s.notices.length > 0 && t++ < 4000) step(s);
-    expect(siteOf(s, 'stockpile').store.stone - stoneBefore).toBe(2);
+    expect(baseStore(s, 'stone') - stoneBefore).toBe(2);
     expect(w.jobsDone).toBe(1); // one trip
     expect(gold - s.gold).toBe(6);
   });
@@ -260,7 +263,7 @@ describe('scribes, scrolls and the charter', () => {
     });
     expect(runUntil(s, () => miner.held.length > 0, 4000)).toBe(true);
     expect(runUntil(s, () => miner.held[0]?.loops >= 2, 20 * 300)).toBe(true);
-    expect(siteOf(s, 'stockpile').store.stone).toBeGreaterThan(0);
+    expect(baseStore(s, 'stone')).toBeGreaterThan(0);
   });
 
   it('a scroll with the scribe loop makes a second scribe', () => {
@@ -310,8 +313,8 @@ describe('the board, hand delivery and the standing charter', () => {
     const card = w.held[0];
     expect(runUntil(s, () => w.held.length === 0, 20 * 400)).toBe(true);
     expect(card.lineDone + card.counts[0]).toBeGreaterThanOrEqual(5); // finished its count
-    const wood = s.items.filter((it) => it.type === 'wood').length + siteOf(s, 'stockpile').store.wood;
-    expect(wood).toBeGreaterThanOrEqual(5);
+    const wood = s.items.filter((it) => it.type === 'wood').length + baseStore(s, 'wood');
+    expect(wood).toBeGreaterThanOrEqual(5 + 8 - 8); // (the patron's 8 wood may have gone into building)
   });
 
   it('something addressed to you by name always wins at the board', () => {
@@ -365,12 +368,13 @@ describe('the tower', () => {
     for (let i = 0; i < p.needs.stone; i++) placeMaterial(s, p, 'stone');
     for (let i = 0; i < p.needs.wood; i++) placeMaterial(s, p, 'wood');
     const row = deckRow(1);
-    for (let x = TOWER.x0; x <= TOWER.x1; x++) {
+    const T = s.tower!;
+    for (let x = T.x0; x <= T.x1; x++) {
       const t = tileAt(s, x, row);
       expect(t === Tile.Deck || t === Tile.Ladder).toBe(true);
     }
-    expect(tileAt(s, TOWER.x0 - 1, row)).toBe(Tile.Air);
-    expect(tileAt(s, TOWER.x1 + 1, row)).toBe(Tile.Air);
+    expect(tileAt(s, T.x0 - 1, row)).toBe(Tile.Air);
+    expect(tileAt(s, T.x1 + 1, row)).toBe(Tile.Air);
   });
 
   it('a blueprint carried up starts a floor; builders finish it with a ladder', () => {
@@ -382,8 +386,7 @@ describe('the tower', () => {
     // the new floor is walkable: there's a path from the ground to its stockpile
     const top = stockpileOn(s, 1)!;
     expect(top).not.toBeNull();
-    const ground = siteOf(s, 'beds');
-    expect(findPath(s, { x: ground.x0, y: ground.y }, { x: top.x0, y: top.y })).not.toBeNull();
+    expect(findPath(s, { x: 60, y: groundRow() }, { x: top.x0, y: top.y })).not.toBeNull();
   });
 
   it('nobody builds without a blueprint', () => {
@@ -427,7 +430,7 @@ function scrollCmdPlaces(verb: Verb, noun: Noun, from: number, to: number, count
 describe('language drift', () => {
   /** Put a worker on a floor and keep them there (needs off) until a condition holds. */
   function strand(s: State, w: (typeof s.workers)[number], level: number) {
-    w.x = TOWER.x0 + 5;
+    w.x = s.tower!.x0 + 5;
     w.y = WORLD.groundRow - 1 - level * TOWER.floorHeight;
     w.hunger = w.thirst = w.fatigue = 0;
   }
@@ -605,19 +608,19 @@ describe('all and forever counts', () => {
     const s = createState(6);
     s.notices = [];
     s.reserved = 0;
-    const y = siteOf(s, 'beds').y;
+    const y = groundRow();
     for (let i = 0; i < 4; i++) s.items.push({ id: s.nextId++, type: 'stone', x: 60 + i, y, reservedBy: null });
     pinNotice(s, makeOrder('HAUL', 'STONE'), ALL, 1, null);
-    const before = siteOf(s, 'stockpile').store.stone;
+    const before = baseStore(s, 'stone');
     expect(runUntil(s, () => s.notices.length === 0, 20 * 300)).toBe(true);
-    expect(siteOf(s, 'stockpile').store.stone - before).toBe(4);
+    expect(baseStore(s, 'stone') - before).toBe(4);
   });
 
   it('a scroll line set to all finishes when there is nothing left, with no hard feelings', () => {
     const s = createState(6);
     const w = s.workers[3];
     s.items = [];
-    const y = siteOf(s, 'beds').y;
+    const y = groundRow();
     s.items.push({ id: s.nextId++, type: 'wood', x: w.x, y, reservedBy: null });
     giveCarrier(s, w, newCarrier(s, [{ order: makeOrder('HAUL', 'WOOD'), count: ALL }, { order: makeOrder('CHOP', 'WOOD'), count: 1 }], 0, { kind: 'worker', workerId: w.id }));
     const card = w.held[0];

@@ -38,7 +38,7 @@ export interface ArtSet {
 }
 
 /** Item, prop and glyph names, in sheet order. */
-export const ITEM_NAMES = ['stone', 'wood', 'grain', 'bread'] as const;
+export const ITEM_NAMES = ['stone', 'wood', 'grain', 'bread', 'beer'] as const;
 export const PROP_NAMES = ['scroll', 'bag', 'sheet'] as const;
 export const GLYPH_NAMES = ['z', '!', '?', '$', 'b'] as const;
 /** Small sprites sit in 8x8 cells, top-left; empty space is trimmed on load. */
@@ -215,6 +215,8 @@ export function defaultArt(): ArtSet {
       wood: ['11111', '10101', '11111'],
       grain: ['101', '010', '111'],
       bread: ['.111.', '10001', '11111'],
+      // a mug with a handle
+      beer: ['111.', '1011', '1011', '111.'],
     },
     props: {
       // a rolled scroll, held at the side

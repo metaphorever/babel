@@ -1,7 +1,33 @@
-import { CONFUSION, MOOD, TOWER, Tile, WORLD, darkness, hourOf, type SimState, type Site, type Worker } from '../sim';
+import { CONFUSION, MOOD, TOWER, Tile, WORLD, darkness, hourOf, type Building, type SimState, type Site, type Worker } from '../sim';
 import { activeProject, deckRow, projectFraction } from '../sim/tower';
+import { worksFraction } from '../sim/build';
+import { buildingLabel, groundRow } from '../sim/world';
 import { INK, PAPER, Patterns, type PatternName } from './patterns';
-import { itemSprite, propSprite, thoughtSprite, workerSprite } from './sprites';
+import { itemSprite, propSprite, thoughtSprite, workerSprite, worldSprite } from './sprites';
+
+/** Height in pixels of one story's walls (the deck above it makes up the rest of a floor). */
+const STORY_PX = 24;
+const ROOF_PX = 6;
+
+/** The placement preview: where something would go, and which tiles are in the way. */
+export interface Ghost {
+  x0: number;
+  x1: number;
+  /** The row it stands on. */
+  y: number;
+  /** How tall to draw it, in pixels. */
+  height: number;
+  blocked: boolean[];
+  ok: boolean;
+}
+
+/** What's under the cursor: a site (fixture, board...) or a building. */
+export type Thing = { kind: 'site'; site: Site } | { kind: 'building'; building: Building };
+
+/** How tall a building is drawn, roof included. */
+export function buildingHeight(stories: number): number {
+  return (stories - 1) * TOWER.floorHeight * 8 + STORY_PX + ROOF_PX;
+}
 
 export const TILE = 8; // native pixels per tile
 export const ZOOMS = [1, 2, 3, 4, 5, 6] as const;
@@ -18,6 +44,10 @@ export class Renderer {
   camY = 0;
   zoom = 3;
   showNames = false;
+  /** The placement preview, while placing something. */
+  ghost: Ghost | null = null;
+  /** A box drawn around whatever demolish mode is pointing at. */
+  highlight: { x0: number; x1: number; y: number; height: number } | null = null;
 
   private buffer = document.createElement('canvas');
   private g: CanvasRenderingContext2D;
@@ -106,6 +136,8 @@ export class Renderer {
     this.resize();
     const bw = this.viewW;
     const bh = this.viewH;
+    // a hidden page has no size; drawing a zero-size canvas throws and would stop the loop
+    if (bw <= 0 || bh <= 0) return;
     if (this.buffer.width !== bw || this.buffer.height !== bh) {
       this.buffer.width = bw;
       this.buffer.height = bh;
@@ -120,10 +152,14 @@ export class Renderer {
     g.translate(-cx, -cy);
 
     this.drawSky(s, cx, cy, bw, bh);
+    // buildings go behind the tiles, so a two-story building's deck and ladder show over its walls
+    for (const b of s.buildings) this.drawBuilding(s, b);
     this.drawTiles(s, cx, cy, bw, bh);
     for (const site of s.sites) this.drawSite(s, site);
     this.drawItems(s);
     for (const w of s.workers) this.drawWorker(s, w, alpha, w.id === selected);
+    if (this.ghost) this.drawGhost(this.ghost);
+    if (this.highlight) this.drawHighlight(this.highlight);
 
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -179,10 +215,91 @@ export class Renderer {
     }
   }
 
+  /** Draw only the bottom part of something (the part built so far). */
+  private clipUp(left: number, base: number, width: number, height: number, frac: number, draw: () => void): void {
+    const g = this.g;
+    const h = Math.max(0, Math.min(height, Math.ceil(height * frac)));
+    g.save();
+    g.beginPath();
+    g.rect(left, base - h, width, h);
+    g.clip();
+    draw();
+    g.restore();
+  }
+
+  /** A dotted outline: something planned but not built yet. */
+  private dotted(x: number, y: number, w: number, h: number): void {
+    const g = this.g;
+    g.fillStyle = INK;
+    for (let i = 0; i < w; i += 2) {
+      g.fillRect(x + i, y, 1, 1);
+      g.fillRect(x + i, y + h - 1, 1, 1);
+    }
+    for (let i = 0; i < h; i += 2) {
+      g.fillRect(x, y + i, 1, 1);
+      g.fillRect(x + w - 1, y + i, 1, 1);
+    }
+  }
+
+  /** Something under construction: a dotted outline of the whole, with the built part filled in from the bottom. */
+  private underway(left: number, base: number, width: number, height: number, frac: number, draw: () => void): void {
+    this.dotted(left, base - height, width, height);
+    this.clipUp(left, base, width, height, frac, draw);
+  }
+
+  /** Marked for demolition: hatched over. */
+  private comingDown(left: number, base: number, width: number, height: number): void {
+    this.pat.stipple('diag', left, base - height, width, height);
+  }
+
+  /** A generic building from its tileable parts: walls (with a door and windows) story by story, and a roof. */
+  private drawBuilding(_s: SimState, b: Building): void {
+    const left = b.x0 * TILE;
+    const n = b.x1 - b.x0 + 1;
+    const base = (groundRow() + 1) * TILE;
+    const height = buildingHeight(b.stories);
+    const draw = () => {
+      if (b.kind === 'shack') {
+        const spr = worldSprite('nature.shack');
+        this.g.drawImage(spr, left + Math.floor((n * TILE - spr.width) / 2), base - spr.height);
+        return;
+      }
+      const floorPx = TOWER.floorHeight * TILE;
+      for (let k = 0; k < b.stories; k++) {
+        const y = base - k * floorPx - STORY_PX;
+        for (let i = 0; i < n; i++) {
+          const piece = i === 0 ? 'wall-left' : i === n - 1 ? 'wall-right' : k === 0 && i === 1 ? 'door' : i % 3 === 2 ? 'window' : 'wall';
+          this.g.drawImage(worldSprite(`building.${piece}`), left + i * TILE, y);
+        }
+      }
+      const roofY = base - height;
+      for (let i = 0; i < n; i++) {
+        const piece = i === 0 ? 'roof-left' : i === n - 1 ? 'roof-right' : 'roof';
+        this.g.drawImage(worldSprite(`building.${piece}`), left + i * TILE, roofY);
+      }
+    };
+    if (b.build) this.underway(left, base, n * TILE, height, worksFraction(b.build), draw);
+    else draw();
+    if (b.demolish) this.comingDown(left, base, n * TILE, height);
+  }
+
+  /** Fixture art, bottom-aligned on the row it stands on. */
+  private fixtureArt(site: Site): string {
+    if (site.kind === 'oven') return site.broken ? 'fixture.oven-broken' : 'fixture.oven';
+    if (site.kind === 'brewery') return 'fixture.brew';
+    return `fixture.${site.kind}`;
+  }
+
   private drawSite(s: SimState, site: Site): void {
     const left = site.x0 * TILE;
     const width = (site.x1 - site.x0 + 1) * TILE;
-    const base = (site.y + 1) * TILE; // ground surface
+    const base = (site.y + 1) * TILE; // the floor it stands on
+    const building = site.build ? worksFraction(site.build) : null;
+    const withProgress = (height: number, draw: () => void) => {
+      if (building !== null) this.underway(left, base, width, height, building, draw);
+      else draw();
+      if (site.demolish) this.comingDown(left, base, width, height);
+    };
     switch (site.kind) {
       case 'home': {
         this.rect(left + 12, base - 18, 2, 18);
@@ -217,51 +334,30 @@ export class Renderer {
         this.box(left + 5, base - 13, 5, 4, 'checker');
         break;
       }
-      case 'kitchen': {
-        this.building(left, width, base, 22);
-        this.box(left + 4, base - 11, 12, 11, 'brick');
-        this.rect(left + 7, base - 6, 6, 4);
-        this.rect(left + 12, base - 30, 4, 9); // chimney
-        // larder shelf
-        this.rect(left + 20, base - 10, width - 24, 1);
-        const n = Math.min(site.store.bread, 10);
-        for (let i = 0; i < n; i++) this.g.drawImage(itemSprite('bread'), left + 20 + i * 5 - (i >= 5 ? 25 : 0), base - 13 - (i >= 5 ? 4 : 0));
-        break;
-      }
-      case 'beds': {
-        this.building(left, width, base, 20);
-        for (let i = 0; i < 6; i++) {
-          const bx = left + 3 + i * 9;
-          this.box(bx, base - 4, 8, 3, 'checker');
-          this.rect(bx, base - 6, 2, 2);
-        }
-        break;
-      }
       case 'board': {
-        this.rect(left + 2, base - 14, 1, 14);
-        this.rect(left + 13, base - 14, 1, 14);
-        this.box(left, base - 20, 16, 11, 'light');
-        const n = Math.min(s.notices.length, 6);
-        for (let i = 0; i < n; i++) {
-          const nx = left + 2 + (i % 3) * 4;
-          const ny = base - 18 + Math.floor(i / 3) * 4;
-          this.box(nx, ny, 4, 4, 'white');
-        }
+        withProgress(20, () => {
+          this.rect(left + 2, base - 14, 1, 14);
+          this.rect(left + 13, base - 14, 1, 14);
+          this.box(left, base - 20, 16, 11, 'light');
+          const n = Math.min(s.notices.length, 6);
+          for (let i = 0; i < n; i++) {
+            const nx = left + 2 + (i % 3) * 4;
+            const ny = base - 18 + Math.floor(i / 3) * 4;
+            this.box(nx, ny, 4, 4, 'white');
+          }
+        });
         break;
       }
       case 'stockpile': {
-        // dashed boundary on the ground
-        for (let x = left; x < left + width; x += 2) this.rect(x, base - 1, 1, 1);
-        const order = ['stone', 'wood', 'grain'] as const;
-        const zone = Math.floor(width / 3);
-        order.forEach((type, zi) => {
-          const n = Math.min(site.store[type], 24);
-          const spr = itemSprite(type);
-          for (let i = 0; i < n; i++) {
-            const col = i % 4;
-            const row = Math.floor(i / 4);
-            this.g.drawImage(spr, left + zi * zone + 2 + col * (spr.width + 1) + (row % 2) * 2, base - 4 - row * 3);
-          }
+        if (site.supplies) {
+          // the patron's wagon, with what's left piled beside it
+          const wagon = worldSprite('nature.wagon');
+          this.g.drawImage(wagon, left, base - wagon.height);
+          break;
+        }
+        withProgress(8, () => {
+          this.g.drawImage(worldSprite('fixture.stockpile'), left, base - 4);
+          this.drawGoods(site, left, base, width);
         });
         break;
       }
@@ -274,29 +370,43 @@ export class Renderer {
         break;
       }
       case 'scriptorium': {
-        this.building(left, width, base, 22);
-        // writing desk with a slanted top, a stool, and the queue of work
-        this.rect(left + 6, base - 9, 1, 9);
-        this.rect(left + 16, base - 9, 1, 9);
-        this.rect(left + 5, base - 10, 13, 1);
-        this.rect(left + 6, base - 11, 11, 1);
-        this.rect(left + 21, base - 5, 6, 1);
-        this.rect(left + 22, base - 4, 1, 4);
-        this.rect(left + 25, base - 4, 1, 4);
-        // shelf of pending designs: one sheet per design in the queue
-        this.rect(left + 30, base - 14, 16, 1);
-        const n = Math.min(s.designs.length, 5);
-        for (let i = 0; i < n; i++) this.g.drawImage(propSprite('sheet'), left + 30 + i * 3, base - 17);
+        withProgress(32, () => {
+          const spr = worldSprite('building.scriptorium');
+          this.g.drawImage(spr, left, base - spr.height);
+          // the queue of work: one sheet per design waiting on the shelf (the sprite's shelf is at y 18)
+          this.rect(left + 30, base - 15, 16, 2, 'white');
+          const n = Math.min(s.designs.length, 5);
+          for (let i = 0; i < n; i++) this.g.drawImage(propSprite('sheet'), left + 30 + i * 3, base - 17);
+        });
         break;
       }
-      case 'tavern': {
-        this.building(left, width, base, 22);
-        this.box(left + 8, base - 12, 7, 12, 'dark'); // door
-        // hanging sign: a mug
-        this.rect(left + width - 14, base - 27, 1, 4);
-        this.box(left + width - 18, base - 23, 9, 8, 'white');
-        this.box(left + width - 16, base - 21, 4, 5, 'checker');
-        this.rect(left + width - 12, base - 20, 1, 2);
+      case 'pantry': {
+        withProgress(16, () => {
+          // shelves of bread, filled in as it's stocked
+          this.box(left, base - 16, 16, 16, 'white');
+          this.rect(left + 1, base - 9, 14, 1);
+          this.rect(left + 1, base - 4, 14, 1);
+          const spr = itemSprite('bread');
+          const n = Math.min(site.store.bread, 4);
+          for (let i = 0; i < n; i++) this.g.drawImage(spr, left + 2 + (i % 2) * 6, base - 12 - (i >= 2 ? -5 : 0));
+        });
+        break;
+      }
+      case 'bar': {
+        withProgress(16, () => {
+          const spr = worldSprite('fixture.bar');
+          this.g.drawImage(spr, left, base - spr.height);
+          const mug = itemSprite('beer');
+          const n = Math.min(site.store.beer, 3);
+          for (let i = 0; i < n; i++) this.g.drawImage(mug, left + 1 + i * 5, base - 10 - mug.height + 1);
+        });
+        break;
+      }
+      case 'bed':
+      case 'oven':
+      case 'brewery': {
+        const spr = worldSprite(this.fixtureArt(site));
+        withProgress(spr.height, () => this.g.drawImage(spr, left, base - spr.height));
         break;
       }
       case 'quarry': {
@@ -312,6 +422,53 @@ export class Renderer {
     }
   }
 
+  /** Stone, wood and grain stacked in a stockpile, a column each. */
+  private drawGoods(site: Site, left: number, base: number, width: number): void {
+    const order = ['stone', 'wood', 'grain'] as const;
+    const zone = Math.floor(width / 3);
+    order.forEach((type, zi) => {
+      const n = Math.min(site.store[type], 12);
+      const spr = itemSprite(type);
+      for (let i = 0; i < n; i++) {
+        const row = Math.floor(i / 2);
+        this.g.drawImage(spr, left + zi * zone + (i % 2) * 2, base - 4 - row * 3);
+      }
+    });
+  }
+
+  /** The placement preview: shaded, outlined, with an X on every tile that's in the way. */
+  private drawGhost(gh: Ghost): void {
+    const left = gh.x0 * TILE;
+    const width = (gh.x1 - gh.x0 + 1) * TILE;
+    const base = (gh.y + 1) * TILE;
+    this.pat.stipple(gh.ok ? 'sparse' : 'light', left, base - gh.height, width, gh.height);
+    this.g.fillStyle = INK;
+    this.g.strokeStyle = INK;
+    // the bounding box
+    this.rect(left, base - gh.height, width, 1);
+    this.rect(left, base - 1, width, 1);
+    this.rect(left, base - gh.height, 1, gh.height);
+    this.rect(left + width - 1, base - gh.height, 1, gh.height);
+    gh.blocked.forEach((b, i) => {
+      if (!b) return;
+      const x = left + i * TILE;
+      const y = base - TILE;
+      this.rect(x, y, TILE, TILE, 'white');
+      for (let k = 1; k < TILE - 1; k++) {
+        this.rect(x + k, y + k, 1, 1);
+        this.rect(x + TILE - 1 - k, y + k, 1, 1);
+      }
+    });
+  }
+
+  private drawHighlight(hl: { x0: number; x1: number; y: number; height: number }): void {
+    const left = hl.x0 * TILE - 2;
+    const width = (hl.x1 - hl.x0 + 1) * TILE + 4;
+    const base = (hl.y + 1) * TILE + 2;
+    this.dotted(left, base - hl.height - 4, width, hl.height + 4);
+    this.dotted(left + 1, base - hl.height - 3, width - 2, hl.height + 2);
+  }
+
   /**
    * The sky: it darkens through dusk into a dithered night with stars and a
    * moon, and lightens again at dawn. Only the open sky changes. The ground
@@ -320,10 +477,10 @@ export class Renderer {
    */
   private drawSky(s: SimState, cx: number, cy: number, bw: number, bh: number): void {
     const d = darkness(s.tick);
-    const horizon = (WORLD.groundRow - 6) * TILE; // just above the rooftops and treetops
-    const towerL = TOWER.x0 * TILE;
-    const towerR = (TOWER.x1 + 1) * TILE;
-    const towerTop = (deckRow(s.floors) - TOWER.floorHeight) * TILE; // the open story above the top floor
+    const horizon = (WORLD.groundRow - 9) * TILE; // just above the rooftops and treetops (two-story buildings included)
+    const towerL = s.tower ? s.tower.x0 * TILE : -1;
+    const towerR = s.tower ? (s.tower.x1 + 1) * TILE : -1;
+    const towerTop = s.tower ? (deckRow(s.floors) - TOWER.floorHeight) * TILE : Infinity; // the open story above the top floor
     const inSky = (x: number, y: number) => y < horizon && !(x >= towerL && x < towerR && y >= towerTop);
     const pattern: PatternName | null = d < 0.15 ? null : d < 0.4 ? 'sparse' : d < 0.6 ? 'light' : d < 0.85 ? 'checker' : 'dark';
     const skyBottom = Math.min(horizon, cy + bh);
@@ -403,13 +560,6 @@ export class Renderer {
       this.rect(lx, top + i * 2, w, 2, edge ? 'black' : 'black');
       if (!edge) this.rect(lx + 1, top + i * 2, w - 2, 2, 'checker');
     });
-  }
-
-  private building(left: number, width: number, base: number, h: number): void {
-    this.box(left, base - h, width, h, 'white');
-    // pitched roof made of stepped rows
-    for (let i = 0; i < 4; i++) this.rect(left - 2 + i * 2, base - h - 1 - i, width + 4 - i * 4, 1);
-    this.rect(left - 2, base - h, width + 4, 1);
   }
 
   private drawItems(s: SimState): void {
@@ -505,22 +655,34 @@ export class Renderer {
       ctx.fillStyle = invert ? PAPER : INK;
       ctx.fillText(text, sx, sy + 2 * this.dpr);
     };
+    const status = (works: { needs: { stone: number; wood: number }; placed: { stone: number; wood: number } } | null, down: unknown) =>
+      down ? ' (coming down)' : works ? ` (planned, ${Math.floor(worksFraction(works as never) * 100)}%)` : '';
     for (const site of s.sites) {
+      // fixtures inside a building are listed on the building's label
+      if (site.buildingId !== null) continue;
       const mid = ((site.x0 + site.x1 + 1) / 2) * TILE;
       const ground = (site.y + 1) * TILE;
       // upper-floor stockpiles get a short label, tucked under their deck
-      tag(site.level > 0 ? 'Stockpile' : site.label, (mid - cx) * z, (ground - cy) * z + 6 * this.dpr);
+      const text = site.level > 0 ? 'Stockpile' : site.label + status(site.build, site.demolish);
+      tag(text, (mid - cx) * z, (ground - cy) * z + 6 * this.dpr);
     }
-    // floor numbers down the right side of the tower, and the floor under way
-    const right = ((TOWER.x1 + 1) * TILE + 3 - cx) * z;
-    // a tag whose left edge sits at x
-    const tagLeft = (text: string, x: number, y: number) => tag(text, x + (ctx.measureText(text).width + 6 * this.dpr) / 2, y);
-    for (let k = 1; k <= s.floors; k++) {
-      tagLeft(`${k}`, right, (deckRow(k) * TILE - cy) * z - 4 * this.dpr);
+    for (const b of s.buildings) {
+      const mid = ((b.x0 + b.x1 + 1) / 2) * TILE;
+      const ground = (groundRow() + 1) * TILE;
+      tag(buildingLabel(s, b) + status(b.build, b.demolish), (mid - cx) * z, (ground - cy) * z + 6 * this.dpr);
     }
-    const p = activeProject(s);
-    if (p) {
-      tagLeft(`Floor ${p.level}: ${Math.floor(projectFraction(p) * 100)}%`, right, (deckRow(p.level) * TILE - cy) * z - 4 * this.dpr);
+    if (s.tower) {
+      // floor numbers down the right side of the tower, and the floor under way
+      const right = ((s.tower.x1 + 1) * TILE + 3 - cx) * z;
+      // a tag whose left edge sits at x
+      const tagLeft = (text: string, x: number, y: number) => tag(text, x + (ctx.measureText(text).width + 6 * this.dpr) / 2, y);
+      for (let k = 1; k <= s.floors; k++) {
+        tagLeft(`${k}`, right, (deckRow(k) * TILE - cy) * z - 4 * this.dpr);
+      }
+      const p = activeProject(s);
+      if (p) {
+        tagLeft(`Floor ${p.level}: ${Math.floor(projectFraction(p) * 100)}%`, right, (deckRow(p.level) * TILE - cy) * z - 4 * this.dpr);
+      }
     }
     for (const w of s.workers) {
       if (!(this.showNames || w.id === selected || w.id === hover)) continue;
@@ -539,13 +701,27 @@ export class Renderer {
     return null;
   }
 
-  siteAt(s: SimState, wx: number, wy: number): Site | null {
-    for (const site of s.sites) {
+  /** The fixture, site or building under a world point. Fixtures win over the building they're in. */
+  thingAt(s: SimState, wx: number, wy: number): Thing | null {
+    for (let i = s.sites.length - 1; i >= 0; i--) {
+      const site = s.sites[i];
       const left = site.x0 * TILE;
       const right = (site.x1 + 1) * TILE;
-      const ground = (site.y + 1) * TILE;
-      if (wx >= left && wx < right && wy >= ground - 32 && wy <= ground + 14) return site;
+      const floor = (site.y + 1) * TILE;
+      const top = site.buildingId !== null ? floor - 18 : floor - 32;
+      if (wx >= left && wx < right && wy >= top && wy <= floor + (site.buildingId !== null ? 0 : 14)) return { kind: 'site', site };
+    }
+    for (const b of s.buildings) {
+      const ground = (groundRow() + 1) * TILE;
+      if (wx >= b.x0 * TILE && wx < (b.x1 + 1) * TILE && wy >= ground - buildingHeight(b.stories) && wy <= ground + 14) return { kind: 'building', building: b };
     }
     return null;
   }
+
+  /** The site under a world point, if any (the board, the scriptorium...). */
+  siteAt(s: SimState, wx: number, wy: number): Site | null {
+    const t = this.thingAt(s, wx, wy);
+    return t?.kind === 'site' ? t.site : null;
+  }
+
 }

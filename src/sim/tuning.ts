@@ -15,7 +15,7 @@ const MAX_FLOORS = 30;
 const FLOOR_HEIGHT = 4; // tiles per story: a deck plus three rows of headroom
 
 export const WORLD = {
-  width: 128,
+  width: 192,
   groundRow: 8 + MAX_FLOORS * FLOOR_HEIGHT, // first solid row
   height: 8 + MAX_FLOORS * FLOOR_HEIGHT + 16,
 };
@@ -23,9 +23,8 @@ export const WORLD = {
 export const TOWER = {
   maxFloors: MAX_FLOORS,
   floorHeight: FLOOR_HEIGHT,
-  /** Footprint of every floor, in tiles (inside the tower site). */
-  x0: 76,
-  x1: 91,
+  /** Width of every floor, in tiles. The player picks where it stands. */
+  width: 16,
   /** Materials to build one floor: stone for the walls of the story below, wood for the deck and ladder. */
   stonePerFloor: 8,
   woodPerFloor: 6,
@@ -33,10 +32,68 @@ export const TOWER = {
   buildTicks: 30,
   /** Writing a blueprint takes this long (in scribe work units). */
   blueprintCost: 220,
-  /** Each finished floor gets a small stockpile on its deck, this wide. */
-  stockpileX0: 82,
-  stockpileX1: 86,
+  /** Each finished floor gets a small stockpile on its deck: this far in from the left wall, this wide. */
+  stockpileInset: 6,
+  stockpileWidth: 5,
 };
+
+/** The map, made fresh for each new game (P1). Widths are in tiles. */
+export const MAP = {
+  /** The road home always runs off the left edge. */
+  roadWidth: 4,
+  /** The right edge is reserved for something not decided yet. Nothing goes there. */
+  reservedRight: 8,
+  forest: 12,
+  quarry: 16,
+  field: 12,
+  well: 2,
+  shack: 6,
+  supplies: 4,
+  /** Clear ground left between features. */
+  minGap: 3,
+};
+
+/**
+ * Everything the player can place. Sizes in tiles, costs in units of
+ * material. Generic buildings are wooden shells: their cost grows with
+ * width and stories.
+ */
+export const BUILD = {
+  scriptorium: { width: 6, cost: { stone: 4, wood: 6 } },
+  board: { width: 2, cost: { stone: 0, wood: 2 } },
+  /** The first board stands this many tiles right of the scriptorium (next to its door). */
+  boardGap: 1,
+  house: { minWidth: 3, maxWidth: 16, defaultWidth: 6, woodPerTilePerStory: 1, stonePerStory: 0 },
+  /** Every fixture is two tiles wide. */
+  fixtureWidth: 2,
+  fixtures: {
+    bed: { cost: { stone: 0, wood: 2 } },
+    oven: { cost: { stone: 4, wood: 0 } },
+    pantry: { cost: { stone: 0, wood: 2 } },
+    brewery: { cost: { stone: 1, wood: 2 } },
+    bar: { cost: { stone: 0, wood: 3 } },
+    /** A stockpile is just marked-out ground (or floor): free, and ready at once. */
+    stockpile: { cost: { stone: 0, wood: 0 } },
+  },
+  /** How much a fixture holds. Stockpiles indoors hold more than out in the open. */
+  capacity: { pantry: 20, bar: 12, stockpileOutdoor: 24, stockpileIndoor: 48 },
+  /** Work ticks to set one unit of material in place, or take one apart. */
+  unitTicks: 30,
+  /** Demolishing gives back this share of what went in (rounded down). */
+  salvage: 0.5,
+  /** The patron's starting supplies. */
+  supplies: { stone: 20, wood: 30, grain: 10, bread: 24, beer: 0 },
+};
+
+/** Fixtures in the order they're offered. */
+export const FIXTURE_LABEL = {
+  bed: 'Bed',
+  oven: 'Oven',
+  pantry: 'Pantry',
+  brewery: 'Brewing station',
+  bar: 'Bar',
+  stockpile: 'Stockpile',
+} as const;
 
 export const MOVE = {
   walkTicksPerTile: 4,
@@ -149,6 +206,15 @@ export const PATRON = {
   floorBonusPerLevel: 10,
   /** Below this patience, the patron stops sending newcomers. */
   recruitAbove: 50,
+  /** Days of grace at the start: patience doesn't drain until then, or until floor 1 is done. */
+  graceDays: 2,
+  /**
+   * Other construction wins back patience at about half the tower's rate,
+   * per unit of material (a floor is 14 units for 35 patience). It can't
+   * lift patience above otherBuildCap, so it can't replace the tower.
+   */
+  otherBuildPerUnit: 1.25,
+  otherBuildCap: 75,
 };
 
 export const QUIT = {
@@ -170,8 +236,14 @@ export const ARRIVALS = {
 
 export const ECONOMY = {
   startingGold: 400,
-  tavernCost: 5,
-  tavernTicks: 120,
+  /** A worker pays this for a beer at the bar. The bar is the colony's, so it goes back to the treasury. */
+  beerPrice: 5,
+  barTicks: 120,
+  /** A beer also takes the edge off thirst. */
+  beerQuench: 30,
+  /** One grain brews this many beers. */
+  beerPerGrain: 2,
+  brewTicks: 90,
 };
 
 /** Utility AI weights. Scores are compared directly; highest wins. */
@@ -181,9 +253,9 @@ export const AI = {
   workBase: 30,
   wageWeight: 5, // per gold of wage, times the worker's greed
   needScale: 1.3, // multiplier on (need^2 / 100)
-  tavernPerGold: 1.2,
-  tavernCap: 55,
-  tavernMoodWeight: 0.35,
+  barPerGold: 1.2,
+  barCap: 55,
+  barMoodWeight: 0.35,
   wanderBase: 8,
   noise: 4, // random jitter on each candidate so equal workers differ
 };
@@ -216,7 +288,7 @@ export const MOOD = {
   ateBread: { value: 6, ticks: 2400 },
   sleptInBed: { value: 6, ticks: 3000 },
   sleptOnGround: { value: -8, ticks: 3000 },
-  tavern: { value: 12, ticks: 3600 },
+  bar: { value: 12, ticks: 3600 },
   gotPaid: { value: 2, ticks: 600 },
   /** Missed job: penalty = base + wage * perWage, capped. */
   missedJobBase: 2,
@@ -229,5 +301,4 @@ export const MOOD = {
 export const POPULATION = {
   start: 8,
   cap: 30,
-  beds: 6,
 };

@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "art:export": "vite-node tools/art-export.ts",
-    "art:import": "vite-node tools/art-import.ts"
+    "art:import": "vite-node tools/art-import.ts",
+    "art:reference": "vite-node tools/reference-art.ts"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

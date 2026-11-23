@@ -758,3 +758,90 @@ p {
   background: var(--paper);
   padding: 0 3px;
 }
+
+/* ------------------------------------------------------- P1: building */
+
+/* System 7 alert: a double frame, centered, over a see-through backdrop
+   that stops clicks reaching the world while it's open */
+.modal-back {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+  pointer-events: auto;
+}
+
+.dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 60px);
+  overflow: auto;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  outline: 2px solid var(--paper);
+  box-shadow: 0 0 0 3px var(--ink), 3px 3px 0 3px var(--ink);
+  padding: 14px 18px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.dialog p {
+  margin: 0 0 10px;
+}
+
+.dialog-title {
+  font: bold 14px var(--font-title);
+  margin-bottom: 8px;
+}
+
+.dialog-buttons {
+  margin-top: 12px;
+}
+
+.dialog input[type='text'] {
+  width: 200px;
+}
+
+.flavor {
+  font-style: italic;
+}
+
+.btn.on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.build-row .num {
+  min-width: 18px;
+  text-align: center;
+}
+
+.fixture-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.fixture-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 4px;
+  line-height: 1.2;
+}
+
+.fixture-btn .hint {
+  font-size: 10px;
+}
+
+.fixture-btn.on .hint {
+  color: var(--paper);
+}
+
+.build-status {
+  min-height: 16px;
+  margin-top: 6px;
+  font-size: 11px;
+}

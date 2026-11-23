@@ -44,6 +44,29 @@ export class Patterns {
     return this.cache.get(name)!;
   }
 
+  private inkCache = new Map<string, CanvasPattern>();
+
+  /** The pattern's ink only, with the paper left see-through (for overlays like the placement preview). */
+  inkOnly(name: PatternName): CanvasPattern {
+    let p = this.inkCache.get(name);
+    if (!p) {
+      const c = document.createElement('canvas');
+      c.width = 4;
+      c.height = 4;
+      const g = c.getContext('2d')!;
+      g.fillStyle = INK;
+      DEFS[name].forEach((row, y) => row.forEach((bit, x) => bit && g.fillRect(x, y, 1, 1)));
+      p = this.ctx.createPattern(c, 'repeat')!;
+      this.inkCache.set(name, p);
+    }
+    return p;
+  }
+
+  stipple(name: PatternName, x: number, y: number, w: number, h: number): void {
+    this.ctx.fillStyle = this.inkOnly(name);
+    this.ctx.fillRect(x, y, w, h);
+  }
+
   fill(name: PatternName, x: number, y: number, w: number, h: number): void {
     this.ctx.fillStyle = this.get(name);
     this.ctx.fillRect(x, y, w, h);

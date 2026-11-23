@@ -26,11 +26,12 @@ export function langName(id: LangId): string {
 }
 
 /** Verbs that produce or move goods. These can go on board notices. */
-export type WorkVerb = 'MINE' | 'CHOP' | 'HARVEST' | 'COOK' | 'HAUL' | 'BUILD';
+export type WorkVerb = 'MINE' | 'CHOP' | 'HARVEST' | 'COOK' | 'BREW' | 'HAUL' | 'BUILD';
 /** Verbs that control a scroll, move orders around, or teach. Scrolls only. */
 export type FlowVerb = 'WRITE' | 'DELIVER' | 'REPEAT' | 'CHECK' | 'TEACH' | 'LEARN';
 export type Verb = WorkVerb | FlowVerb;
-export type Noun = 'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BOARD' | 'TOWER';
+/** CAMP is everything built on the ground: buildings and the fixtures in them (everything but the tower). */
+export type Noun = 'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER' | 'BOARD' | 'TOWER' | 'CAMP';
 /** Little words that introduce details: where from, where to. */
 export type Prep = 'FROM' | 'TO';
 /** Places. FLOOR carries its number on the token. */
@@ -52,37 +53,37 @@ export interface Token {
 
 export type Order = Token[];
 
-export const VERBS: readonly WorkVerb[] = ['MINE', 'CHOP', 'HARVEST', 'COOK', 'HAUL', 'BUILD'];
-export const NOUNS: readonly Noun[] = ['STONE', 'WOOD', 'GRAIN', 'BREAD'];
+export const VERBS: readonly WorkVerb[] = ['MINE', 'CHOP', 'HARVEST', 'COOK', 'BREW', 'HAUL', 'BUILD'];
+export const NOUNS: readonly Noun[] = ['STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER'];
 
 /** Every word that can drift (everything except names). */
 export const DRIFTABLE: readonly Exclude<TokenId, NameWord>[] = [
-  'MINE', 'CHOP', 'HARVEST', 'COOK', 'HAUL', 'BUILD',
+  'MINE', 'CHOP', 'HARVEST', 'COOK', 'BREW', 'HAUL', 'BUILD',
   'WRITE', 'DELIVER', 'REPEAT', 'CHECK', 'TEACH', 'LEARN',
-  'STONE', 'WOOD', 'GRAIN', 'BREAD', 'BOARD', 'TOWER',
+  'STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER', 'BOARD', 'TOWER', 'CAMP',
   'FROM', 'TO', 'BASE', 'FLOOR',
   'WANT', 'WATER', 'SLEEP', 'HOME', 'GOLD', 'WHAT',
 ];
 
 const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
   en: {
-    MINE: 'mine', CHOP: 'chop', HARVEST: 'harvest', COOK: 'cook', HAUL: 'haul', BUILD: 'build',
+    MINE: 'mine', CHOP: 'chop', HARVEST: 'harvest', COOK: 'cook', BREW: 'brew', HAUL: 'haul', BUILD: 'build',
     WRITE: 'write', DELIVER: 'deliver', REPEAT: 'repeat', CHECK: 'check', TEACH: 'teach', LEARN: 'learn from',
-    STONE: 'stone', WOOD: 'wood', GRAIN: 'grain', BREAD: 'bread', BOARD: 'board', TOWER: 'tower',
+    STONE: 'stone', WOOD: 'wood', GRAIN: 'grain', BREAD: 'bread', BEER: 'beer', BOARD: 'board', TOWER: 'tower', CAMP: 'camp',
     FROM: 'from', TO: 'to', BASE: 'base', FLOOR: 'floor',
     WANT: 'want', WATER: 'water', SLEEP: 'sleep', HOME: 'home', GOLD: 'gold', WHAT: 'what?',
   },
   fr: {
-    MINE: 'creuser', CHOP: 'couper', HARVEST: 'récolter', COOK: 'cuire', HAUL: 'porter', BUILD: 'bâtir',
+    MINE: 'creuser', CHOP: 'couper', HARVEST: 'récolter', COOK: 'cuire', BREW: 'brasser', HAUL: 'porter', BUILD: 'bâtir',
     WRITE: 'écrire', DELIVER: 'livrer', REPEAT: 'répéter', CHECK: 'voir', TEACH: 'enseigner', LEARN: 'apprendre de',
-    STONE: 'pierre', WOOD: 'bois', GRAIN: 'blé', BREAD: 'pain', BOARD: 'tableau', TOWER: 'tour',
+    STONE: 'pierre', WOOD: 'bois', GRAIN: 'blé', BREAD: 'pain', BEER: 'bière', BOARD: 'tableau', TOWER: 'tour', CAMP: 'camp',
     FROM: 'de', TO: 'à', BASE: 'base', FLOOR: 'étage',
     WANT: 'veux', WATER: 'eau', SLEEP: 'dormir', HOME: 'maison', GOLD: 'or', WHAT: 'quoi ?',
   },
   el: {
-    MINE: 'σκάψε', CHOP: 'κόψε', HARVEST: 'θέρισε', COOK: 'ψήσε', HAUL: 'κουβάλα', BUILD: 'χτίσε',
+    MINE: 'σκάψε', CHOP: 'κόψε', HARVEST: 'θέρισε', COOK: 'ψήσε', BREW: 'ζύμωσε', HAUL: 'κουβάλα', BUILD: 'χτίσε',
     WRITE: 'γράψε', DELIVER: 'παράδωσε', REPEAT: 'επανάλαβε', CHECK: 'δες', TEACH: 'δίδαξε', LEARN: 'μάθε από',
-    STONE: 'πέτρα', WOOD: 'ξύλο', GRAIN: 'σιτάρι', BREAD: 'ψωμί', BOARD: 'πίνακας', TOWER: 'πύργος',
+    STONE: 'πέτρα', WOOD: 'ξύλο', GRAIN: 'σιτάρι', BREAD: 'ψωμί', BEER: 'μπίρα', BOARD: 'πίνακας', TOWER: 'πύργος', CAMP: 'καταυλισμός',
     FROM: 'από', TO: 'σε', BASE: 'βάση', FLOOR: 'όροφος',
     WANT: 'θέλω', WATER: 'νερό', SLEEP: 'ύπνος', HOME: 'σπίτι', GOLD: 'χρυσός', WHAT: 'τι;',
   },
@@ -181,8 +182,9 @@ export const VALID_JOBS: Record<WorkVerb, readonly Noun[]> = {
   CHOP: ['WOOD'],
   HARVEST: ['GRAIN'],
   COOK: ['BREAD'],
+  BREW: ['BEER'],
   HAUL: ['STONE', 'WOOD', 'GRAIN'],
-  BUILD: ['TOWER'],
+  BUILD: ['TOWER', 'CAMP'],
 };
 
 export function isValidJob(verb: Verb, noun: Noun): boolean {
@@ -228,7 +230,7 @@ export function countText(n: number): string {
 
 /** "All" only makes sense where the work can run out. */
 export function allowsAll(verb: Verb): boolean {
-  return verb === 'HAUL' || verb === 'BUILD' || verb === 'COOK' || verb === 'WRITE' || verb === 'TEACH' || verb === 'LEARN';
+  return verb === 'HAUL' || verb === 'BUILD' || verb === 'COOK' || verb === 'BREW' || verb === 'WRITE' || verb === 'TEACH' || verb === 'LEARN';
 }
 
 /** "Forever" is for work that can go on indefinitely. */

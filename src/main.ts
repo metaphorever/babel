@@ -1,7 +1,8 @@
 import './ui/style.css';
-import { Sim, TICKS_PER_SECOND, type Difficulty } from './sim';
+import { Sim, TICKS_PER_SECOND, type Difficulty, type StartMode } from './sim';
 import { Renderer, TILE } from './render/renderer';
 import { Ui } from './ui/ui';
+import { BuildUi } from './ui/build';
 import { loadArt } from './render/artLoader';
 
 // Seed from the URL (?seed=123) so a playtest can be reproduced exactly.
@@ -9,15 +10,17 @@ const params = new URLSearchParams(location.search);
 const seed = Number(params.get('seed')) || 1 + Math.floor(Math.random() * 1e9);
 const diffParam = params.get('difficulty');
 const difficulty: Difficulty = diffParam === 'easy' || diffParam === 'hard' ? diffParam : 'normal';
-const sim = new Sim(seed, difficulty);
+// ?start=prebuilt skips the opening with a colony already laid out (handy for playtesting later stages)
+const start: StartMode = params.get('start') === 'prebuilt' ? 'prebuilt' : 'opening';
+const sim = new Sim(seed, difficulty, start);
 
 const canvas = document.getElementById('world') as HTMLCanvasElement;
 const renderer = new Renderer(canvas);
 renderer.resize();
-const boardSite = sim.state.sites.find((s) => s.kind === 'board')!;
-/** Frame the board with the ground about two-thirds of the way down. */
+/** Frame the board (or, at the opening, the patron's supplies) with the ground about two-thirds of the way down. */
 function frameStart(): void {
-  renderer.centerOn(boardSite.x0 * TILE, (boardSite.y + 1) * TILE);
+  const focus = sim.state.sites.find((s) => s.kind === 'board') ?? sim.state.sites.find((s) => s.supplies) ?? sim.state.sites[0];
+  renderer.centerOn(focus.x0 * TILE, (focus.y + 1) * TILE);
   renderer.camY -= renderer.viewH * 0.17;
 }
 // the page can load while hidden (zero size), so frame once there's a size
@@ -40,6 +43,9 @@ const ui = new Ui(document.getElementById('ui')!, sim, {
     if (w) renderer.centerOn(w.x * TILE, w.y * TILE);
   },
 });
+const build = new BuildUi(document.getElementById('ui')!, ui.wm, sim, renderer, ui.scriptorium, {
+  centerOnTile: (x, y) => renderer.centerOn(x * TILE, y * TILE),
+});
 
 // ------------------------------------------------------------------ input
 
@@ -50,8 +56,21 @@ const typing = (e: Event) => {
 };
 
 window.addEventListener('keydown', (e) => {
-  if (typing(e)) return;
+  if (typing(e) || build.modalOpen) return;
   const k = e.key.toLowerCase();
+  if (k === 'escape' && (build.placing || build.demolishing)) {
+    if (build.placing) build.cancel();
+    else build.stopDemolish();
+    return;
+  }
+  if (k === '[' || k === ']') {
+    build.nudgeWidth(k === '[' ? -1 : 1);
+    return;
+  }
+  if (k === 'b') {
+    ui.wm.toggle('build');
+    return;
+  }
   if (k === ' ') {
     e.preventDefault();
     if (speed === 0) speed = lastSpeed;
@@ -98,21 +117,29 @@ canvas.addEventListener('mousemove', (e) => {
     return;
   }
   const p = renderer.screenToWorld(e.clientX, e.clientY);
+  if (build.hover(p.x, p.y)) {
+    hover = null;
+    canvas.style.cursor = 'crosshair';
+    return;
+  }
   hover = renderer.workerAt(sim.state, p.x, p.y)?.id ?? null;
   canvas.style.cursor = hover !== null ? 'pointer' : 'default';
 });
 canvas.addEventListener('click', (e) => {
   const p = renderer.screenToWorld(e.clientX, e.clientY);
+  if (build.click(p.x, p.y)) return;
   const w = renderer.workerAt(sim.state, p.x, p.y);
   if (w) {
     ui.select(w.id);
     return;
   }
-  const site = renderer.siteAt(sim.state, p.x, p.y);
-  if (site?.kind === 'board') ui.wm.show('board');
-  else if (site?.kind === 'scriptorium') ui.wm.show('scriptorium');
+  const thing = renderer.thingAt(sim.state, p.x, p.y);
+  const site = thing?.kind === 'site' ? thing.site : null;
+  if (site?.kind === 'board' && !site.build) ui.wm.show('board');
+  else if (site?.kind === 'scriptorium' && !site.build) ui.wm.show('scriptorium');
   else if (site?.kind === 'foundation') ui.wm.show('tower');
-  else if (site?.kind === 'stockpile' || site?.kind === 'kitchen') ui.wm.show('stores');
+  else if (site?.supplies || (site?.kind === 'stockpile' && site.level > 0)) ui.wm.show('stores');
+  else if (thing && (thing.kind === 'building' || site?.buildingId !== null || site?.kind === 'stockpile' || site?.build)) build.inspect(thing);
   else ui.select(null);
 });
 canvas.addEventListener(
@@ -165,10 +192,12 @@ function frame(now: number) {
   if (uiTimer > 200) {
     uiTimer = 0;
     ui.refresh();
+    build.refresh();
   }
   requestAnimationFrame(frame);
 }
 ui.refresh();
+build.refresh();
 requestAnimationFrame(frame);
 
 // Sprite sheets from public/art/ replace the built-in art when present. While
@@ -178,5 +207,5 @@ void loadArt();
 if (import.meta.env.DEV) window.addEventListener('focus', () => void loadArt());
 
 // handy in the console while tuning: babel.sim.state, babel.seed
-(window as unknown as { babel: unknown }).babel = { sim, seed, renderer, ui };
-console.info(`Babel P0 — seed ${seed}. Reload with ?seed=${seed} to replay this start.`);
+(window as unknown as { babel: unknown }).babel = { sim, seed, renderer, ui, build };
+console.info(`Babel P1 — seed ${seed}. Reload with ?seed=${seed} to replay this start (add &start=prebuilt to skip the opening).`);

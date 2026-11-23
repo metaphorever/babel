@@ -44,7 +44,7 @@ const DOING: Record<ActivityKind, string> = {
   job: 'Working',
   scroll: 'Following a scroll',
   lesson: 'At a lesson',
-  tavern: 'At the tavern',
+  bar: 'At the bar',
 };
 
 export function formatTime(tick: number): string {
@@ -108,8 +108,11 @@ export class Ui {
     this.wm.create('stores', 'Stores', 390, 34, 220);
     this.wm.create('log', 'Log', 16, -220, 440);
     this.buildHelp();
-    this.wm.show('board');
-    this.wm.show('help');
+    // at the opening, the opening text does the welcoming
+    if (this.sim.state.start !== 'opening') {
+      this.wm.show('board');
+      this.wm.show('help');
+    }
     window.addEventListener('resize', () => this.wm.keepAllOnScreen());
     window.addEventListener('mousedown', () => (this.mouseDown = true), true);
     window.addEventListener('mouseup', () => (this.mouseDown = false), true);
@@ -138,6 +141,7 @@ export class Ui {
       'div',
       { class: 'menubar' },
       h('span', { class: 'menu-apple' }, 'Babel'),
+      menu('Build', 'build'),
       menu('Job Board', 'board'),
       menu('Scriptorium', 'scriptorium'),
       menu('Tower', 'tower'),
@@ -372,17 +376,26 @@ export class Ui {
     const win = this.wm.get('stores')!;
     if (!win.open) return;
     clear(win.body);
-    // totals across every stockpile, on the ground and up the tower
-    const pile = { store: { stone: 0, wood: 0, grain: 0, bread: 0 } };
-    for (const sp of this.s.sites) if (sp.kind === 'stockpile') for (const k of ['stone', 'wood', 'grain'] as const) pile.store[k] += sp.store[k];
-    const kitchen = this.s.sites.find((x) => x.kind === 'kitchen')!;
-    const loose = { stone: 0, wood: 0, grain: 0, bread: 0 };
+    // totals across every stockpile, on the ground and up the tower (the patron's supplies count too)
+    const sum = (kind: string, k: 'stone' | 'wood' | 'grain' | 'bread' | 'beer') => this.s.sites.filter((x) => x.kind === kind && x.build === null).reduce((n, x) => n + x.store[k], 0);
+    const room = this.s.sites.filter((x) => x.kind === 'stockpile' && x.build === null && !x.supplies);
+    const cap0 = room.reduce((n, x) => n + (x.capacity ?? 0), 0);
+    const used = room.reduce((n, x) => n + x.store.stone + x.store.wood + x.store.grain, 0);
+    const loose = { stone: 0, wood: 0, grain: 0, bread: 0, beer: 0 };
     for (const it of this.s.items) loose[it.type]++;
+    const supplies = this.s.sites.find((x) => x.supplies);
     const t = h('table', { class: 'stores' });
     t.append(h('tr', {}, h('th', {}, ''), h('th', {}, 'Stored'), h('th', {}, 'Lying around')));
-    for (const k of ['stone', 'wood', 'grain'] as const) t.append(h('tr', {}, h('td', {}, cap(k)), h('td', { class: 'num' }, pile.store[k]), h('td', { class: 'num' }, loose[k])));
-    t.append(h('tr', {}, h('td', {}, 'Bread'), h('td', { class: 'num' }, kitchen.store.bread), h('td', { class: 'hint' }, 'in the larder')));
-    win.body.append(t, h('div', { class: 'hint' }, 'Stored counts every stockpile. The Tower window shows each floor.'));
+    for (const k of ['stone', 'wood', 'grain'] as const) t.append(h('tr', {}, h('td', {}, cap(k)), h('td', { class: 'num' }, sum('stockpile', k)), h('td', { class: 'num' }, loose[k])));
+    const breadSupplies = supplies?.store.bread ?? 0;
+    t.append(h('tr', {}, h('td', {}, 'Bread'), h('td', { class: 'num' }, sum('pantry', 'bread') + breadSupplies), h('td', { class: 'hint' }, breadSupplies ? 'pantries and supplies' : 'in the pantries')));
+    t.append(h('tr', {}, h('td', {}, 'Beer'), h('td', { class: 'num' }, sum('bar', 'beer')), h('td', { class: 'hint' }, 'at the bar')));
+    win.body.append(
+      t,
+      h('div', { class: 'hint' }, room.length ? `Stockpiles at the base: ${used} of ${cap0} full.` : 'No stockpiles yet: goods only count once they’re stored.'),
+      supplies ? h('div', { class: 'hint' }, "The patron's supplies are counted in. Nothing can be added to them.") : '',
+      h('div', { class: 'hint' }, 'The Tower window shows each floor.'),
+    );
   }
 
   private lastLogTick = -1;
@@ -403,7 +416,7 @@ export class Ui {
   }
 
   private buildHelp(): void {
-    const win = this.wm.create('help', 'Welcome to Babel (P0)', 390, 34, 420);
+    const win = this.wm.create('help', 'Welcome to Babel (P1)', 390, 34, 420);
     win.body.append(
       h('p', {}, 'Grey-box prototype. You can’t touch anything. You compose orders in the Scriptorium; your scribe writes them out and carries them. A single work line posted on the board is a notice: anyone takes one job at a time from it. A card or scroll on the board is taken down by the first worker free to take it. Anything handed to a worker directly replaces whatever they were doing.'),
       h('p', {}, 'Counts and wages are per unit. Anything addressed to a worker by name always wins over orders for Anyone. If nobody is writing, the patron’s charter posts a scribe loop on the board so you can never lose your scribes for good.'),
@@ -412,10 +425,11 @@ export class Ui {
         { class: 'keys' },
         h('li', {}, h('b', {}, 'WASD / arrows'), ' pan · ', h('b', {}, 'right-drag'), ' pan'),
         h('li', {}, h('b', {}, 'Scroll'), ' zoom (whole steps)'),
-        h('li', {}, h('b', {}, 'Click'), ' a worker to inspect; click the board, stockpile or kitchen to open their window'),
+        h('li', {}, h('b', {}, 'Click'), ' a worker to inspect; click the board, scriptorium, a building or a fixture to open its window'),
+        h('li', {}, h('b', {}, 'B'), ' the Build window · ', h('b', {}, 'Esc'), ' stop placing · ', h('b', {}, '[ ]'), ' building width'),
         h('li', {}, h('b', {}, 'Space'), ' pause · ', h('b', {}, '1 2 3'), ' speed · ', h('b', {}, 'N'), ' show all names'),
       ),
-      h('p', { class: 'hint' }, 'To build the tower: draw a blueprint (Tower window or Scriptorium), then post “build tower” work. Languages drift from floor 3 up (see the Languages window). Keep the patron pleased by finishing floors, and keep your workers fed or they’ll quit. Not in yet: mailboxes, upper job boards, COPY.'),
+      h('p', { class: 'hint' }, 'To build anything on the ground: place it from the Build window, then post “build camp” work. Fixtures (beds, ovens, pantries, the bar...) go inside finished buildings. To build the tower: draw a blueprint (Tower window or Scriptorium), then post “build tower” work. Languages drift from floor 3 up (see the Languages window). Keep the patron pleased by finishing floors, and keep your workers fed or they’ll quit. Not in yet: mailboxes, upper job boards, COPY.'),
     );
   }
 

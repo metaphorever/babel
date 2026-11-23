@@ -441,7 +441,7 @@ Fights, metalwork, cordage, the full tech tree, contraptions (crane, bucket brig
 
 ## 15. P1 spec: the new game, the map and buildings
 
-*Decided 2026-11-22, after the first playtests. Not built yet; this is the next big piece of work. It replaces P0's fixed ground strip with a map the player lays out.*
+*Decided 2026-11-22, after the first playtests. Built on 2026-11-23 (session 2); see §15.10 for how it works and what was decided along the way. It replaces P0's fixed ground strip with a map the player lays out.*
 
 ### 15.1 The map
 
@@ -525,6 +525,43 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 - **Drift starts on the third story.** Floors 1 and 2 are safe, and French joins the drift pool once the tower is 3 floors tall. *(Changed in code on 2026-11-22.)*
 - **Art pipeline:** working sheets are MacPaint documents, edited on a System 7 Mac in an emulator (Infinite Mac). Each sprite has a mask beside it, and converters go both ways. See [SPRITES.md](SPRITES.md). *Revised the same day: art now arrives as PNG screenshots of MacPaint, sliced by hand. Set pieces like the forest may be one large drawing; clouds will be assembled from parts, like workers.*
 
+### 15.10 How P1 works (built 2026-11-23; provisional, revisit in playtests)
+
+**The map:**
+- **Layout:** the world is 192 tiles wide. The road home takes the left 4 tiles; the right 8 are kept clear. The forest (12), quarry (16), field (12), well (2), old shack (6) and the patron's supplies (4) land in a random order with random gaps of at least 3, from the seed.
+- **The patron's supplies** are a pile (drawn as the supply wagon) of 20 stone, 30 wood, 10 grain and 24 bread. Workers take from it like a stockpile but nothing can be added to it. Until there are pantries, everyone eats from it.
+- **`?start=prebuilt`** lays out a P0-style colony instead (fixed map, everything built). The tests use it.
+
+**The opening:**
+- **Before anything is built,** workers wait by the supplies, eat from them, drink at the well and sleep rough. There's no board and no charter yet.
+- **Placing the scriptorium** marks out it and the board beside its door (6 + 1 gap + 2 tiles). The patron's clerk hands four workers a card, "build camp ×all", wage 1. When both stand, the charter is decreed: the worker with a knack for writing becomes the scribe, and three starter notices go up (mine stone, chop wood, harvest grain).
+- **Placement order:** the scriptorium comes first; nothing else can be placed until it is. The tower site comes next in the tutorial, but any time is allowed.
+
+**Building on the ground ("build camp"):**
+- **CAMP is a new noun:** `[BUILD] [CAMP]` works on everything planned on the ground (buildings, fixtures, the scriptorium and board), oldest plan first, and takes things down that are marked for demolition. `[BUILD] [TOWER]` is unchanged. *Why a word and not automatic:* the player can't touch anything; placing lays out the plan, and the labour still has to be ordered. Placing is the one direct action, the way a patron's architect would draw plans.
+- **Builders** take stone and wood only from stockpiles (or the supplies), never from the ground: "workers can only use what's stored". Each counts what others are already carrying, and when everything is on its way they take a short breather rather than give up.
+- **"Build camp ×all"** comes down once nothing planned is left, so new plans need new work. Players may prefer "forever" for a standing crew.
+- **Costs:** a generic building is 1 wood per tile per story. Scriptorium 6 wood + 4 stone; board 2 wood; bed 2 wood; oven 4 stone; pantry 2 wood; brewing station 2 wood + 1 stone; bar 3 wood. **A stockpile costs nothing and is ready at once:** it's marked-out ground. That also means stored goods can never be locked out by a lack of somewhere to store them.
+- **Building widths** are 3 to 16 tiles, chosen while placing (the − / + buttons, or [ and ]). Every fixture is 2 tiles wide.
+- **Two stories:** finishing a two-story building lays a deck across it and a ladder up its left end; fixtures can go upstairs (not over the ladder). Demolishing takes the deck out and brings anyone up there down.
+
+**Fixtures:**
+- **Ovens and pantries:** "cook bread" fetches a grain from a stockpile, bakes at the nearest oven and carries the bread to the nearest pantry with room. Pantries hold 20. Eating takes from the nearest pantry (or the supplies).
+- **Beer:** "brew beer" is the same at a brewing station, into a bar (holds 12). A worker with money and the mood for it buys a beer (5 gold), which lifts their mood and takes the edge off thirst. *Decided here: what workers pay at the bar goes back to the treasury,* since the bar is the colony's own. That's a change from P0's tavern, whose gold left the economy. It makes brewing worth doing; watch whether it makes gold too easy.
+- **Beds:** one worker per bed, nearest free bed first. Otherwise they sleep rough.
+- **Stockpiles:** outdoors hold 24, indoors 48 (all goods together). Haulers fill the nearest one with room. "From base" takes from the nearest base stockpile with that good. Tower floors keep their automatic, unlimited stockpile (the P0 stand-in).
+- **The old shack's oven** is broken and can't be used.
+
+**Demolishing:** marking something is immediate; the work waits until it's empty (goods for a pantry, bar or stockpile, fixtures for a building) and is done by "build camp" workers, a unit at a time. Half of what went in (rounded down) is left lying there to haul. Something nobody has started is simply called off. The scriptorium, the tower site, the board (until there can be more than one) and the land can't be demolished.
+
+**The patron:**
+- **Grace:** for the first 2 days, patience doesn't drain, unless floor 1 is finished sooner.
+- **Other construction:** each unit of material set in place anywhere but the tower wins back 1.25 patience (half a floor's rate), but only up to 75%. Only the tower can take the patron all the way to happy.
+
+**Tutorials:** the §15.8 outline is in as ten steps in a Tutorial window, each with buttons that do the thing and most moving on by themselves once it's done. *The text is a first draft by Claude and should be rewritten after a playtest.*
+
+**Interface:** a Build menu and window (key B), placement with a shaded preview and an X on every blocked tile, System 7 confirmation dialogs, a window for any building or fixture you click (with Demolish), and building labels like "Dormitory (Bed, Bed, Pantry)".
+
 ## Glossary
 
 | Term | Meaning |
@@ -543,3 +580,5 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 | **Name** | A worker's unique name. Never lost to drift, always recognized on an order. |
 | **Courier** | A worker carrying a bag of carriers to deliver. |
 | **Patron** | The funder. Their patience is the difficulty. |
+| **Camp** | Everything built on the ground (buildings and fixtures), as opposed to the tower. `[BUILD] [CAMP]` builds it. |
+| **Fixture** | Something fixed in place inside a building: bed, oven, pantry, brewing station, bar, stockpile. |

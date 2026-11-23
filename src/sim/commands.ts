@@ -3,6 +3,7 @@ import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCar
 import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isValidLine, langName, makeOrder, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
 import { SCRIBE, TOWER } from './tuning';
 import type { Dest, SimState } from './types';
+import { applyDemolish, applyPlace, validateDemolish, validatePlace, type DemolishTarget, type PlaceRequest } from './build';
 
 // Every player action is a command. The sim applies commands at the start of
 // a tick, so the same seed plus the same command log always replays the same
@@ -37,7 +38,11 @@ export type Command =
   | { type: 'cancelDesign'; playerId: number; designId: number }
   | { type: 'removeNotice'; playerId: number; noticeId: number }
   | { type: 'takeDown'; playerId: number; carrierId: number }
-  | { type: 'blueprint'; playerId: number };
+  | { type: 'blueprint'; playerId: number }
+  /** Lay out a building, fixture, the scriptorium or the tower site. Workers build it. */
+  | { type: 'place'; playerId: number; place: PlaceRequest }
+  /** Mark something to be taken down. */
+  | { type: 'demolish'; playerId: number; target: DemolishTarget };
 
 export interface StampedCommand {
   tick: number;
@@ -114,9 +119,18 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       if (!s.boardScrolls.some((c) => c.id === cmd.carrierId)) return { ok: false, error: 'Somebody already took it.' };
       return { ok: true };
     case 'blueprint': {
+      if (!s.tower) return { ok: false, error: 'Choose the tower site first.' };
       const planned = s.floors + s.projects.length + s.designs.filter((d) => d.carrier.kind === 'blueprint').length;
       if (planned >= TOWER.maxFloors) return { ok: false, error: 'The tower is as tall as this world allows.' };
       return { ok: true };
+    }
+    case 'place': {
+      const error = validatePlace(s, cmd.place);
+      return error ? { ok: false, error } : { ok: true };
+    }
+    case 'demolish': {
+      const error = validateDemolish(s, cmd.target);
+      return error ? { ok: false, error } : { ok: true };
     }
   }
 }
@@ -155,6 +169,12 @@ export function applyCommand(s: SimState, cmd: Command): CommandResult {
       log(s, 'Sent to the scriptorium: a blueprint for the next floor.');
       break;
     }
+    case 'place':
+      applyPlace(s, cmd.place);
+      break;
+    case 'demolish':
+      applyDemolish(s, cmd.target);
+      break;
   }
   return { ok: true };
 }
