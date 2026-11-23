@@ -1,5 +1,19 @@
 # Drawing art for Babel
 
+## How art actually arrives (decided 2026-11-22)
+
+Moving MacPaint files in and out of the emulator turned out to be a pain, so **art comes in as PNG screenshots** of MacPaint, dropped into [`art-src/shots/`](../art-src/shots) and committed as the record of what was drawn. Claude cuts them up into the game's PNGs by hand for each delivery; there is deliberately no automatic screenshot importer.
+
+- **Pixels must survive.** A screenshot at 1:1, or at a clean whole-number scale (2×, 3×), is fine: Claude scales it back down. A fractional scale (Windows display scaling at 125% or 150%, or a stretched emulator window) smears pixels and can't be undone cleanly.
+- **Say what it is.** Keep the dotted frame labels in the shot when drawing on a sheet, or name the file after what it shows (`forest.png`, `cloud-parts.png`).
+- **Masks are optional now.** Without a mask, white that touches the outside edge of the drawing is see-through and enclosed white is solid paper. Draw a mask box only when that guess would be wrong (a see-through gap inside a shape, or solid white that touches the edge).
+- **Set pieces can be one big picture.** The forest, for example, may be a single large drawing rather than one tree repeated. (The forest never runs out of wood, so it doesn't need to show trees being cut down.)
+- **Clouds will be built from parts,** the way workers are, so the sky varies. Not built yet.
+
+The rest of this document describes the MacPaint sheets and the `.bin`/`.pntg` round trip. They still work and remain the reference for box sizes and layouts, but they're no longer the main route.
+
+## The MacPaint sheets
+
 All of the game's art lives on three **MacPaint documents** in [`art-src/`](../art-src). Draw on them in MacPaint on a System 7 Mac (in the [Infinite Mac](https://infinitemac.org) emulator, or a real one), and a converter turns them into the PNGs the game uses. No Photoshop step is needed.
 
 | Page | What's on it |

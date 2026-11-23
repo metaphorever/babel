@@ -54,9 +54,9 @@ The README's checklist has the same list. DESIGN.md §13 records how P0 works, i
 
 ## Next steps, in order
 
-1. **The first art round trip through Infinite Mac.**
-   - **The test:** the user uploads a page's `.bin`, edits it in MacPaint and brings it back; `npm run art:import` converts it. This is unverified so far: does Infinite Mac recognize MacBinary, and how do files come back out? Fix whatever breaks. See [SPRITES.md](SPRITES.md).
-   - **The scriptorium:** the user is drawing its special art.
+1. **The user's first art delivery.**
+   - **How it arrives:** PNG screenshots of MacPaint, not `.bin` files (moving files through the emulator was a pain). Claude slices them by hand into the game's PNGs; no automatic importer. Rules in [SPRITES.md](SPRITES.md) ("How art actually arrives").
+   - **Coming:** the scriptorium's special art, a forest drawn as one large set piece, and clouds built from parts like the workers (not built yet). Expected around session 3.
 2. **Draw the world from the sheets.** Switch the renderer from drawing terrain, the tower, nature, buildings and the sky in code to the `world.png` atlas, whose rectangles are in `public/art/manifest.json`. Dynamic overlays (bread on shelves, notices on the board, stockpile contents) stay in code. That way the user's art shows up everywhere.
 3. **P1: the map and buildings** (DESIGN.md §15). Roughly in this order:
    1. **Map:** random placement of the forest, quarry, field, well and old shack; the road home on the left edge; starting supplies.

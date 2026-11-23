@@ -523,7 +523,7 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 ### 15.9 Also decided
 
 - **Drift starts on the third story.** Floors 1 and 2 are safe, and French joins the drift pool once the tower is 3 floors tall. *(Changed in code on 2026-11-22.)*
-- **Art pipeline:** working sheets are MacPaint documents, edited on a System 7 Mac in an emulator (Infinite Mac). Each sprite has a mask beside it, and converters go both ways. See [SPRITES.md](SPRITES.md).
+- **Art pipeline:** working sheets are MacPaint documents, edited on a System 7 Mac in an emulator (Infinite Mac). Each sprite has a mask beside it, and converters go both ways. See [SPRITES.md](SPRITES.md). *Revised the same day: art now arrives as PNG screenshots of MacPaint, sliced by hand. Set pieces like the forest may be one large drawing; clouds will be assembled from parts, like workers.*
 
 ## Glossary
 
