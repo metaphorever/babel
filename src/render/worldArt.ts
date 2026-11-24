@@ -135,12 +135,31 @@ export function fixtureArt(): WorldSprite[] {
       for (let x = 0; x < 16; x += 2) b.rect(x, 3, 1, 1);
       b.rect(0, 0, 1, 4).rect(15, 0, 1, 4);
     }),
-    // added after the first art delivery: last on the sheet, so no other box moves
+  ];
+}
+
+/**
+ * Pieces added after the first art delivery. They go on their own page
+ * (Babel Extras), so the boxes on the pages already drawn never move.
+ */
+export function extrasArt(): WorldSprite[] {
+  const deck = terrainArt().find((s) => s.name === 'tower.deck')!;
+  return [
     art('fixture.shelves', 'STORAGE SHELVES', 16, 16, (b) => {
       // an open frame with three shelves; goods are drawn on them by the game
       b.rect(0, 0, 1, 16).rect(15, 0, 1, 16).rect(0, 0, 16, 1);
       b.rect(1, 5, 14, 1).rect(1, 10, 14, 1).rect(1, 15, 14, 1);
     }),
+    // not in the game yet: a faster way up than the ladder (see DESIGN.md, the roadmap)
+    art('fixture.stairs', 'STAIRS (ONE FLOOR)', 24, 32, (b) => {
+      for (let i = 0; i < 8; i++) {
+        const x = i * 3;
+        const y = 32 - (i + 1) * 4;
+        b.rect(x, y, 3, 1).rect(x, y, 1, 4);
+      }
+      for (let i = 0; i < 24; i++) b.set(i, Math.min(31, 31 - Math.floor((i * 4) / 3) + 3), INK);
+    }),
+    { name: 'building.deck', label: 'HOUSE DECK (UPSTAIRS FLOOR)', grid: deck.grid },
   ];
 }
 
@@ -191,5 +210,5 @@ export function extraWorldArt(): WorldSprite[] {
 }
 
 export function allWorldArt(): WorldSprite[] {
-  return [...terrainArt(), ...natureArt(), ...buildingArt(), ...fixtureArt(), ...skyArt()];
+  return [...terrainArt(), ...natureArt(), ...buildingArt(), ...fixtureArt(), ...skyArt(), ...extrasArt()];
 }

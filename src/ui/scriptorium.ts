@@ -16,6 +16,11 @@ import {
   takesPlaces,
   takesWho,
   wordIn,
+  word,
+  placeKey,
+  placeName,
+  placeTokens,
+  type Place,
   type LangId,
   type TokenId,
   type Dest,
@@ -24,6 +29,7 @@ import {
   type SimState,
   type Verb,
 } from '../sim';
+import { siteTitle } from '../sim/world';
 import { clear, h } from './dom';
 import type { WindowManager } from './windows';
 
@@ -47,16 +53,20 @@ function cap(s: string): string {
 export interface DraftLine {
   verb: Verb;
   noun: Noun | null;
-  /** Hauling only: from a stockpile (null = whatever's lying around) and to one (base by default). */
-  from: number | null;
-  to: number | null;
+  /** Hauling only: from a store (null = whatever's lying around) and to one (null = the nearest with room). */
+  from: Place | null;
+  to: Place | null;
   /** Teaching / learning: which worker. */
   who?: number | null;
   count: number;
 }
 
-function place(level: number): string {
-  return level === 0 ? 'the base' : `floor ${level}`;
+interface PlaceOption {
+  key: string;
+  place: Place | null;
+  text: string;
+  /** The words it needs, to grey it out when they can't be written in this language. */
+  words: TokenId[];
 }
 
 const VERB_LABEL: Record<Verb, string> = {
@@ -297,6 +307,50 @@ export class ScriptoriumPanel {
     this.bpError.textContent = r.ok ? '' : r.error;
   }
 
+  /**
+   * Where a haul can come from or go to: nowhere in particular (lying
+   * around / the nearest store), anywhere at the base or in the tower, one
+   * floor, or one store by number or name, left to right, base first.
+   */
+  private placeOptions(dir: 'from' | 'to'): PlaceOption[] {
+    const s = this.s;
+    const opts: PlaceOption[] = [
+      { key: '', place: null, text: dir === 'from' ? 'lying around' : 'to the nearest store', words: [] },
+      { key: placeKey(0), place: 0, text: `${dir} the base (any)`, words: ['BASE'] },
+    ];
+    if (s.floors > 0) opts.push({ key: placeKey('tower'), place: 'tower', text: `${dir} the tower (any floor)`, words: ['TOWER'] });
+    for (let k = 1; k <= s.floors; k++) opts.push({ key: placeKey(k), place: k, text: `${dir} floor ${k}`, words: ['FLOOR'] });
+    const stores = s.sites.filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves') && x.num > 0).sort((a, b) => a.level - b.level || a.x0 - b.x0);
+    for (const x of stores) {
+      const p: Place = x.named ? { name: x.label } : { fixture: x.kind === 'stockpile' ? 'STOCKPILE' : 'SHELVES', n: x.num };
+      opts.push({ key: placeKey(p), place: p, text: `${dir} ${siteTitle(s, x)}${x.build ? ', being built' : ''}`, words: x.named ? [] : [p && typeof p === 'object' && 'fixture' in p ? p.fixture : 'STOCKPILE'] });
+    }
+    return opts;
+  }
+
+  private placeSelect(i: number, dir: 'from' | 'to', line: DraftLine): HTMLSelectElement {
+    const opts = this.placeOptions(dir);
+    const current = line[dir];
+    // a place the line already names that isn't there any more stays on the menu
+    if (current !== null && !opts.some((o) => o.key === placeKey(current))) opts.push({ key: placeKey(current), place: current, text: `${dir} ${placeName(current)} (not there now)`, words: [] });
+    const sel = h('select', { 'aria-label': `Line ${i + 1} ${dir}` });
+    for (const o of opts) sel.append(h('option', { value: o.key, disabled: o.words.some((t) => !this.canWrite(t)) && o.key !== placeKey(current) }, o.text));
+    sel.value = placeKey(current);
+    sel.addEventListener('change', () => {
+      line[dir] = opts.find((o) => o.key === sel.value)?.place ?? null;
+      this.updateSummary();
+    });
+    return sel;
+  }
+
+  /** Stores that exist, so the place menus can be redrawn when one is added, renamed or taken away. */
+  private storesSig(): string {
+    return this.s.sites
+      .filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves') && x.num > 0)
+      .map((x) => `${x.id}:${x.label}:${x.build ? 0 : 1}`)
+      .join('|');
+  }
+
   private usePreset(lines: DraftLine[]): void {
     this.lines = lines.map((l) => ({ ...l }));
     this.renderLines();
@@ -336,18 +390,7 @@ export class ScriptoriumPanel {
         placeEls.push(whoSel);
       }
       if (takesPlaces(line.verb)) {
-        const floors = this.s.floors;
-        const fromSel = h('select', { 'aria-label': `Line ${i + 1} from` }, h('option', { value: '' }, 'lying around'));
-        const toSel = h('select', { 'aria-label': `Line ${i + 1} to` });
-        for (let k = 0; k <= floors; k++) {
-          fromSel.append(h('option', { value: String(k) }, `from ${place(k)}`));
-          toSel.append(h('option', { value: String(k) }, `to ${place(k)}`));
-        }
-        fromSel.value = line.from === null ? '' : String(line.from);
-        toSel.value = String(line.to ?? 0);
-        fromSel.addEventListener('change', () => ((line.from = fromSel.value === '' ? null : Number(fromSel.value)), this.updateSummary()));
-        toSel.addEventListener('change', () => ((line.to = Number(toSel.value)), this.updateSummary()));
-        placeEls.push(fromSel, toSel);
+        placeEls.push(this.placeSelect(i, 'from', line), this.placeSelect(i, 'to', line));
       }
       let countEl: HTMLElement = h('span', { class: 'slot-empty' });
       if (hasCount(line.verb)) {
@@ -450,8 +493,8 @@ export class ScriptoriumPanel {
       if (takesWho(l.verb)) words.push(nameOf(l.who));
       if (l.noun && l.verb !== 'CHECK') words.push(wordIn(l.noun, this.lang));
       if (l.verb === 'CHECK') words.push(wordIn('BOARD', this.lang));
-      if (takesPlaces(l.verb) && l.from !== null) words.push(wordIn('FROM', this.lang), l.from === 0 ? wordIn('BASE', this.lang) : wordIn('FLOOR', this.lang, l.from));
-      if (takesPlaces(l.verb) && ((l.to ?? 0) !== 0 || l.from !== null)) words.push(wordIn('TO', this.lang), (l.to ?? 0) === 0 ? wordIn('BASE', this.lang) : wordIn('FLOOR', this.lang, l.to ?? 0));
+      if (takesPlaces(l.verb) && l.from !== null) words.push(wordIn('FROM', this.lang), ...placeTokens(l.from, this.lang).map(word));
+      if (takesPlaces(l.verb) && l.to !== null) words.push(wordIn('TO', this.lang), ...placeTokens(l.to, this.lang).map(word));
       return words.join(' ') + (hasCount(l.verb) && (l.count > 1 || isSpecialCount(l.count)) ? ` ×${countText(l.count)}` : '');
     });
     this.preview.textContent = `«${lineWords.join(' → ')}»`;
@@ -466,7 +509,7 @@ export class ScriptoriumPanel {
         noun: l.noun,
         who: takesWho(l.verb) ? l.who ?? null : null,
         from: takesPlaces(l.verb) ? l.from : null,
-        to: takesPlaces(l.verb) && (l.from !== null || (l.to ?? 0) !== 0) ? l.to ?? 0 : null,
+        to: takesPlaces(l.verb) ? l.to : null,
         count: l.count,
       })),
       lang: this.lang,
@@ -476,7 +519,7 @@ export class ScriptoriumPanel {
     this.error.textContent = r.ok ? '' : r.error;
   }
 
-  private floorsSeen = -1;
+  private placesSeen = '';
 
   refresh(): void {
     this.syncWho();
@@ -484,8 +527,9 @@ export class ScriptoriumPanel {
       this.syncLangs();
       this.renderLines();
     }
-    if (this.floorsSeen !== this.s.floors) {
-      this.floorsSeen = this.s.floors;
+    const sig = `${this.s.floors}#${this.storesSig()}`;
+    if (this.placesSeen !== sig) {
+      this.placesSeen = sig;
       this.renderLines();
     }
     const s = this.s;

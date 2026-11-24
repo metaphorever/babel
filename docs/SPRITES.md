@@ -20,7 +20,8 @@ Moving MacPaint files in and out of the emulator turned out to be a pain, so **a
 **What the first delivery taught (2026-11-23):**
 - **Inside the boxes is best,** but anything else is fine if the commit says what it is. The new dirt top was drawn just right of its box; it was found by comparing every box with the old art.
 - **The forest PNG had 19 grey pixels** (a smoothing step somewhere, or a scaled copy). They're rounded to black or white, which is harmless, but a straight 1:1 screenshot avoids it.
-- **New boxes since the sheets were made:** storage shelves (16×16, a new fixture). It isn't on your MacPaint page; draw it loose in the next delivery, at 16×16, standing on the bottom row. The game puts stone, wood and grain on it, one shelf each, bottom to top, about 5 pixels apart.
+- **New boxes go on a new page, Babel Extras,** so the boxes on the pages already drawn never move. `art-src/Babel Extras.bin` has storage shelves (blank, as asked; the game draws stone, wood and grain on planks at rows 5, 10 and 15), stairs (24×32, a placeholder for the roadmap) and a deck for two-story houses (a copy of the tower deck, to redraw if houses should look different). Screenshot it like the others, and add it to `SHEET_SHOTS` in `tools/shots.ts`.
+- **Answers from the user (2026-11-24):** the dirt top drawn beside its box is the new one (it just wasn't moved into place). The field's stubble-to-full-heads is variety, not growth stages: it stays static unless fields can run out one day. The quarry rock is a texture. The tower deck and wall were meant to be redrawn but didn't save; they'll come with the portrait sprint. The ladder is unchanged because there was nothing to change, and the house walls on purpose.
 
 ### Reference pictures to draw over
 
@@ -116,8 +117,8 @@ It won't overwrite a page that already exists. Add `-- --force` to start a page 
 |---|---|
 | Workers, items, props, thought symbols | Yes, now |
 | Buildings and fixtures | Yes, the user's art (first delivery, 2026-11-23): generic buildings assembled from the wall, door, window and roof parts (one 8-pixel tile each, so any width works), the scriptorium, the job board, the old shack and every fixture. Storage shelves are still a placeholder. |
-| Terrain, nature, the tower's tiles, sun and moon | Yes, the user's art: dirt (top, middle, deep), the forest and field set pieces, the quarry's rock (a 16×16 texture tiled over the stepped rock face), the well, the road home sign, the supply wagon (two frames, rolling in at the start of a new game), the sun and the moon. The tower's deck, wall and ladder use their sheet boxes, which haven't been redrawn yet. |
-| Things the game draws over the art | The job board shows only as many of its four drawn notices as are posted; the pantry hides its loaves as it empties (each is a third of a full pantry); the bar gets a mug on the counter while there's beer. The scriptorium no longer shows its queue of designs (the new art has no shelf for it). |
+| Terrain, nature, the tower's tiles, sun and moon | Yes, the user's art: dirt (top, middle, deep), the forest and field set pieces, the quarry's rock (a 16×16 texture tiled over the stepped rock face), the well, the road home sign, the supply wagon (two frames, rolling in at the start of a new game), the sun and the moon. The tower's deck, wall and ladder use their sheet boxes, which haven't been redrawn yet. Two-story houses now use their own deck (`building.deck`, on Babel Extras), which starts as a copy of the tower's. |
+| Things the game draws over the art | The job board shows only as many of its four drawn notices as are posted; the pantry hides its loaves as it empties (each is a third of a full pantry); the bar gets a mug on the counter while there's beer. The scriptorium stacks its writing queue between each pair of columns, bottom up: orders on the left, blueprints on the right, two rows a sheet, 11 a side (the gaps are `SCRIPTORIUM_GAPS` in `renderer.ts`; if the columns move, change those). |
 | Clouds | Not yet: still drawn in code, until the parts are drawn. |
 
 ## Changing the layout

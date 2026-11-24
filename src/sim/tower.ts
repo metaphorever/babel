@@ -124,5 +124,5 @@ function completeFloor(s: SimState, p: Project): void {
 
 function floorStockpile(s: SimState, level: number): Site {
   const x0 = towerSpan(s).x0 + TOWER.stockpileInset;
-  return newSite(s, { kind: 'stockpile', label: `Floor ${level} stockpile`, x0, x1: x0 + TOWER.stockpileWidth - 1, y: standRow(level), level });
+  return newSite(s, { kind: 'stockpile', label: 'Stockpile', x0, x1: x0 + TOWER.stockpileWidth - 1, y: standRow(level), level });
 }

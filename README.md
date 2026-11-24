@@ -81,5 +81,5 @@ In the browser console, `babel.sim.state` holds the live game state, for poking 
 - [x] The patron's grace period; other construction wins back some patience
 - [x] Tutorial scaffolding (draft text)
 - [ ] Tutorial text rewritten after playtesting
-- [ ] Addressing particular stockpiles and fixtures in orders
+- [x] Addressing particular stockpiles and shelves in orders: by number ("stockpile 3") or by a name you give them
 - [ ] The user's art in place of the built-in drawings

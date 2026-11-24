@@ -53,7 +53,17 @@ export interface Works {
 export interface Site {
   id: number;
   kind: SiteKind;
+  /** What it's called: "Stockpile 3", or the name the player gave it. */
   label: string;
+  /**
+   * Fixtures: a permanent number per kind, given when it's placed and never
+   * changed, so orders written on paper keep meaning the same thing. The
+   * lowest free number is reused. 0 for everything else (and the broken
+   * oven, and the patron's supplies).
+   */
+  num: number;
+  /** The player renamed it (label is their name, not "Stockpile 3"). */
+  named: boolean;
   x0: number; // inclusive
   x1: number; // inclusive
   /** Row workers stand on while using the site. */
@@ -310,7 +320,7 @@ export interface GameEvent {
 export type StartMode = 'opening' | 'prebuilt';
 
 export interface SimState {
-  version: 7;
+  version: 8;
   start: StartMode;
   seed: number;
   tick: number;

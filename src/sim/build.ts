@@ -217,7 +217,7 @@ export function applyPlace(s: SimState, req: PlaceRequest): void {
       // something that costs nothing (a stockpile is just marked-out ground) is ready at once
       if (cost.stone + cost.wood > 0) site.build = newWorks(s, cost);
       s.sites.push(site);
-      log(s, `Planned: ${site.label.toLowerCase()}${fp.building ? ` in ${fp.building.name}` : ' on open ground'}.`);
+      log(s, `Planned: ${site.label}${fp.building ? ` in ${fp.building.name}` : ' on open ground'}.`);
       break;
     }
   }
@@ -320,7 +320,7 @@ function finishBuild(s: SimState, j: Job): void {
     const site = s.sites.find((x) => x.id === j.id)!;
     site.build = null;
     const b = buildingOf(s, site);
-    log(s, `${site.kind === 'board' || site.kind === 'scriptorium' ? `The ${site.label.toLowerCase()}` : `A ${site.label.toLowerCase()}`} is built${b ? ` in ${b.name}` : ''}.`);
+    log(s, `${site.kind === 'board' || site.kind === 'scriptorium' ? `The ${site.label.toLowerCase()}` : site.label} is built${b ? ` in ${b.name}` : ''}.`);
     if (site.kind === 'scriptorium' || site.kind === 'board') checkFounding(s);
   }
   pleasePatron(s, units);
@@ -449,6 +449,36 @@ export function applyRename(s: SimState, buildingId: number, name: string): void
   const old = b.name;
   b.name = name.trim();
   if (old !== b.name) log(s, `${old} is now called ${b.name}.`);
+}
+
+/**
+ * Renaming a fixture, for players who want to micromanage: orders can then
+ * name it ("haul stone to North Pile"). Its number stays, so orders written
+ * with the number still find it. A blank name goes back to the number.
+ * Names can't collide with another fixture's name or look like a number
+ * ("Oven 2"), so an order never means two places.
+ */
+export function validateRenameFixture(s: SimState, siteId: number, name: string): string | null {
+  const site = s.sites.find((x) => x.id === siteId);
+  if (!site || site.num === 0) return 'Only fixtures can be renamed.';
+  const n = name.trim();
+  if (n.length > BUILD.house.maxName) return `Names are at most ${BUILD.house.maxName} letters.`;
+  if (n === '') return null;
+  const lower = n.toLowerCase();
+  if (s.sites.some((x) => x !== site && x.named && x.label.toLowerCase() === lower)) return `Something is already called ${n}.`;
+  const numbered = /^(.*?)\s*\d+$/.exec(lower);
+  const kinds = [...Object.values(FIXTURE_LABEL).map((l) => l.toLowerCase()), 'shelves'];
+  if (numbered && kinds.includes(numbered[1])) return 'That looks like another fixture’s number. Try a name.';
+  return null;
+}
+
+export function applyRenameFixture(s: SimState, siteId: number, name: string): void {
+  const site = s.sites.find((x) => x.id === siteId)!;
+  const old = site.label;
+  const n = name.trim();
+  site.named = n !== '';
+  site.label = site.named ? n : `${FIXTURE_LABEL[site.kind as FixtureKind]} ${site.num}`;
+  if (old !== site.label) log(s, `${old} is now called ${site.label}.`);
 }
 
 // --------------------------------------------------- the founding moment

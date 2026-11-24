@@ -1,7 +1,7 @@
 import { BUILD, FIXTURE_LABEL, PATRON, TOWER, currentStipend, type Building, type FixtureKind, type Sim, type SimState, type Site } from '../sim';
 import { footprint, houseCost, placeCost, worksFraction, type PlaceRequest } from '../sim/build';
 import { deckRow } from '../sim/tower';
-import { buildingLabel, groundRow, storedTotal } from '../sim/world';
+import { buildingLabel, groundRow, siteTitle, storedTotal } from '../sim/world';
 import { buildingHeight, TILE, type Renderer, type Thing } from '../render/renderer';
 import { clear, h } from './dom';
 import { flavor, type FlavorWord } from './flavor';
@@ -377,18 +377,25 @@ export class BuildUi {
     return h('button', { class: 'btn', disabled: !!thing.demolish, onclick: () => this.takeDown(t) }, thing.build ? 'Cancel…' : 'Demolish…');
   }
 
-  private rename(b: Building): void {
-    const input = h('input', { type: 'text', value: b.name, maxlength: BUILD.house.maxName, 'aria-label': 'Name' });
+  /** Rename a building, or a fixture (blank puts a fixture back to its number). */
+  private rename(t: Thing): void {
+    const site = t.kind === 'site' ? t.site : null;
+    const input = h('input', { type: 'text', value: site ? (site.named ? site.label : '') : t.kind === 'building' ? t.building.name : '', maxlength: BUILD.house.maxName, 'aria-label': 'Name', placeholder: site ? site.label : '' });
     this.modal(
       'Rename',
-      [h('div', { class: 'row' }, h('label', {}, 'Name ', input))],
+      [
+        h('div', { class: 'row' }, h('label', {}, 'Name ', input)),
+        site ? h('p', { class: 'hint' }, `Orders can name it, as “haul stone to ${site.named ? site.label : 'Your Name'}”. Its number stays too, so orders written with the number still find it. Leave it blank to go back to just the number.`) : null,
+      ],
       [
         { label: 'Cancel', run: () => undefined },
         {
           label: 'Rename',
           primary: true,
           run: () => {
-            const r = this.sim.enqueue({ type: 'rename', playerId: 0, buildingId: b.id, name: input.value });
+            const r = site
+              ? this.sim.enqueue({ type: 'renameFixture', playerId: 0, siteId: site.id, name: input.value })
+              : this.sim.enqueue({ type: 'rename', playerId: 0, buildingId: (t as { building: Building }).building.id, name: input.value });
             if (!r.ok) this.say(r.error, true);
             this.refreshInfo();
           },
@@ -461,7 +468,7 @@ export class BuildUi {
       }
       into.append(
         b.kind === 'house'
-          ? h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Name'), h('span', { class: 'v' }, b.name, ' ', h('button', { class: 'btn btn-small', onclick: () => this.rename(b) }, 'Rename…')))
+          ? h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Name'), h('span', { class: 'v' }, b.name, ' ', h('button', { class: 'btn btn-small', onclick: () => this.rename({ kind: 'building', building: b }) }, 'Rename…')))
           : '',
         kv('Label', buildingLabel(s, b)),
         kv('Size', `${b.x1 - b.x0 + 1} tiles wide, ${b.stories === 1 ? 'one story' : 'two stories'}`),
@@ -483,14 +490,18 @@ export class BuildUi {
     const b = s.buildings.find((x) => x.id === site.buildingId);
     const goods = (['stone', 'wood', 'grain', 'bread', 'beer'] as const).filter((k) => site.store[k] > 0).map((k) => `${site.store[k]} ${k}`);
     into.append(
-      kv('Where', b ? `${b.name}${site.y < groundRow() ? ', upstairs' : ''}` : 'Out in the open'),
+      site.num
+        ? h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Name'), h('span', { class: 'v' }, site.label, ' ', h('button', { class: 'btn btn-small', onclick: () => this.rename({ kind: 'site', site }) }, 'Rename…')))
+        : '',
+      site.named ? kv('Number', `${FIXTURE_LABEL[site.kind as FixtureKind]} ${site.num}`) : '',
+      kv('Where', b ? `${b.name}${site.y < groundRow() ? ', upstairs' : ''}` : site.level > 0 ? `Tower floor ${site.level}` : 'Out in the open'),
       kv('State', statusOf(site)),
       site.capacity !== null && !site.supplies ? kv('Holds', `${storedTotal(site)} of ${site.capacity}`) : '',
       goods.length ? kv('Has', goods.join(', ')) : '',
       site.broken ? h('div', { class: 'hint' }, 'Broken beyond repair. Take it down for the materials.') : '',
       h('div', { class: 'row row-end' }, this.takeDownButton({ kind: 'site', site })),
     );
-    return site.label;
+    return siteTitle(s, site);
   }
 
   // ------------------------------------------------------- System 7 dialogs

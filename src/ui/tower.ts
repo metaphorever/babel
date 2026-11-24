@@ -1,5 +1,6 @@
 import { currentStipend, type Sim, type SimState } from '../sim';
 import { activeProject, projectFraction, standRow } from '../sim/tower';
+import { siteTitle } from '../sim/world';
 import { bar, clear, h } from './dom';
 import type { WindowManager } from './windows';
 
@@ -88,7 +89,7 @@ export class TowerPanel {
         h(
           'tr',
           {},
-          h('td', {}, sp.level === 0 ? 'Base' : `Floor ${sp.level}`),
+          h('td', {}, siteTitle(s, sp)),
           h('td', { class: 'num' }, sp.store.stone),
           h('td', { class: 'num' }, sp.store.wood),
           h('td', { class: 'num' }, sp.store.grain),

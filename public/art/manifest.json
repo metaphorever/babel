@@ -265,45 +265,57 @@
           16,
           4
         ],
-        "fixture.shelves": [
-          17,
-          66,
-          16,
-          16
-        ],
         "sky.cloud": [
-          34,
+          17,
           66,
           32,
           12
         ],
         "sky.sun": [
-          67,
+          50,
           66,
           46,
           45
         ],
         "sky.moon": [
-          114,
+          97,
           66,
           40,
           44
         ],
-        "nature.forest": [
+        "fixture.shelves": [
+          138,
+          66,
+          16,
+          16
+        ],
+        "fixture.stairs": [
           155,
           66,
-          96,
-          34
+          24,
+          32
         ],
-        "nature.field": [
+        "building.deck": [
+          180,
+          66,
+          8,
+          8
+        ],
+        "nature.forest": [
           0,
           112,
           96,
           34
         ],
-        "nature.wagon-step": [
+        "nature.field": [
           97,
           112,
+          96,
+          34
+        ],
+        "nature.wagon-step": [
+          0,
+          147,
           70,
           22
         ]

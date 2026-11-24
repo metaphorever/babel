@@ -24,7 +24,7 @@ import { applyPlace, campJobs, finishNow, type PlaceRequest } from './build';
  */
 export function createState(seed: number, difficulty: Difficulty = 'normal', start: StartMode = 'prebuilt'): SimState {
   const s: SimState = {
-    version: 7,
+    version: 8,
     start,
     seed,
     tick: 0,

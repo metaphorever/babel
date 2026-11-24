@@ -3,7 +3,7 @@ import { createState, hashState, replay, step, Sim } from '../src/sim/sim';
 import { applyCommand, validateCommand, type Command } from '../src/sim/commands';
 import { campJobs, footprint, groundUse, type PlaceRequest } from '../src/sim/build';
 import { pinNotice } from '../src/sim/carriers';
-import { ALL, makeOrder } from '../src/sim/lang';
+import { ALL, makeOrder, orderText, parseOrder, type Place } from '../src/sim/lang';
 import { findPath } from '../src/sim/path';
 import { deckRow } from '../src/sim/tower';
 import { BUILD, MAP, PATRON, TIME } from '../src/sim/tuning';
@@ -187,7 +187,7 @@ describe('buildings and fixtures', () => {
     expect(runUntil(s, () => campJobs(s).length === 0, 20 * 600)).toBe(true);
     const dorm = s.buildings.find((x) => x.name === 'Dorm')!;
     const inside = s.sites.filter((x) => x.buildingId === dorm.id).map((x) => x.label);
-    expect(inside).toEqual(['Bed', 'Pantry']);
+    expect(inside).toEqual(['Bed 7', 'Pantry 2']);
   });
 
   it('a stockpile goes on open ground and holds the same as one indoors', () => {
@@ -414,5 +414,80 @@ describe('session 3: shelves, cancelling, renaming, loose materials', () => {
     expect(runUntil(s, () => bed.build === null, 20 * 600)).toBe(true);
     expect(s.items.filter((it) => it.type === 'wood').length).toBe(loose);
     expect(s.workers.some((w) => w.moodlets.some((m) => m.kind === 'scavenged'))).toBe(false);
+  });
+});
+
+describe('session 4: fixtures by number and name in orders', () => {
+  const stores = (s: SimState) => s.sites.filter((x) => x.kind === 'stockpile' && !x.supplies);
+
+  it('fixtures get permanent numbers per kind, reusing the lowest free one', () => {
+    const s = createState(3);
+    const nums = stores(s).map((x) => x.num);
+    expect(new Set(nums).size).toBe(nums.length);
+    expect(nums.every((n) => n >= 1)).toBe(true);
+    expect(stores(s).every((x) => x.label === `Stockpile ${x.num}`)).toBe(true);
+    // free up stockpile 1, then place another: it takes number 1 again
+    s.sites = s.sites.filter((x) => !(x.kind === 'stockpile' && x.num === 1));
+    const x0 = freeSpot(s, 2, 100);
+    expect(applyCommand(s, place({ what: 'fixture', fixture: 'stockpile', x0, story: 0 })).ok).toBe(true);
+    expect(s.sites[s.sites.length - 1].label).toBe('Stockpile 1');
+    // and nothing else was renumbered
+    expect(stores(s).filter((x) => x.num !== 1).map((x) => x.num).sort()).toEqual(nums.filter((n) => n !== 1).sort());
+  });
+
+  it('orders name places as words that can drift, and names that never do', () => {
+    const o = makeOrder('HAUL', 'STONE', { from: 'tower', to: { fixture: 'STOCKPILE', n: 3 } });
+    expect(orderText(o)).toBe('haul stone from tower to stockpile 3');
+    expect(parseOrder(o)).toMatchObject({ from: 'tower', to: { fixture: 'STOCKPILE', n: 3 } });
+    expect(orderText(makeOrder('HAUL', 'WOOD', { to: { fixture: 'SHELVES', n: 2 } }, 'fr'))).toBe('porter bois à étagère 2');
+    const named = makeOrder('HAUL', 'GRAIN', { to: { name: 'North Pile' } }, 'el');
+    expect(orderText(named)).toBe('κουβάλα σιτάρι σε North Pile');
+    expect(parseOrder(named).to).toEqual({ name: 'North Pile' });
+  });
+
+  /** Loose stone by the left edge, and a notice to haul all of it to a place. */
+  function haulTo(s: SimState, to: Place) {
+    s.notices = [];
+    s.reserved = 0;
+    s.items = s.items.filter((it) => it.type !== 'stone');
+    const gy = groundRow();
+    for (let i = 0; i < 4; i++) s.items.push({ id: s.nextId++, type: 'stone', x: 10 + i, y: gy, reservedBy: null });
+    pinNotice(s, makeOrder('HAUL', 'STONE', { to }), ALL, 1, null);
+  }
+
+  it('a haul can go to one stockpile by number, even the far one', () => {
+    const s = createState(3);
+    const far = [...stores(s)].sort((a, b) => b.x0 - a.x0)[0];
+    far.capacity = null;
+    const before = far.store.stone;
+    haulTo(s, { fixture: 'STOCKPILE', n: far.num });
+    expect(runUntil(s, () => !s.items.some((it) => it.type === 'stone') && !s.workers.some((w) => w.carrying === 'stone'), 20 * 900)).toBe(true);
+    expect(far.store.stone).toBe(before + 4);
+  });
+
+  it('renamed fixtures can be named in orders; names must not collide or look like numbers', () => {
+    const s = createState(3);
+    const [a, b] = stores(s);
+    const rename = (id: number, name: string) => applyCommand(s, { type: 'renameFixture', playerId: 0, siteId: id, name });
+    expect(rename(a.id, 'North Pile').ok).toBe(true);
+    expect(a.label).toBe('North Pile');
+    expect(rename(b.id, 'north pile').ok).toBe(false);
+    expect(rename(b.id, 'Stockpile 9').ok).toBe(false);
+    expect(rename(b.id, 'Oven 2').ok).toBe(false);
+    a.capacity = null;
+    const before = a.store.stone;
+    haulTo(s, { name: 'North Pile' });
+    expect(runUntil(s, () => !s.items.some((it) => it.type === 'stone') && !s.workers.some((w) => w.carrying === 'stone'), 20 * 900)).toBe(true);
+    expect(a.store.stone).toBe(before + 4);
+    // a blank name goes back to the number, which orders could use all along
+    expect(rename(a.id, '').ok).toBe(true);
+    expect(a.label).toBe(`Stockpile ${a.num}`);
+  });
+
+  it('an order naming a fixture that isn’t there fails, and leaves things where they are', () => {
+    const s = createState(3);
+    haulTo(s, { fixture: 'STOCKPILE', n: 99 });
+    run(s, 20 * 60);
+    expect(s.items.filter((it) => it.type === 'stone').length).toBe(4);
   });
 });

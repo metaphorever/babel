@@ -1,6 +1,7 @@
+import { FIXTURE_WORD_KIND, type Place } from './lang';
 import { randInt } from './rng';
-import { BUILD, MAP, TOWER, WORLD } from './tuning';
-import { Tile, type Building, type ItemType, type NatureKind, type Pt, type SimState, type Site, type SiteKind } from './types';
+import { BUILD, FIXTURE_LABEL, MAP, TOWER, WORLD } from './tuning';
+import { FIXTURE_KINDS, Tile, type Building, type FixtureKind, type ItemType, type NatureKind, type Pt, type SimState, type Site, type SiteKind } from './types';
 
 export function tileAt(s: SimState, x: number, y: number): number {
   if (x < 0 || y < 0 || x >= s.width || y >= s.height) return Tile.Dirt;
@@ -63,10 +64,13 @@ export interface SiteInit {
 
 /** A new, finished site. Placing something to be built gives it works afterwards. */
 export function newSite(s: SimState, d: SiteInit): Site {
+  const num = isFixture(d.kind) && !d.supplies && !d.broken ? freeNumber(s, d.kind) : 0;
   return {
     id: s.nextId++,
     kind: d.kind,
-    label: d.label,
+    label: num ? `${d.label} ${num}` : d.label,
+    num,
+    named: false,
     x0: d.x0,
     x1: d.x1,
     y: d.y ?? groundRow(),
@@ -79,6 +83,35 @@ export function newSite(s: SimState, d: SiteInit): Site {
     broken: d.broken ?? false,
     supplies: d.supplies ?? false,
   };
+}
+
+function isFixture(kind: SiteKind): kind is FixtureKind {
+  return (FIXTURE_KINDS as readonly string[]).includes(kind);
+}
+
+/** The lowest number no other fixture of this kind has. */
+function freeNumber(s: SimState, kind: SiteKind): number {
+  const taken = new Set(s.sites.filter((x) => x.kind === kind).map((x) => x.num));
+  let n = 1;
+  while (taken.has(n)) n++;
+  return n;
+}
+
+/** Where a fixture stands, for its full name: its building, a tower floor, or the base. */
+export function siteWhere(s: SimState, site: Site): string {
+  const b = buildingOf(s, site);
+  if (b) return b.name;
+  return site.level > 0 ? `Tower L${site.level}` : 'Base';
+}
+
+/** A fixture's full name, as menus show it: "Stockpile 3 (Mess Hall)". */
+export function siteTitle(s: SimState, site: Site): string {
+  return site.num ? `${site.label} (${siteWhere(s, site)})` : site.label;
+}
+
+/** A site in running text: "stockpile 3", or a name as the player wrote it. */
+export function siteRef(site: Site): string {
+  return site.named ? site.label : site.label.toLowerCase();
 }
 
 export function newBuilding(s: SimState, kind: Building['kind'], name: string, x0: number, width: number, stories: 1 | 2): Building {
@@ -243,14 +276,25 @@ export function stockpileOn(s: SimState, level: number): Site | null {
   return stockpilesAt(s, level).find((x) => !x.supplies) ?? null;
 }
 
-/** The nearest stockpile at a place with this good in it (supplies count). */
-export function sourceFor(s: SimState, level: number, type: ItemType, from: Pt): Site | null {
-  return nearest(stockpilesAt(s, level).filter((x) => x.store[type] > 0), from);
+/** The stores an order's place means (null = every store). Finished ones only. */
+export function storesAt(s: SimState, place: Place | null): Site[] {
+  const all = stockpiles(s);
+  if (place === null) return all;
+  if (typeof place === 'number') return all.filter((x) => x.level === place);
+  if (place === 'tower') return all.filter((x) => x.level > 0);
+  if ('fixture' in place) return all.filter((x) => x.kind === FIXTURE_WORD_KIND[place.fixture] && x.num === place.n);
+  const name = place.name.toLowerCase();
+  return all.filter((x) => x.named && x.label.toLowerCase() === name);
 }
 
-/** The nearest stockpile at a place with room for more. */
-export function depotFor(s: SimState, level: number, from: Pt): Site | null {
-  return nearest(stockpilesAt(s, level).filter((x) => roomIn(x) > 0), from);
+/** The nearest store at a place with this good in it (supplies count). */
+export function sourceFor(s: SimState, place: Place, type: ItemType, from: Pt): Site | null {
+  return nearest(storesAt(s, place).filter((x) => x.store[type] > 0), from);
+}
+
+/** The nearest store at a place (null = anywhere) with room for more, other than the ones in `not`. */
+export function depotFor(s: SimState, place: Place | null, from: Pt, not: readonly Site[] = []): Site | null {
+  return nearest(storesAt(s, place).filter((x) => roomIn(x) > 0 && !not.includes(x)), from);
 }
 
 export function buildingOf(s: SimState, site: Site): Building | null {
@@ -275,7 +319,23 @@ export function inSite(site: Site, x: number, y: number): boolean {
 }
 
 /** A building's label: its name and what's inside, e.g. "Dormitory (Bed, Bed, Pantry)". */
+/**
+ * A building's map label: its name and what's in it. Stores show their
+ * number or name (orders use them); everything else is just counted, so a
+ * dorm reads "Dorm (Bed ×6)" rather than six numbers.
+ */
 export function buildingLabel(s: SimState, b: Building): string {
-  const inside = s.sites.filter((x) => x.buildingId === b.id).map((x) => x.label);
-  return inside.length ? `${b.name} (${inside.join(', ')})` : b.name;
+  const parts: string[] = [];
+  const counts = new Map<string, number>();
+  for (const x of s.sites) {
+    if (x.buildingId !== b.id) continue;
+    if (x.kind === 'stockpile' || x.kind === 'shelves') parts.push(x.label);
+    else {
+      const k = x.broken ? x.label : FIXTURE_LABEL[x.kind as FixtureKind];
+      if (!counts.has(k)) parts.push(k);
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+  }
+  const text = parts.map((p) => ((counts.get(p) ?? 1) > 1 ? `${p} ×${counts.get(p)}` : p));
+  return text.length ? `${b.name} (${text.join(', ')})` : b.name;
 }

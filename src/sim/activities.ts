@@ -7,7 +7,7 @@ import { rand, randInt } from './rng';
 import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_OF_VERB, skillLevel } from './skills';
 import { BUILD, ECONOMY, MOOD, NEEDS, SCRIBE, SKILLS, TOWER, WORK } from './tuning';
 import type { ActivityKind, BuildMaterial, Carrier, FixtureKind, Item, ItemType, Notice, SimState, Site, SiteKind, SkillId, Worker } from './types';
-import { depotFor, findSite, nearest, siteOf, sitesOf, sourceFor, spotFor, standable, stockpiles, usable } from './world';
+import { depotFor, findSite, nearest, siteOf, siteRef, sitesOf, sourceFor, spotFor, standable, stockpiles, storesAt, usable } from './world';
 import { activeProject, buildSpot, placeMaterial } from './tower';
 import { accepts, campJobs, jobSpot, placeUnit, stillNeeded, undoUnit, type Job } from './build';
 
@@ -246,7 +246,7 @@ export function nothingToHaul(s: SimState, n: Notice): boolean {
   if (o.verb === 'COOK' || o.verb === 'BREW') return !canProcess(s, PROCESS[o.verb]);
   if (o.verb !== 'HAUL') return false;
   const type = nounItem(o.noun as Noun);
-  if (o.from !== null) return !s.sites.some((x) => usable(x) && (x.kind === 'stockpile' || x.kind === 'shelves') && x.level === o.from && x.store[type] > 0);
+  if (o.from !== null) return !storesAt(s, o.from).some((x) => x.store[type] > 0);
   return !s.items.some((it) => it.type === type && it.reservedBy === null);
 }
 
@@ -376,8 +376,8 @@ export function workOrder(s: SimState, w: Worker, order: Order): Result {
   const prod = PRODUCE[verb];
   if (prod) return produceJob(s, w, verb as WorkVerb, prod.site, prod.ticks, prod.doing, nounItem(noun as Noun));
   if (verb === 'HAUL') {
-    if (from !== null) return haulBetween(s, w, nounItem(noun as Noun), from, to ?? 0);
-    return haulJob(s, w, nounItem(noun as Noun), to ?? 0);
+    if (from !== null) return haulBetween(s, w, nounItem(noun as Noun), from, to);
+    return haulJob(s, w, nounItem(noun as Noun), to);
   }
   if (verb === 'COOK' || verb === 'BREW') return processJob(s, w, PROCESS[verb]);
   if (verb === 'BUILD') return noun === 'CAMP' ? campJob(s, w) : buildJob(s, w);
@@ -515,14 +515,22 @@ function gatherLoose(s: SimState, w: Worker): 'running' | 'done' | 'failed' {
   return 'running';
 }
 
-function noDepot(level: Place): string {
-  return level === 0 ? 'No stockpile with room at the base.' : `There's no stockpile on ${placeName(level)}.`;
+/** Why nothing can go to a place: there's no such store, or it's full. */
+function noDepot(s: SimState, to: Place | null): string {
+  if (to === null) return 'No stockpile with room anywhere.';
+  const there = storesAt(s, to);
+  if (typeof to === 'number' || to === 'tower') return there.length === 0 ? `There's no stockpile on ${placeName(to)}.` : `No stockpile with room on ${placeName(to)}.`;
+  return there.length === 0 ? `There's no ${placeName(to)}.` : `${cap(siteRef(there[0]))} is full.`;
 }
 
-function haulJob(s: SimState, w: Worker, type: ItemType, toLevel: Place): Result {
+function cap(t: string): string {
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function haulJob(s: SimState, w: Worker, type: ItemType, toPlace: Place | null): Result {
   const a = w.activity;
   if (a.stage === 0) {
-    if (!depotFor(s, toLevel, w)) return failWork(s, w, noDepot(toLevel));
+    if (!depotFor(s, toPlace, w)) return failWork(s, w, noDepot(s, toPlace));
     if (w.carrying === type) {
       // picking a haul back up after a break: deliver what's in hand
       a.stage = 2;
@@ -552,12 +560,12 @@ function haulJob(s: SimState, w: Worker, type: ItemType, toLevel: Place): Result
     }
   }
   if (a.stage === 2) {
-    const pile = depotFor(s, toLevel, w);
+    const pile = depotFor(s, toPlace, w);
     if (!pile) {
       dropCarried(s, w);
-      return failWork(s, w, noDepot(toLevel));
+      return failWork(s, w, noDepot(s, toPlace));
     }
-    w.thought = `Taking ${w.carryCount > 1 ? `${w.carryCount} ` : ''}${type} to the stockpile${toLevel === 0 ? '' : ` on ${placeName(toLevel)}`}.`;
+    w.thought = `Taking ${w.carryCount > 1 ? `${w.carryCount} ` : ''}${type} to ${siteRef(pile)}.`;
     const m = moveTo(s, w, spotFor(pile, w.id));
     if (m === 'moving') return 'running';
     if (m === 'unreachable') return failWork(s, w, "Can't reach the stockpile.");
@@ -583,24 +591,26 @@ function haulJob(s: SimState, w: Worker, type: ItemType, toLevel: Place): Result
  * Carry goods from one place to another, e.g. stone from the base up to
  * floor 3 so builders don't have to climb all the way down for it.
  */
-function haulBetween(s: SimState, w: Worker, type: ItemType, fromLevel: Place, toLevel: Place): Result {
+function haulBetween(s: SimState, w: Worker, type: ItemType, fromPlace: Place, toPlace: Place | null): Result {
   const a = w.activity;
+  // with no TO, the nearest store that isn't one it's coming from
+  const sources = storesAt(s, fromPlace);
   if (a.stage === 0) {
-    if (!depotFor(s, toLevel, w)) return failWork(s, w, noDepot(toLevel));
+    if (!depotFor(s, toPlace, w, sources)) return failWork(s, w, noDepot(s, toPlace));
     if (w.carrying === type) a.stage = 2;
     else {
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
       let src = a.ref === null ? null : s.sites.find((x) => x.id === a.ref) ?? null;
       if (!src || src.store[type] <= 0) {
-        src = sourceFor(s, fromLevel, type, w);
-        if (!src) return failWork(s, w, `No ${type} stored at ${placeName(fromLevel)}.`, true);
+        src = sourceFor(s, fromPlace, type, w);
+        if (!src) return failWork(s, w, sources.length === 0 && typeof fromPlace === 'object' ? `There's no ${placeName(fromPlace)}.` : `No ${type} stored at ${placeName(fromPlace)}.`, true);
         a.ref = src.id;
       }
-      w.thought = `Fetching ${type} from ${placeName(fromLevel)}.`;
+      w.thought = `Fetching ${type} from ${siteRef(src)}.`;
       const m = moveTo(s, w, spotFor(src, w.id));
       if (m === 'moving') return 'running';
-      if (m === 'unreachable') return failWork(s, w, `Can't reach ${placeName(fromLevel)}.`);
-      const room = depotFor(s, toLevel, w);
+      if (m === 'unreachable') return failWork(s, w, `Can't reach ${siteRef(src)}.`);
+      const room = depotFor(s, toPlace, w, sources);
       const take = Math.min(carryCapacity(w), src.store[type], room ? roomFor(room) : 0);
       if (take <= 0) return failWork(s, w, `Somebody took the last ${type}.`);
       src.store[type] -= take;
@@ -610,15 +620,15 @@ function haulBetween(s: SimState, w: Worker, type: ItemType, fromLevel: Place, t
     }
   }
   if (a.stage === 2) {
-    const dst = depotFor(s, toLevel, w);
+    const dst = depotFor(s, toPlace, w, sources);
     if (!dst) {
       dropCarried(s, w);
-      return failWork(s, w, noDepot(toLevel));
+      return failWork(s, w, noDepot(s, toPlace));
     }
-    w.thought = `Taking ${w.carryCount} ${type} to ${placeName(toLevel)}.`;
+    w.thought = `Taking ${w.carryCount} ${type} to ${siteRef(dst)}.`;
     const m = moveTo(s, w, spotFor(dst, w.id));
     if (m === 'moving') return 'running';
-    if (m === 'unreachable') return failWork(s, w, `Can't reach ${placeName(toLevel)}.`);
+    if (m === 'unreachable') return failWork(s, w, `Can't reach ${siteRef(dst)}.`);
     a.stage = 3;
     a.timer = WORK.dropTicks;
     a.ref = dst.id;

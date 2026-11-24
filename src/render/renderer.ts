@@ -13,6 +13,9 @@ const ROOF_PX = 6;
 const NATURE_ART = { home: 'nature.sign-home', forest: 'nature.forest', field: 'nature.field', well: 'nature.well' } as const;
 /** The notices pinned up in the job board's art (x, y, w, h), in the order they're posted. */
 const BOARD_NOTICES: [number, number, number, number][] = [[2, 4, 6, 7], [9, 4, 6, 7], [2, 13, 6, 3], [9, 13, 6, 3]];
+/** The gaps between each pair of columns in the scriptorium's art (rows from its top), where the writing queue stacks up. */
+const SCRIPTORIUM_GAPS = [{ x: 6, top: 6, bottom: 27 }, { x: 37, top: 6, bottom: 27 }] as const;
+const SCRIPTORIUM_GAP_W = 5;
 /** What's on the pantry's shelves in its art, in the order it's eaten last to first. */
 const PANTRY_LOAVES: [number, number, number, number][] = [[2, 4, 5, 3], [9, 4, 5, 3], [1, 9, 14, 3]];
 /** How long the supply wagon takes to roll in at the start of a new game. */
@@ -197,7 +200,7 @@ export class Renderer {
           let depth = 0;
           for (let k = 1; k <= 3 && y - k >= 0 && s.tiles[(y - k) * s.width + x] === Tile.Dirt; k++) depth = k;
           name = depth === 0 ? 'terrain.dirt-top' : depth >= 3 ? 'terrain.dirt-deep' : 'terrain.dirt';
-        } else if (t === Tile.Deck) name = 'tower.deck';
+        } else if (t === Tile.Deck) name = s.tower && x >= s.tower.x0 && x <= s.tower.x1 ? 'tower.deck' : 'building.deck';
         else if (t === Tile.Wall) name = 'tower.wall';
         else name = 'tower.ladder';
         this.g.drawImage(worldSprite(name), px, py);
@@ -334,7 +337,26 @@ export class Renderer {
       }
       case 'scriptorium': {
         const spr = worldSprite('building.scriptorium');
-        withProgress(spr.height, () => this.g.drawImage(spr, left, base - spr.height));
+        withProgress(spr.height, () => {
+          const top = base - spr.height;
+          this.g.drawImage(spr, left, top);
+          if (site.build) return;
+          // the writing queue, stacked from the bottom up between each pair of columns:
+          // orders on the left, blueprints on the right, two rows a sheet
+          const orders = s.designs.filter((d) => d.carrier.kind !== 'blueprint').length;
+          const plans = s.designs.length - orders;
+          const stack = (gap: { x: number; bottom: number; top: number }, n: number) => {
+            const fits = Math.floor((gap.bottom - gap.top + 1) / 2);
+            for (let i = 0; i < Math.min(n, fits); i++) {
+              const y = top + gap.bottom - 1 - i * 2;
+              this.rect(left + gap.x, y, SCRIPTORIUM_GAP_W, 1);
+              this.rect(left + gap.x, y + 1, 1, 1);
+              this.rect(left + gap.x + SCRIPTORIUM_GAP_W - 1, y + 1, 1, 1);
+            }
+          };
+          stack(SCRIPTORIUM_GAPS[0], orders);
+          stack(SCRIPTORIUM_GAPS[1], plans);
+        });
         break;
       }
       case 'pantry': {
@@ -637,7 +659,7 @@ export class Renderer {
       const mid = ((site.x0 + site.x1 + 1) / 2) * TILE;
       const ground = (site.y + 1) * TILE;
       // upper-floor stockpiles get a short label, tucked under their deck
-      const text = site.level > 0 ? 'Stockpile' : site.label + status(site.build, site.demolish);
+      const text = site.level > 0 ? site.label : site.label + status(site.build, site.demolish);
       tag(text, (mid - cx) * z, (ground - cy) * z + 6 * this.dpr);
     }
     for (const b of s.buildings) {

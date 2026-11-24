@@ -33,7 +33,7 @@ export function levelOfRow(y: number): number {
 }
 
 export function knows(w: Worker, tok: Token): boolean {
-  if (tok.t === 'WHO') return true; // everyone recognizes a name
+  if (tok.t === 'WHO' || tok.t === 'NAMED') return true; // everyone recognizes a name
   return w.vocab[tok.lang]?.includes(tok.t) ?? false;
 }
 

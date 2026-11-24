@@ -446,7 +446,7 @@ Fights, metalwork, cordage, the full tech tree, contraptions (crane, bucket brig
 ### 15.1 The map
 
 - **Random natural features:** the forest, quarry, field and well are placed randomly on each new map, along with an **abandoned shack holding a broken oven**. The shack is always there: the demolition tutorial uses it, and experienced players will probably clear it first.
-- **The road home is always on the left edge.** The right edge is reserved for something not yet decided.
+- **The road home is always on the left edge.** The right edge is reserved: it will be the road to far-away lands, for the trader and pilgrims (§16).
 - **The patron's starting supplies** sit at a random spot (possibly the far side of the scriptorium) until there's somewhere to store them.
 - **Workers sleep rough** until beds are built. That costs mood, which is the reason for the bed tutorial.
 
@@ -549,7 +549,7 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 - **Ovens and pantries:** "cook bread" fetches a grain from a stockpile, bakes at the nearest oven and carries the bread to the nearest pantry with room. Pantries hold 20. Eating takes from the nearest pantry (or the supplies).
 - **Beer:** "brew beer" is the same at a brewing station, into a bar (holds 12). A worker with money and the mood for it buys a beer (5 gold), which lifts their mood and takes the edge off thirst. *Decided here: what workers pay at the bar goes back to the treasury,* since the bar is the colony's own. That's a change from P0's tavern, whose gold left the economy. It makes brewing worth doing; watch whether it makes gold too easy.
 - **Beds:** one worker per bed, nearest free bed first. Otherwise they sleep rough.
-- **Stockpiles:** hold 24 anywhere (all goods together): a stockpile is just designated space. *Changed in session 3* (it was 24 outside, 48 inside). **Storage shelves** (3 wood, indoors only) hold 48; they are the way to store more. Haulers fill the nearest one with room. "From base" takes from the nearest base stockpile with that good. Tower floors keep their automatic, unlimited stockpile (the P0 stand-in).
+- **Stockpiles:** hold 24 anywhere (all goods together): a stockpile is just designated space. *Changed in session 3* (it was 24 outside, 48 inside). **Storage shelves** (3 wood, indoors only) hold 48; they are the way to store more. Haulers fill the nearest one with room (see §15.11 for naming a particular one). "From base" takes from the nearest base stockpile with that good. Tower floors keep their automatic, unlimited stockpile (the P0 stand-in).
 - **The old shack's oven** is broken and can't be used.
 
 **Cancelling** (session 3): something not finished is cancelled, not demolished, and its button says "Cancel…". With nothing set in place it just disappears, with no dialog. Part-built, a dialog asks first; then everything already set in place is left lying there in full (no loss) and the plan is gone at once.
@@ -562,7 +562,58 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 
 **Tutorials:** the §15.8 outline, plus the user's session 3 additions, is in as twelve steps (the stipend, gathering, stockpiles and hauling, the tower site, buildings, food, rest, drink, demolishing twice, plans for the second floor, the warning) in a Tutorial window, each with buttons that do the thing and most moving on by themselves once it's done. *The text is a first draft by Claude and should be rewritten after a playtest.*
 
-**Interface:** a Build menu and window (key B), placement with a shaded preview and an X on every blocked tile, System 7 confirmation dialogs for buildings, the scriptorium and the tower (*session 3:* fixtures place with no dialog, and you keep placing until Esc), a window for any building or fixture you click (Rename for buildings; Cancel or Demolish), the simulation paused while a dialog is open, and building labels like "Dormitory (Bed, Bed, Pantry)".
+**Interface:** a Build menu and window (key B), placement with a shaded preview and an X on every blocked tile, System 7 confirmation dialogs for buildings, the scriptorium and the tower (*session 3:* fixtures place with no dialog, and you keep placing until Esc), a window for any building or fixture you click (Rename for buildings; Cancel or Demolish), the simulation paused while a dialog is open, and building labels like "Dormitory (Bed ×2, Pantry, Stockpile 3)" (*session 4:* fixtures are counted, stores show their number).
+
+### 15.11 Addressing fixtures in orders (session 4, 2026-11-24)
+
+*The user proposed numbering left to right, with a warning when a new fixture renumbers others. Claude pushed back: orders are physical paper, so renumbering would make notices already on the board quietly mean something else. Agreed: numbers by build order, never renumbered.*
+
+- **Every fixture gets a permanent number per kind** when it's placed: "Stockpile 3", "Oven 2". The lowest free number is reused, so after stockpile 1 is demolished the next stockpile placed is stockpile 1 again. Nothing is ever renumbered. The patron's supplies and the broken oven have no number.
+- **Full names** read fixture first, then where it is: "Stockpile 3 (Mess Hall)", "Stockpile 4 (Tower L2)", "Stockpile 1 (Base)" for one out in the open. The map shows the short name; building labels count everything but stores ("Dorm (Bed ×6, Stockpile 2)").
+- **Renaming** (for players who want to micromanage): a fixture's window has Rename…. A name can't match another fixture's name (ignoring case) or look like a number ("Oven 2"), so an order never means two places. A blank name goes back to the number. The number stays either way, so orders written with it still work.
+- **In orders,** a haul's TO and FROM can be:
+  - nothing: TO the **nearest store with room** (*changed:* it used to mean the base), FROM whatever's **lying around**;
+  - **the base** (any store on the ground), **the tower** (any floor; TOWER is the same word as the noun), or **floor N**;
+  - **one store by number**, a new word with the number on it: STOCKPILE 3, SHELVES 2. Like FLOOR, these words drift (*réserve 3*, *σωρός 3*; *étagère*, *ράφια*), and the player has to learn them in a language to write them in it;
+  - **one store by name**, written as is in every language, like a worker's name: nobody forgets a name.
+- **The menus** in the scriptorium list those in that order: nearest, base, tower, each floor, then each store left to right, base first, by full name.
+- **An order naming a store that isn't there** (demolished, or never built) fails with "There's no stockpile 3", like any job that can't be done. It works again as soon as something takes that number or name. With no TO, a haul FROM somewhere never goes back to where it came from.
+- **Only stores so far.** Every fixture is numbered, but only stockpiles and storage shelves can be named in orders, since hauling is the only order that takes places. Ovens, pantries and bars can join when there's an order that needs them (cook *at* oven 2, haul bread *to* pantry 1).
+
+## 16. Roadmap: ideas the user has decided on, not built yet
+
+*Recorded 2026-11-24 (session 4). Claude's suggestions are marked as such.*
+
+### 16.1 Stairs
+
+A fixture for the tower (and two-story houses) that's a faster way up than the ladder. Costs stone and takes longer to build. Placeholder art is on the Babel Extras sheet (24×32, one floor tall). *To decide when it's built:* how much faster, whether it replaces the ladder or sits beside it, and its width.
+
+### 16.2 The trader
+
+The supply wagon comes back now and then with new things to trade.
+
+- **Arriving:** it parks in the free space closest to the scriptorium (or a space kept for it at the right edge if the map is full) and announces itself: "A trader from a far-away land has arrived. Select their cart to see what they have to offer." *(Claude's edit of the wording.)*
+- **Trading:** clicking the cart opens a trade window. Each offer has a cost in goods and a button that drafts the trade order: "Pulley Lift Plans. Cost: 10 beer [Trade]". The order opens in the scriptorium, the way the tutorial's buttons do.
+- **Leaving:** they stay one full day, then go, unless there are trade orders still pending.
+- **Claude's suggestions:**
+  - **How often:** the first visit once the grace period is over, then every 4 days, give or take one (from the seed), all in `tuning.ts`. Regular enough to plan around, not clockwork.
+  - **The trade order is a haul:** "haul beer to cart ×10". CART becomes a place word, the way stores just did, so trading uses machinery that already exists, and it can be misread when the words drift. That needs hauling bread and beer, which doesn't exist yet (see the open questions in HANDOFF.md).
+  - **Don't let a stuck order keep them forever:** pending orders hold the trader at most one extra day. If what was paid falls short, they leave what was delivered by the road.
+  - **The right edge:** the space kept clear on the right is 8 tiles, and the wagon is 9. The right edge becomes the road to far-away lands: the trader comes in that way, and pilgrims leave by it.
+
+### 16.3 Pilgrimages
+
+Workers can leave by the right edge on a pilgrimage for a set time, and come back knowing something new.
+
+- **What they bring back,** one language per trip: words in a randomly chosen foreign language, or the plans for a random new fixture. A plan is worth 5 words, so a trip under 5 days can't bring back a plan, and a 10-day trip could bring 2 plans, or 1 plan and 5 words of French.
+- **Claude's suggestions:**
+  - **The order** is a scroll line handed to one worker, with the count as the number of days ("go on a pilgrimage ×10").
+  - **The words are the pilgrim's,** not the player's: they come home knowing them, and TEACH and LEARN spread them, which gives those verbs a job. The plans go to the player.
+  - **The cost** is the worker's absence (and maybe their wages while away), which makes long trips a real choice.
+
+### 16.4 About and credits
+
+An About window (System 7 style, under the Babel menu) saying who did what, with the user's acknowledgements. The text is in [CREDITS.md](CREDITS.md).
 
 ## Glossary
 

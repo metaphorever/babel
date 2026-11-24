@@ -1,9 +1,9 @@
 import { log } from './actions';
 import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCarrier, queueDesign } from './carriers';
-import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isValidLine, langName, makeOrder, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
-import { SCRIBE, TOWER } from './tuning';
+import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isValidLine, langName, makeOrder, placeKey, FIXTURE_WORDS, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
+import { BUILD, SCRIBE, TOWER } from './tuning';
 import type { Dest, SimState } from './types';
-import { applyDemolish, applyPlace, applyRename, validateDemolish, validatePlace, validateRename, type DemolishTarget, type PlaceRequest } from './build';
+import { applyDemolish, applyPlace, applyRename, applyRenameFixture, validateDemolish, validatePlace, validateRename, validateRenameFixture, type DemolishTarget, type PlaceRequest } from './build';
 
 // Every player action is a command. The sim applies commands at the start of
 // a tick, so the same seed plus the same command log always replays the same
@@ -44,7 +44,9 @@ export type Command =
   /** Mark something to be taken down. */
   | { type: 'demolish'; playerId: number; target: DemolishTarget }
   /** Rename one of your buildings (its label shows the name). */
-  | { type: 'rename'; playerId: number; buildingId: number; name: string };
+  | { type: 'rename'; playerId: number; buildingId: number; name: string }
+  /** Rename a fixture (blank goes back to its number). */
+  | { type: 'renameFixture'; playerId: number; siteId: number; name: string };
 
 export interface StampedCommand {
   tick: number;
@@ -77,6 +79,15 @@ function buildCarrier(s: SimState, cmd: Extract<Command, { type: 'compose' }>, d
   return newCarrier(s, lines, cmd.wage, cmd.dest);
 }
 
+/** What's wrong with a place in an order, if anything. Places that don't exist (yet) are fine: the order just fails when it's carried out. */
+function placeError(p: Place): string | null {
+  if (typeof p === 'number') return Number.isInteger(p) && p >= 0 && p <= TOWER.maxFloors ? null : 'No such floor.';
+  if (p === 'tower') return null;
+  if (typeof p !== 'object' || p === null) return 'No such place.';
+  if ('fixture' in p) return FIXTURE_WORDS.includes(p.fixture) && Number.isInteger(p.n) && p.n >= 1 && p.n <= 999 ? null : 'No such fixture.';
+  return typeof p.name === 'string' && p.name.trim() !== '' && p.name.length <= BUILD.house.maxName ? null : 'No such name.';
+}
+
 export function validateCommand(s: SimState, cmd: Command): CommandResult {
   switch (cmd.type) {
     case 'compose': {
@@ -89,8 +100,9 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
         if (!countless(l.verb) && !isSpecialCount(l.count) && (!Number.isInteger(l.count) || l.count < 1 || l.count > 999)) return { ok: false, error: 'Counts must be 1 to 999, all, or forever.' };
         const places = [l.from, l.to].filter((p): p is Place => p !== undefined && p !== null);
         if (places.length > 0 && !takesPlaces(l.verb)) return { ok: false, error: `"${l.verb.toLowerCase()}" doesn't take a from or to.` };
-        if (places.some((p) => !Number.isInteger(p) || p < 0 || p > TOWER.maxFloors)) return { ok: false, error: 'No such floor.' };
-        if (l.from !== undefined && l.from !== null && l.from === l.to) return { ok: false, error: 'From and to are the same place.' };
+        const bad = places.map(placeError).find((e) => e !== null);
+        if (bad) return { ok: false, error: bad };
+        if (l.from !== undefined && l.from !== null && placeKey(l.from) === placeKey(l.to ?? null)) return { ok: false, error: 'From and to are the same place.' };
       }
       if (cmd.lines[0].verb === 'REPEAT') return { ok: false, error: 'Repeat what? Put it after the lines to repeat.' };
       for (const l of cmd.lines) {
@@ -100,7 +112,7 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       const lang = cmd.lang ?? 'en';
       const lex = s.lexicon[lang] ?? [];
       for (const tok of buildCarrier(s, cmd, true).orders.flat()) {
-        if (tok.t !== 'WHO' && !lex.includes(tok.t)) return { ok: false, error: `You don't know how to write «${tok.t.toLowerCase()}» in ${langName(lang)} yet.` };
+        if (tok.t !== 'WHO' && tok.t !== 'NAMED' && !lex.includes(tok.t)) return { ok: false, error: `You don't know how to write «${tok.t.toLowerCase()}» in ${langName(lang)} yet.` };
       }
       if (!Number.isInteger(cmd.wage) || cmd.wage < 0 || cmd.wage > 50) return { ok: false, error: 'Wage must be 0 to 50.' };
       if (cmd.dest.kind === 'tower') return { ok: false, error: 'Only blueprints go to the top of the tower.' };
@@ -136,6 +148,10 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
     }
     case 'rename': {
       const error = validateRename(s, cmd.buildingId, cmd.name);
+      return error ? { ok: false, error } : { ok: true };
+    }
+    case 'renameFixture': {
+      const error = validateRenameFixture(s, cmd.siteId, cmd.name);
       return error ? { ok: false, error } : { ok: true };
     }
   }
@@ -183,6 +199,9 @@ export function applyCommand(s: SimState, cmd: Command): CommandResult {
       break;
     case 'rename':
       applyRename(s, cmd.buildingId, cmd.name);
+      break;
+    case 'renameFixture':
+      applyRenameFixture(s, cmd.siteId, cmd.name);
       break;
   }
   return { ok: true };

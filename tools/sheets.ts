@@ -22,7 +22,7 @@ import {
   type ArtSet,
   type Grid,
 } from '../src/render/spriteData';
-import { allWorldArt, buildingArt, fixtureArt, natureArt, skyArt, terrainArt, type WorldSprite } from '../src/render/worldArt';
+import { allWorldArt, buildingArt, extrasArt, fixtureArt, natureArt, skyArt, terrainArt, type WorldSprite } from '../src/render/worldArt';
 import { drawText, textWidth } from './font';
 import { PAINT_H, PAINT_W } from './macpaint';
 
@@ -61,8 +61,11 @@ const world = (list: WorldSprite[]): Slot[] =>
   list.map((s) => ({ key: s.name, label: s.label, w: s.grid[0].length, h: s.grid.length, grid: s.grid }));
 
 /** The pages and what's on them, filled with the given art. */
-export function buildPages(art: ArtSet = defaultArt(), worldArt?: { terrain: WorldSprite[]; nature: WorldSprite[]; buildings: WorldSprite[]; fixtures: WorldSprite[]; sky: WorldSprite[] }): Page[] {
-  const wa = worldArt ?? { terrain: terrainArt(), nature: natureArt(), buildings: buildingArt(), fixtures: fixtureArt(), sky: skyArt() };
+export function buildPages(art: ArtSet = defaultArt(), worldArt?: { terrain: WorldSprite[]; nature: WorldSprite[]; buildings: WorldSprite[]; fixtures: WorldSprite[]; sky: WorldSprite[]; extras?: WorldSprite[] }): Page[] {
+  const wa = worldArt ?? { terrain: terrainArt(), nature: natureArt(), buildings: buildingArt(), fixtures: fixtureArt(), sky: skyArt(), extras: extrasArt() };
+  // boxes the user asked to get blank, to draw from scratch
+  const blank = new Set(['fixture.shelves']);
+  const extras = world(wa.extras ?? extrasArt()).map((sl) => (blank.has(sl.key) ? { ...sl, grid: null } : sl));
   const bodies: Slot[] = [];
   const nBody = art.body.length + SPARE.body;
   for (let v = 0; v < nBody; v++) {
@@ -118,6 +121,13 @@ export function buildPages(art: ArtSet = defaultArt(), worldArt?: { terrain: Wor
         { title: 'GENERIC BUILDING PARTS: ONE TILE WIDE, ONE STORY TALL, ROOF ON TOP', perRow: 5, slots: world(wa.buildings.slice(0, 8)) },
         { title: 'SPECIAL BUILDINGS', perRow: 2, slots: world(wa.buildings.slice(8)) },
         { title: 'FIXTURES (MOSTLY PLACEHOLDERS FOR P1)', perRow: 4, slots: world(wa.fixtures) },
+      ],
+    },
+    {
+      name: 'Babel Extras',
+      title: 'BABEL EXTRAS',
+      groups: [
+        { title: 'NEW PIECES. SHELVES: PLANKS ON ROWS 5, 10 AND 15', perRow: 3, slots: extras },
       ],
     },
   ];

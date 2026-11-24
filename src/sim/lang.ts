@@ -34,20 +34,28 @@ export type Verb = WorkVerb | FlowVerb;
 export type Noun = 'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER' | 'BOARD' | 'TOWER' | 'CAMP';
 /** Little words that introduce details: where from, where to. */
 export type Prep = 'FROM' | 'TO';
-/** Places. FLOOR carries its number on the token. */
+/** Places. FLOOR carries its number on the token. TOWER (a noun too) means any floor. */
 export type PlaceWord = 'BASE' | 'FLOOR';
+/** Storage fixtures, by kind: the token carries the fixture's permanent number ("stockpile 3"). */
+export type FixtureWord = 'STOCKPILE' | 'SHELVES';
+/** Which fixture kind each fixture word names. */
+export const FIXTURE_WORD_KIND: Record<FixtureWord, 'stockpile' | 'shelves'> = { STOCKPILE: 'stockpile', SHELVES: 'shelves' };
+export const FIXTURE_WORDS: readonly FixtureWord[] = ['STOCKPILE', 'SHELVES'];
 /** Words workers think and say, so you can read what they want. */
 export type SayWord = 'WANT' | 'WATER' | 'SLEEP' | 'HOME' | 'GOLD' | 'WHAT';
-/** A worker's name. Names never drift and everyone recognizes their own. */
-export type NameWord = 'WHO';
-export type TokenId = Verb | Noun | Prep | PlaceWord | SayWord | NameWord;
+/**
+ * A worker's name (WHO), or a fixture the player has named (NAMED). Names
+ * never drift: they're written the same in every language.
+ */
+export type NameWord = 'WHO' | 'NAMED';
+export type TokenId = Verb | Noun | Prep | PlaceWord | FixtureWord | SayWord | NameWord;
 
 export interface Token {
   t: TokenId;
   lang: LangId;
   /** A number carried by the word: which floor, or which worker (for WHO). */
   n?: number;
-  /** For WHO: the name, written as is in every language. */
+  /** For WHO and NAMED: the name, written as is in every language. */
   name?: string;
 }
 
@@ -61,7 +69,7 @@ export const DRIFTABLE: readonly Exclude<TokenId, NameWord>[] = [
   'MINE', 'CHOP', 'HARVEST', 'COOK', 'BREW', 'HAUL', 'BUILD',
   'WRITE', 'DELIVER', 'REPEAT', 'CHECK', 'TEACH', 'LEARN',
   'STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER', 'BOARD', 'TOWER', 'CAMP',
-  'FROM', 'TO', 'BASE', 'FLOOR',
+  'FROM', 'TO', 'BASE', 'FLOOR', 'STOCKPILE', 'SHELVES',
   'WANT', 'WATER', 'SLEEP', 'HOME', 'GOLD', 'WHAT',
 ];
 
@@ -70,28 +78,28 @@ const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
     MINE: 'mine', CHOP: 'chop', HARVEST: 'harvest', COOK: 'cook', BREW: 'brew', HAUL: 'haul', BUILD: 'build',
     WRITE: 'write', DELIVER: 'deliver', REPEAT: 'repeat', CHECK: 'check', TEACH: 'teach', LEARN: 'learn from',
     STONE: 'stone', WOOD: 'wood', GRAIN: 'grain', BREAD: 'bread', BEER: 'beer', BOARD: 'board', TOWER: 'tower', CAMP: 'camp',
-    FROM: 'from', TO: 'to', BASE: 'base', FLOOR: 'floor',
+    FROM: 'from', TO: 'to', BASE: 'base', FLOOR: 'floor', STOCKPILE: 'stockpile', SHELVES: 'shelves',
     WANT: 'want', WATER: 'water', SLEEP: 'sleep', HOME: 'home', GOLD: 'gold', WHAT: 'what?',
   },
   fr: {
     MINE: 'creuser', CHOP: 'couper', HARVEST: 'récolter', COOK: 'cuire', BREW: 'brasser', HAUL: 'porter', BUILD: 'bâtir',
     WRITE: 'écrire', DELIVER: 'livrer', REPEAT: 'répéter', CHECK: 'voir', TEACH: 'enseigner', LEARN: 'apprendre de',
     STONE: 'pierre', WOOD: 'bois', GRAIN: 'blé', BREAD: 'pain', BEER: 'bière', BOARD: 'tableau', TOWER: 'tour', CAMP: 'camp',
-    FROM: 'de', TO: 'à', BASE: 'base', FLOOR: 'étage',
+    FROM: 'de', TO: 'à', BASE: 'base', FLOOR: 'étage', STOCKPILE: 'réserve', SHELVES: 'étagère',
     WANT: 'veux', WATER: 'eau', SLEEP: 'dormir', HOME: 'maison', GOLD: 'or', WHAT: 'quoi ?',
   },
   el: {
     MINE: 'σκάψε', CHOP: 'κόψε', HARVEST: 'θέρισε', COOK: 'ψήσε', BREW: 'ζύμωσε', HAUL: 'κουβάλα', BUILD: 'χτίσε',
     WRITE: 'γράψε', DELIVER: 'παράδωσε', REPEAT: 'επανάλαβε', CHECK: 'δες', TEACH: 'δίδαξε', LEARN: 'μάθε από',
     STONE: 'πέτρα', WOOD: 'ξύλο', GRAIN: 'σιτάρι', BREAD: 'ψωμί', BEER: 'μπίρα', BOARD: 'πίνακας', TOWER: 'πύργος', CAMP: 'καταυλισμός',
-    FROM: 'από', TO: 'σε', BASE: 'βάση', FLOOR: 'όροφος',
+    FROM: 'από', TO: 'σε', BASE: 'βάση', FLOOR: 'όροφος', STOCKPILE: 'σωρός', SHELVES: 'ράφια',
     WANT: 'θέλω', WATER: 'νερό', SLEEP: 'ύπνος', HOME: 'σπίτι', GOLD: 'χρυσός', WHAT: 'τι;',
   },
 };
 
 /** A word as written in its own language. Numbers and names are the same everywhere. */
 export function word(tok: Token): string {
-  if (tok.t === 'WHO') return tok.name ?? '?';
+  if (tok.t === 'WHO' || tok.t === 'NAMED') return tok.name ?? '?';
   const w = WORDS[tok.lang][tok.t];
   return tok.n !== undefined ? `${w} ${tok.n}` : w;
 }
@@ -101,15 +109,50 @@ export function wordIn(t: TokenId, lang: LangId, n?: number): string {
   return word({ t, lang, n });
 }
 
-/** A place, as a level: 0 is the base (on the ground), n is floor n. */
-export type Place = number;
+/**
+ * A place in an order (after FROM or TO):
+ * - a level: 0 is the base (anywhere on the ground), n is tower floor n;
+ * - 'tower': any tower floor;
+ * - one storage fixture by its permanent number ("stockpile 3");
+ * - one fixture by the name the player gave it.
+ * No place at all means the nearest (TO) or whatever's lying around (FROM).
+ */
+export type Place = number | 'tower' | { fixture: FixtureWord; n: number } | { name: string };
 
-export function placeTokens(level: Place, lang: LangId = 'en'): Token[] {
-  return level === 0 ? [{ t: 'BASE', lang }] : [{ t: 'FLOOR', lang, n: level }];
+export function placeTokens(place: Place, lang: LangId = 'en'): Token[] {
+  if (typeof place === 'number') return place === 0 ? [{ t: 'BASE', lang }] : [{ t: 'FLOOR', lang, n: place }];
+  if (place === 'tower') return [{ t: 'TOWER', lang }];
+  if ('fixture' in place) return [{ t: place.fixture, lang, n: place.n }];
+  return [{ t: 'NAMED', lang, name: place.name }];
 }
 
-export function placeName(level: Place): string {
-  return level === 0 ? 'the base' : `floor ${level}`;
+export function placeName(place: Place): string {
+  if (typeof place === 'number') return place === 0 ? 'the base' : `floor ${place}`;
+  if (place === 'tower') return 'the tower';
+  if ('fixture' in place) return `${word({ t: place.fixture, lang: 'en' })} ${place.n}`;
+  return place.name;
+}
+
+/** A place as a short string, for comparing places and for menus. */
+export function placeKey(place: Place | null): string {
+  if (place === null) return '';
+  if (typeof place === 'number') return `L${place}`;
+  if (place === 'tower') return 'T';
+  if ('fixture' in place) return `F:${place.fixture}:${place.n}`;
+  return `N:${place.name.toLowerCase()}`;
+}
+
+/** The place a token names, if it names one. */
+function tokenPlace(tok: Token): Place | null {
+  switch (tok.t) {
+    case 'BASE': return 0;
+    case 'FLOOR': return tok.n ?? 0;
+    case 'TOWER': return 'tower';
+    case 'STOCKPILE':
+    case 'SHELVES': return { fixture: tok.t, n: tok.n ?? 0 };
+    case 'NAMED': return { name: tok.name ?? '' };
+    default: return null;
+  }
 }
 
 /** The parts of an order: verb, object, a worker named in it, and optional FROM / TO places. */
@@ -130,9 +173,10 @@ export function parseOrder(order: Order): ParsedOrder {
     const prep = order[i].t;
     const place = order[i + 1];
     if (!place || !isPrep(prep)) break;
-    const level = place.t === 'FLOOR' ? place.n ?? 0 : 0;
-    if (prep === 'FROM') out.from = level;
-    else out.to = level;
+    const where = tokenPlace(place);
+    if (where === null) break;
+    if (prep === 'FROM') out.from = where;
+    else out.to = where;
     i += 2;
   }
   return out;
@@ -162,7 +206,7 @@ export function makeOrder(verb: Verb, noun: Noun | null = null, extras: OrderExt
   return o;
 }
 
-/** Only hauling takes places (FROM a stockpile, TO a stockpile) in P0. */
+/** Only hauling takes places (FROM a store, TO a store). */
 export function takesPlaces(verb: Verb): boolean {
   return verb === 'HAUL';
 }
