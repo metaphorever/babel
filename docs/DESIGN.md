@@ -597,6 +597,7 @@ The supply wagon comes back now and then with new things to trade.
 - **Leaving:** they stay one full day, then go, unless there are trade orders still pending.
 - **Claude's suggestions:**
   - **How often:** the first visit once the grace period is over, then every 4 days, give or take one (from the seed), all in `tuning.ts`. Regular enough to plan around, not clockwork.
+  - **Trade items** get their own art (the user will draw it), shown in the wagon bed the way the patron's supplies are.
   - **The trade order is a haul:** "haul beer to cart ×10". CART becomes a place word, the way stores just did, so trading uses machinery that already exists, and it can be misread when the words drift. That needs hauling bread and beer, which doesn't exist yet (see the open questions in HANDOFF.md).
   - **Don't let a stuck order keep them forever:** pending orders hold the trader at most one extra day. If what was paid falls short, they leave what was delivered by the road.
   - **The right edge:** the space kept clear on the right is 8 tiles, and the wagon is 9. The right edge becomes the road to far-away lands: the trader comes in that way, and pilgrims leave by it.

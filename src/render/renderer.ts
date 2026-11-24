@@ -13,6 +13,8 @@ const ROOF_PX = 6;
 const NATURE_ART = { home: 'nature.sign-home', forest: 'nature.forest', field: 'nature.field', well: 'nature.well' } as const;
 /** The notices pinned up in the job board's art (x, y, w, h), in the order they're posted. */
 const BOARD_NOTICES: [number, number, number, number][] = [[2, 4, 6, 7], [9, 4, 6, 7], [2, 13, 6, 3], [9, 13, 6, 3]];
+/** The supply wagon's bed in its art: where it starts, how wide, the row of its top rail, and the most items piled per good. */
+const WAGON_BED = { x: 1, w: 32, rail: 11, most: 10 };
 /** The gaps between each pair of columns in the scriptorium's art (rows from its top), where the writing queue stacks up. */
 const SCRIPTORIUM_GAPS = [{ x: 6, top: 6, bottom: 27 }, { x: 37, top: 6, bottom: 27 }] as const;
 const SCRIPTORIUM_GAP_W = 5;
@@ -555,7 +557,22 @@ export class Renderer {
       frame = Math.floor(s.tick / 4) % 2;
     }
     const spr = worldSprite(frame ? 'nature.wagon-step' : 'nature.wagon');
-    this.g.drawImage(spr, x, base - spr.height);
+    const top = base - spr.height;
+    // what's left of the supplies, piled in the bed behind the driver: a column per good
+    const supplies = s.sites.find((x) => x.supplies);
+    if (supplies) {
+      const goods = (['stone', 'wood', 'grain', 'bread'] as const).filter((t) => supplies.store[t] > 0);
+      const col = Math.floor(WAGON_BED.w / 4);
+      goods.forEach((type, ci) => {
+        const item = itemSprite(type);
+        const n = Math.min(WAGON_BED.most, Math.ceil(supplies.store[type] / 3));
+        for (let i = 0; i < n; i++) {
+          const y = top + WAGON_BED.rail - item.height - Math.floor(i / 2) * 3;
+          this.g.drawImage(item, x + WAGON_BED.x + ci * col + (i % 2) * 3, y);
+        }
+      });
+    }
+    this.g.drawImage(spr, x, top);
   }
 
   private drawItems(s: SimState): void {

@@ -1,8 +1,10 @@
-import type { LangId } from '../sim';
+import { LANGS, type LangId } from '../sim';
 
 // Flavor words for the opening text. Each one is shown in a language picked
-// at random from every language in the game. They're never translated and
-// nothing depends on them: the sentences read fine without them.
+// at random from every language in the game except the common tongue
+// (English): they're always foreign, whether or not the player has met that
+// language yet. They're never translated and nothing depends on them: the
+// sentences read fine without them.
 
 export type FlavorWord = 'benevolent' | 'legendary' | 'industrious' | 'plentiful' | 'heavy' | 'trusted' | 'monumental' | 'goodLuck';
 
@@ -17,7 +19,8 @@ const WORDS: Record<FlavorWord, Record<LangId, string>> = {
   goodLuck: { en: 'Good luck!', fr: 'Bonne chance !', el: 'Καλή τύχη!' },
 };
 
-const LANG_IDS: LangId[] = ['en', 'fr', 'el'];
+/** Every language but the one everyone starts with. */
+const LANG_IDS: LangId[] = LANGS.map((l) => l.id).filter((id) => id !== 'en');
 
 /** The same game always gets the same flavor (from its seed), so a replay reads the same. */
 export function flavor(seed: number, word: FlavorWord): { text: string; lang: LangId } {
