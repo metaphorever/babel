@@ -528,7 +528,7 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 ### 15.10 How P1 works (built 2026-11-23; provisional, revisit in playtests)
 
 **The map:**
-- **Layout:** the world is 192 tiles wide. The road home takes the left 4 tiles; the right 8 are kept clear. The forest (12), quarry (16), field (12), well (2), old shack (6) and the patron's supplies (9, the width of the wagon's art) land in a random order with random gaps of at least 3, from the seed.
+- **Layout:** the world is 192 tiles wide. The road home takes the left 4 tiles; the right 12 are kept clear for the road to far-away lands (*session 4:* it was 8). The forest (12), quarry (16), field (12), well (2), old shack (6) and the patron's supplies (9, the width of the wagon's art) land in a random order with random gaps of at least 3, from the seed.
 - **The patron's supplies** are a pile (drawn as the supply wagon, which rolls in along the road over the first 8 seconds of a new game) of 20 stone, 30 wood, 10 grain and 24 bread. Workers take from it like a stockpile but nothing can be added to it. Until there are pantries, everyone eats from it.
 - **`?start=prebuilt`** lays out a P0-style colony instead (fixed map, everything built). The tests use it.
 
@@ -594,27 +594,41 @@ The supply wagon comes back now and then with new things to trade.
 
 - **Arriving:** it parks in the free space closest to the scriptorium (or a space kept for it at the right edge if the map is full) and announces itself: "A trader from a far-away land has arrived. Select their cart to see what they have to offer." *(Claude's edit of the wording.)*
 - **Trading:** clicking the cart opens a trade window. Each offer has a cost in goods and a button that drafts the trade order: "Pulley Lift Plans. Cost: 10 beer [Trade]". The order opens in the scriptorium, the way the tutorial's buttons do.
-- **Leaving:** they stay one full day, then go, unless there are trade orders still pending.
-- **Claude's suggestions:**
-  - **How often:** the first visit once the grace period is over, then every 4 days, give or take one (from the seed), all in `tuning.ts`. Regular enough to plan around, not clockwork.
-  - **Trade items** get their own art (the user will draw it), shown in the wagon bed the way the patron's supplies are.
-  - **The trade order is a haul:** "haul beer to cart ×10". CART becomes a place word, the way stores just did, so trading uses machinery that already exists, and it can be misread when the words drift. That needs hauling bread and beer, which doesn't exist yet (see the open questions in HANDOFF.md).
-  - **Don't let a stuck order keep them forever:** pending orders hold the trader at most one extra day. If what was paid falls short, they leave what was delivered by the road.
-  - **The right edge:** the space kept clear on the right is 8 tiles, and the wagon is 9. The right edge becomes the road to far-away lands: the trader comes in that way, and pilgrims leave by it.
+- **How often** (decided 2026-11-24): the gaps between visits are 4 days, then 6, then 8, then 10, and every 10 after that. Frequent trade gives a boost early on; the late game gets more breathing room. In `tuning.ts`. *To decide:* whether the first gap counts from the start of the game or from the end of the grace period.
+- **The trade order is a haul** (decided): "haul beer to cart ×10". CART becomes a place word, the way stores did, so trading uses machinery that already exists, and it can be misread when the words drift. It needs **hauling bread and beer**, which doesn't exist yet, and which the camp needs anyway (see below).
+- **Leaving:** they stay one full day, then go. Pending trade orders hold them **half a day more at most** (decided). When there are alerts (§16.5), a warning goes up before they leave. *Claude's suggestion:* if what was paid falls short when they go, they leave what was delivered by the road.
+- **Trade items** get their own art (the user will draw it), shown in the wagon bed the way the patron's supplies are.
+- **The right edge** is the road to far-away lands: the trader comes in that way, and pilgrims leave by it. *Done:* it's now 12 tiles wide (it was 8; the wagon is 9), and the placement message says "The road to far-away lands is in the way."
+
+**Hauling bread and beer** (needed before trading). Today a cook carries bread straight from the oven to the nearest pantry with room, and a brewer carries beer to a bar, so getting food *into* a pantry works without it. What can't be done yet: moving bread or beer from one pantry or bar to another (up the tower, to the far end of the camp), emptying one that's being demolished, picking up bread or beer left lying on the ground, and paying the trader. Bread would go to pantries and beer to bars, and the place menus would offer them the way they offer stockpiles now (pantry 2, bar 1).
 
 ### 16.3 Pilgrimages
 
 Workers can leave by the right edge on a pilgrimage for a set time, and come back knowing something new.
 
 - **What they bring back,** one language per trip: words in a randomly chosen foreign language, or the plans for a random new fixture. A plan is worth 5 words, so a trip under 5 days can't bring back a plan, and a 10-day trip could bring 2 plans, or 1 plan and 5 words of French.
+- **The words are the pilgrim's** (decided): they come home knowing them, and TEACH and LEARN spread them, which gives those verbs a job. Pilgrims only add words; they never lose any they knew.
+- **Plans go to the player:** the pilgrim delivers any plans to the scriptorium by themselves, without an order.
+- **Coming home** gets a fanfare announcement: "Ninbin has returned from their pilgrimage with a Wheelbarrow Plan and has learned 5 new words in French."
 - **Claude's suggestions:**
   - **The order** is a scroll line handed to one worker, with the count as the number of days ("go on a pilgrimage ×10").
-  - **The words are the pilgrim's,** not the player's: they come home knowing them, and TEACH and LEARN spread them, which gives those verbs a job. The plans go to the player.
   - **The cost** is the worker's absence (and maybe their wages while away), which makes long trips a real choice.
 
 ### 16.4 About and credits
 
 An About window (System 7 style, under the Babel menu) saying who did what, with the user's acknowledgements. The text is in [CREDITS.md](CREDITS.md).
+
+### 16.5 Alerts
+
+A popup message when something needs the player's attention, with a little sound effect.
+
+- **What raises one,** for example: the patron's favor dropping below 25%, a worker giving notice, the trader about to leave with orders still pending.
+- **The buttons:** Acknowledge, Turn Off Warnings for Events of This Type, and Turn Off All Warnings. Closing the window is the same as Acknowledge.
+- **Claude's suggestions:**
+  - **One alert at a time,** queued, so several at once don't bury each other. An alert of a type that's already waiting isn't added twice.
+  - **Somewhere to turn them back on:** a Warnings window (or a section in a Settings window) listing every type with a checkbox, since "turn off all" is easy to click and hard to undo otherwise.
+  - **Pausing:** the game already pauses while a dialog is open, so an alert pauses it too. That's probably right for the serious ones; if it gets annoying, minor ones could become a line in the log instead.
+  - **The sound** comes with the procedural sound effects on the "later" list: a short System 7 style beep would fit.
 
 ## Glossary
 

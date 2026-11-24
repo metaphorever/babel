@@ -87,7 +87,7 @@ export function groundUse(s: SimState): (string | null)[] {
   for (const site of s.sites) if (site.buildingId === null && site.y === groundRow()) mark(site.x0, site.x1, site.label);
   for (const b of s.buildings) mark(b.x0, b.x1, b.name);
   if (s.tower) mark(s.tower.x0, s.tower.x1, 'Tower');
-  mark(s.width - MAP.reservedRight, s.width - 1, 'The edge of the land');
+  mark(s.width - MAP.reservedRight, s.width - 1, 'The road to far-away lands');
   return use;
 }
 

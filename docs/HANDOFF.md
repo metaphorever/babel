@@ -79,11 +79,11 @@ Built and tested: the random map, the opening text and founding, placement mode 
 2. **More art:** clouds built from parts (reference: `art-src/shots/cloud-reference.png`), the Babel Extras page, and the tower's deck and wall (with the portrait sprint). Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art to catch anything missed.
 3. **The portrait card:** the worker inspector showing a 64x64 portrait built from layers (body, hair, head, beard, hat) picked from each worker's look seed, once the user has drawn parts.
 4. **P0 leftovers:** mailboxes and upper job boards (then the first board can be demolished), the COPY order, and night changing behavior (workers preferring to sleep at night).
-5. **The roadmap** (DESIGN.md §16): the About window is the quickest win; stairs next; the trader and pilgrimages need hauling bread and beer, and a road off the right edge.
+5. **The roadmap** (DESIGN.md §16): the About window is the quickest win; then hauling bread and beer (the trader needs it); alerts (§16.5); stairs; the trader and pilgrimages.
 6. **Later:** tables (mood when eating and drinking), typography (start with GNU Unifont, check its license), procedural sound effects and public-domain music, and acts of god at height.
 
 ## Open questions
 
 These are DESIGN.md §14, plus:
-- **The right edge of the map:** decided in session 4: the road to far-away lands (DESIGN.md §16). It's 8 tiles; the wagon is 9.
-- **Hauling bread and beer:** cooks and brewers carry what they make straight to a pantry or bar. There's no "haul bread" yet, so food can't be carried up the tower. That will matter once floors have their own fixtures.
+- **The right edge of the map:** decided in session 4: the road to far-away lands (DESIGN.md §16), now 12 tiles wide.
+- **Hauling bread and beer:** cooks and brewers carry what they make straight to a pantry or bar. There's no "haul bread" yet, so food can't be moved between pantries, carried up the tower, or paid to the trader. It comes before the trader (DESIGN.md §16.2).

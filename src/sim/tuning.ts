@@ -41,8 +41,12 @@ export const TOWER = {
 export const MAP = {
   /** The road home always runs off the left edge. */
   roadWidth: 4,
-  /** The right edge is reserved for something not decided yet. Nothing goes there. */
-  reservedRight: 8,
+  /**
+   * The right edge: the road to far-away lands, where the trader will come in
+   * and pilgrims leave (DESIGN.md §16). Nothing is built there. Wide enough for
+   * the wagon (9) with room to spare.
+   */
+  reservedRight: 12,
   forest: 12,
   quarry: 16,
   field: 12,
