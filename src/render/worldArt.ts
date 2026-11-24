@@ -135,6 +135,12 @@ export function fixtureArt(): WorldSprite[] {
       for (let x = 0; x < 16; x += 2) b.rect(x, 3, 1, 1);
       b.rect(0, 0, 1, 4).rect(15, 0, 1, 4);
     }),
+    // added after the first art delivery: last on the sheet, so no other box moves
+    art('fixture.shelves', 'STORAGE SHELVES', 16, 16, (b) => {
+      // an open frame with three shelves; goods are drawn on them by the game
+      b.rect(0, 0, 1, 16).rect(15, 0, 1, 16).rect(0, 0, 16, 1);
+      b.rect(1, 5, 14, 1).rect(1, 10, 14, 1).rect(1, 15, 14, 1);
+    }),
   ];
 }
 
@@ -156,6 +162,31 @@ export function skyArt(): WorldSprite[] {
       disc(b, 6, 6, 6, 'white');
       disc(b, 9, 5, 5, 'cut');
     }),
+  ];
+}
+
+/**
+ * Built-in stand-ins for art that arrives outside the MacPaint sheets (set
+ * pieces and loose drawings, see tools/shots.ts). They're not on the sheets,
+ * so adding one here doesn't move any box.
+ */
+export function extraWorldArt(): WorldSprite[] {
+  const wagon = natureArt().find((s) => s.name === 'nature.wagon')!;
+  return [
+    art('nature.forest', 'FOREST', 96, 34, (b) => {
+      for (let x = 2; x < 88; x += 13) {
+        const h = 22 + ((x * 7) % 9);
+        b.rect(x + 4, 34 - h + 8, 2, h - 8);
+        [3, 5, 7, 9, 9, 9, 7, 5, 3].forEach((w, i) => b.rect(x + 5 - Math.ceil(w / 2), 34 - h + i * 2, w, 2, i === 0 || i === 8 ? INK : 'checker'));
+      }
+    }),
+    art('nature.field', 'FIELD', 96, 8, (b) => {
+      for (let x = 1; x < 95; x += 2) {
+        const h = 5 + ((x * 3) % 3);
+        b.rect(x, 8 - h, 1, h);
+      }
+    }),
+    { name: 'nature.wagon-step', label: 'SUPPLY WAGON STEP', grid: wagon.grid },
   ];
 }
 

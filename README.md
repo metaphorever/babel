@@ -75,9 +75,11 @@ In the browser console, `babel.sim.state` holds the live game state, for poking 
 - [x] The opening text (flavor words in random languages); the scriptorium and first board placed together and built by the patron's workers; the charter decreed
 - [x] Placement mode: preview, blocked-tile markers, the confirmation dialog; the tower site, chosen once
 - [x] Generic buildings (named, 3 to 16 tiles wide, one or two stories) and their labels
-- [x] Fixtures: bed, oven, pantry, brewing station, bar (beer from grain), stockpiles with capacities (bigger indoors)
-- [x] Demolishing fixtures, then empty buildings; half the materials back
+- [x] Fixtures: bed, oven, pantry, brewing station, bar (beer from grain), stockpiles and storage shelves
+- [x] Demolishing fixtures, then empty buildings; half the materials back. Cancelling unfinished things gives everything back. Renaming buildings
+- [x] The user's first art delivery: terrain, nature, the wagon, sun and moon, buildings and fixtures
 - [x] The patron's grace period; other construction wins back some patience
 - [x] Tutorial scaffolding (draft text)
 - [ ] Tutorial text rewritten after playtesting
+- [ ] Addressing particular stockpiles and fixtures in orders
 - [ ] The user's art in place of the built-in drawings

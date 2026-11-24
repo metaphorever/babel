@@ -82,7 +82,7 @@ export class TowerPanel {
     this.body.append(h('div', { class: 'section-label' }, 'Stockpiles'));
     const t = h('table', { class: 'stores' });
     t.append(h('tr', {}, h('th', {}, ''), h('th', {}, 'Stone'), h('th', {}, 'Wood'), h('th', {}, 'Grain')));
-    const piles = s.sites.filter((x) => x.kind === 'stockpile').sort((a, b) => b.level - a.level);
+    const piles = s.sites.filter((x) => x.kind === 'stockpile' || x.kind === 'shelves').sort((a, b) => b.level - a.level);
     for (const sp of piles) {
       t.append(
         h(

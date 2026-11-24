@@ -4,7 +4,7 @@ import { ALL, makeOrder, type Noun, type WorkVerb } from './lang';
 import { giveCarrier } from './scrolls';
 import { BUILD, FIXTURE_LABEL, MAP, PATRON, TOWER } from './tuning';
 import { deckRow } from './tower';
-import { Tile, type BuildMaterial, type Building, type FixtureKind, type ItemType, type Pt, type SimState, type Site, type Works } from './types';
+import { FIXTURE_KINDS, Tile, type BuildMaterial, type Building, type FixtureKind, type ItemType, type Pt, type SimState, type Site, type Works } from './types';
 import { buildingOf, groundRow, newBuilding, newSite, setTile, siteCenter, spotFor, storedTotal, storyRow, tileAt } from './world';
 
 // Building on the ground (P1). The player places things; workers build them.
@@ -116,7 +116,7 @@ export function footprint(s: SimState, req: PlaceRequest): Footprint {
     // anything else has to go inside a building
     if (!b) {
       fp.blocked.fill(true);
-      fp.error = req.fixture === 'stockpile' ? 'A stockpile goes inside a building, or on open ground.' : 'Fixtures go inside a building.';
+      fp.error = req.fixture === 'stockpile' ? 'A stockpile goes inside a building, or on open ground.' : req.fixture === 'shelves' ? 'Storage shelves go inside a building.' : 'Fixtures go inside a building.';
       return fp;
     }
     fp.building = b;
@@ -204,7 +204,6 @@ export function applyPlace(s: SimState, req: PlaceRequest): void {
       break;
     }
     case 'fixture': {
-      const indoors = fp.building !== null;
       const site = newSite(s, {
         kind: req.fixture,
         label: FIXTURE_LABEL[req.fixture],
@@ -212,7 +211,7 @@ export function applyPlace(s: SimState, req: PlaceRequest): void {
         x1: fp.x1,
         y: fp.y,
         buildingId: fp.building?.id ?? null,
-        capacity: capacityOf(req.fixture, indoors),
+        capacity: capacityOf(req.fixture),
       });
       const cost = BUILD.fixtures[req.fixture].cost;
       // something that costs nothing (a stockpile is just marked-out ground) is ready at once
@@ -224,10 +223,11 @@ export function applyPlace(s: SimState, req: PlaceRequest): void {
   }
 }
 
-export function capacityOf(kind: FixtureKind, indoors: boolean): number | null {
+export function capacityOf(kind: FixtureKind): number | null {
   if (kind === 'pantry') return BUILD.capacity.pantry;
   if (kind === 'bar') return BUILD.capacity.bar;
-  if (kind === 'stockpile') return indoors ? BUILD.capacity.stockpileIndoor : BUILD.capacity.stockpileOutdoor;
+  if (kind === 'stockpile') return BUILD.capacity.stockpile;
+  if (kind === 'shelves') return BUILD.capacity.shelves;
   return null;
 }
 
@@ -393,38 +393,62 @@ export function validateDemolish(s: SimState, t: DemolishTarget): string | null 
   if (site.kind === 'board') return "The job board stays (for now: there's only one board until upper boards are built).";
   if (site.supplies) return "The patron's supplies go when they're used up.";
   if (site.level > 0) return "A tower floor's stockpile is part of the floor.";
-  if (!(['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile'] as string[]).includes(site.kind)) return "That's part of the land.";
+  if (!(FIXTURE_KINDS as readonly string[]).includes(site.kind)) return "That's part of the land.";
   if (site.demolish) return 'Already being taken down.';
   return null;
 }
 
 /**
  * Mark something to be taken down. Workers with "build camp" do the work
- * once it's empty, and half the materials are left lying there. Something
- * not yet started simply disappears.
+ * once it's empty, and half the materials are left lying there.
+ *
+ * Something not finished yet is called off instead, at once: whatever was
+ * already set in place is left lying there in full (nothing is lost).
  */
 export function applyDemolish(s: SimState, t: DemolishTarget): void {
   const thing = t.kind === 'building' ? s.buildings.find((x) => x.id === t.id)! : s.sites.find((x) => x.id === t.id)!;
   const label = 'name' in thing ? thing.name : thing.label;
   if (thing.build) {
-    // never finished: whatever was set in place comes back as half, like anything else
     const placed = thing.build.placed;
-    if (placed.stone + placed.wood === 0) {
-      if (t.kind === 'building') {
-        // its planned fixtures go with it
-        s.sites = s.sites.filter((x) => x.buildingId !== t.id);
-        s.buildings = s.buildings.filter((x) => x.id !== t.id);
-      } else s.sites = s.sites.filter((x) => x.id !== t.id);
-      log(s, `Called off: ${label}.`);
-      return;
+    const y = 'stories' in thing ? groundRow() : thing.y;
+    const width = thing.x1 - thing.x0 + 1;
+    let n = 0;
+    for (const m of ['stone', 'wood'] as const) {
+      for (let i = 0; i < placed[m]; i++) {
+        s.items.push({ id: s.nextId++, type: m, x: thing.x0 + (n % width), y, reservedBy: null });
+        n++;
+      }
     }
-    thing.demolish = { needs: { ...placed }, placed: { ...placed }, undone: 0, since: s.tick };
-    thing.build = null;
-  } else {
-    const cost = 'stories' in thing ? houseCost(thing.x1 - thing.x0 + 1, thing.stories) : thing.kind === 'oven' && thing.broken ? BUILD.fixtures.oven.cost : BUILD.fixtures[thing.kind as FixtureKind].cost;
-    thing.demolish = { needs: { ...cost }, placed: { ...cost }, undone: 0, since: s.tick };
+    if (t.kind === 'building') {
+      // its planned fixtures go with it (there can't be any yet, but be safe)
+      s.sites = s.sites.filter((x) => x.buildingId !== t.id);
+      s.buildings = s.buildings.filter((x) => x.id !== t.id);
+    } else s.sites = s.sites.filter((x) => x.id !== t.id);
+    log(s, `Called off: ${label}.${n ? ` The ${costLine(placed)} already set in place ${n === 1 ? 'is' : 'are'} left there to haul.` : ''}`);
+    return;
   }
+  const cost = 'stories' in thing ? houseCost(thing.x1 - thing.x0 + 1, thing.stories) : thing.kind === 'oven' && thing.broken ? BUILD.fixtures.oven.cost : BUILD.fixtures[thing.kind as FixtureKind].cost;
+  thing.demolish = { needs: { ...cost }, placed: { ...cost }, undone: 0, since: s.tick };
   log(s, `Marked to be taken down: ${label}. Workers with "build camp" will do it once it's empty.`);
+}
+
+function costLine(c: Record<BuildMaterial, number>): string {
+  return [c.wood ? `${c.wood} wood` : '', c.stone ? `${c.stone} stone` : ''].filter(Boolean).join(' and ');
+}
+
+export function validateRename(s: SimState, buildingId: number, name: string): string | null {
+  const b = s.buildings.find((x) => x.id === buildingId);
+  if (!b || b.kind !== 'house') return 'Only your own buildings can be renamed.';
+  if (!name.trim()) return 'A building needs a name.';
+  if (name.trim().length > BUILD.house.maxName) return `Names are at most ${BUILD.house.maxName} letters.`;
+  return null;
+}
+
+export function applyRename(s: SimState, buildingId: number, name: string): void {
+  const b = s.buildings.find((x) => x.id === buildingId)!;
+  const old = b.name;
+  b.name = name.trim();
+  if (old !== b.name) log(s, `${old} is now called ${b.name}.`);
 }
 
 // --------------------------------------------------- the founding moment
@@ -463,7 +487,7 @@ export function decreeCharter(s: SimState): void {
 export function accepts(site: Site, type: ItemType): boolean {
   if (site.kind === 'pantry') return type === 'bread';
   if (site.kind === 'bar') return type === 'beer';
-  if (site.kind === 'stockpile') return type === 'stone' || type === 'wood' || type === 'grain';
+  if (site.kind === 'stockpile' || site.kind === 'shelves') return type === 'stone' || type === 'wood' || type === 'grain';
   return false;
 }
 

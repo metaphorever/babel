@@ -12,7 +12,7 @@ import {
   type ArtSet,
   type Grid,
 } from './spriteData';
-import { allWorldArt } from './worldArt';
+import { allWorldArt, extraWorldArt } from './worldArt';
 
 // Turns art (grids) into canvases, cached. The art starts as the built-in
 // placeholder set; loadArt() swaps in PNG sheets from public/art/ if they
@@ -90,7 +90,13 @@ export function thoughtSprite(ch: string): HTMLCanvasElement {
   return cached(`t${ch}`, () => thoughtGrid(art.glyphs[ch] ?? art.glyphs['?'] ?? ['1']));
 }
 
-const WORLD_ART = new Map(allWorldArt().map((a) => [a.name, a.grid]));
+const WORLD_ART = new Map([...allWorldArt(), ...extraWorldArt()].map((a) => [a.name, a.grid]));
+
+/** Swap in world art loaded from public/art/world.png. */
+export function setWorldArt(next: Record<string, Grid>): void {
+  for (const [name, grid] of Object.entries(next)) WORLD_ART.set(name, grid);
+  for (const key of [...cache.keys()]) if (key.startsWith('world:')) cache.delete(key);
+}
 
 /**
  * A piece of world art (buildings, fixtures, nature) by name, e.g.

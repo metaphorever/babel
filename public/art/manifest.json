@@ -44,7 +44,8 @@
         "stone",
         "wood",
         "grain",
-        "bread"
+        "bread",
+        "beer"
       ]
     },
     "props": {
@@ -153,134 +154,158 @@
         "nature.wagon": [
           172,
           0,
-          32,
-          16
+          70,
+          22
         ],
         "building.wall-left": [
-          205,
+          243,
           0,
           8,
           24
         ],
         "building.wall": [
-          214,
           0,
+          33,
           8,
           24
         ],
         "building.wall-right": [
-          223,
-          0,
+          9,
+          33,
           8,
           24
         ],
         "building.door": [
-          232,
-          0,
+          18,
+          33,
           8,
           24
         ],
         "building.window": [
-          241,
-          0,
+          27,
+          33,
           8,
           24
         ],
         "building.roof-left": [
-          0,
+          36,
           33,
           8,
           6
         ],
         "building.roof": [
-          9,
+          45,
           33,
           8,
           6
         ],
         "building.roof-right": [
-          18,
+          54,
           33,
           8,
           6
         ],
         "building.scriptorium": [
-          27,
+          63,
           33,
           48,
           32
         ],
         "building.board": [
-          76,
+          112,
           33,
           16,
           24
         ],
         "fixture.bed": [
-          93,
+          129,
           33,
           16,
           6
         ],
         "fixture.oven": [
-          110,
+          146,
           33,
           16,
           16
         ],
         "fixture.oven-broken": [
-          127,
+          163,
           33,
           16,
           16
         ],
         "fixture.pantry": [
-          144,
+          180,
           33,
           16,
           16
         ],
         "fixture.brew": [
-          161,
+          197,
           33,
           16,
           16
         ],
         "fixture.bar": [
-          178,
+          214,
           33,
           16,
           16
         ],
         "fixture.table": [
-          195,
+          231,
           33,
           16,
           8
         ],
         "fixture.stockpile": [
-          212,
-          33,
+          0,
+          66,
           16,
           4
         ],
+        "fixture.shelves": [
+          17,
+          66,
+          16,
+          16
+        ],
         "sky.cloud": [
-          0,
+          34,
           66,
           32,
           12
         ],
         "sky.sun": [
-          33,
+          67,
           66,
-          19,
-          19
+          46,
+          45
         ],
         "sky.moon": [
-          53,
+          114,
           66,
-          13,
-          13
+          40,
+          44
+        ],
+        "nature.forest": [
+          155,
+          66,
+          96,
+          34
+        ],
+        "nature.field": [
+          0,
+          112,
+          96,
+          34
+        ],
+        "nature.wagon-step": [
+          97,
+          112,
+          70,
+          22
         ]
       }
     }

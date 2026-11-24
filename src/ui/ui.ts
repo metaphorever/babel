@@ -378,7 +378,7 @@ export class Ui {
     clear(win.body);
     // totals across every stockpile, on the ground and up the tower (the patron's supplies count too)
     const sum = (kind: string, k: 'stone' | 'wood' | 'grain' | 'bread' | 'beer') => this.s.sites.filter((x) => x.kind === kind && x.build === null).reduce((n, x) => n + x.store[k], 0);
-    const room = this.s.sites.filter((x) => x.kind === 'stockpile' && x.build === null && !x.supplies);
+    const room = this.s.sites.filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves') && x.build === null && !x.supplies);
     const cap0 = room.reduce((n, x) => n + (x.capacity ?? 0), 0);
     const used = room.reduce((n, x) => n + x.store.stone + x.store.wood + x.store.grain, 0);
     const loose = { stone: 0, wood: 0, grain: 0, bread: 0, beer: 0 };
@@ -386,13 +386,13 @@ export class Ui {
     const supplies = this.s.sites.find((x) => x.supplies);
     const t = h('table', { class: 'stores' });
     t.append(h('tr', {}, h('th', {}, ''), h('th', {}, 'Stored'), h('th', {}, 'Lying around')));
-    for (const k of ['stone', 'wood', 'grain'] as const) t.append(h('tr', {}, h('td', {}, cap(k)), h('td', { class: 'num' }, sum('stockpile', k)), h('td', { class: 'num' }, loose[k])));
+    for (const k of ['stone', 'wood', 'grain'] as const) t.append(h('tr', {}, h('td', {}, cap(k)), h('td', { class: 'num' }, sum('stockpile', k) + sum('shelves', k)), h('td', { class: 'num' }, loose[k])));
     const breadSupplies = supplies?.store.bread ?? 0;
     t.append(h('tr', {}, h('td', {}, 'Bread'), h('td', { class: 'num' }, sum('pantry', 'bread') + breadSupplies), h('td', { class: 'hint' }, breadSupplies ? 'pantries and supplies' : 'in the pantries')));
     t.append(h('tr', {}, h('td', {}, 'Beer'), h('td', { class: 'num' }, sum('bar', 'beer')), h('td', { class: 'hint' }, 'at the bar')));
     win.body.append(
       t,
-      h('div', { class: 'hint' }, room.length ? `Stockpiles at the base: ${used} of ${cap0} full.` : 'No stockpiles yet: goods only count once they’re stored.'),
+      h('div', { class: 'hint' }, room.length ? `Stockpiles at the base: ${used} of ${cap0} full.` : 'No stockpiles yet. Goods lying around can still be used, but workers would rather take from a stockpile.'),
       supplies ? h('div', { class: 'hint' }, "The patron's supplies are counted in. Nothing can be added to them.") : '',
       h('div', { class: 'hint' }, 'The Tower window shows each floor.'),
     );

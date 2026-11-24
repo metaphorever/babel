@@ -190,13 +190,13 @@ describe('buildings and fixtures', () => {
     expect(inside).toEqual(['Bed', 'Pantry']);
   });
 
-  it('an outdoor stockpile goes on open ground and holds less than one indoors', () => {
+  it('a stockpile goes on open ground and holds the same as one indoors', () => {
     const s = createState(3);
     const x0 = freeSpot(s, 2, 100);
     expect(applyCommand(s, place({ what: 'fixture', fixture: 'stockpile', x0, story: 0 })).ok).toBe(true);
     const pile = s.sites[s.sites.length - 1];
-    expect(pile.capacity).toBe(BUILD.capacity.stockpileOutdoor);
-    expect(BUILD.capacity.stockpileIndoor).toBeGreaterThan(BUILD.capacity.stockpileOutdoor);
+    expect(pile.capacity).toBe(BUILD.capacity.stockpile);
+    expect(pile.build).toBeNull();
   });
 
   it('a full stockpile takes no more', () => {
@@ -337,6 +337,82 @@ describe('fixtures', () => {
     const kinds: FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile'];
     kinds.forEach((fixture, i) => expect(applyCommand(s, place({ what: 'fixture', fixture, x0: x0 + i * 2, story: 0 })).ok).toBe(true));
     const indoor = s.sites[s.sites.length - 1];
-    expect(indoor.capacity).toBe(BUILD.capacity.stockpileIndoor);
+    expect(indoor.capacity).toBe(BUILD.capacity.stockpile);
+  });
+});
+
+describe('session 3: shelves, cancelling, renaming, loose materials', () => {
+  it('storage shelves go indoors only and hold twice a stockpile', () => {
+    const s = createState(3);
+    const out = freeSpot(s, 2, 100);
+    expect(applyCommand(s, place({ what: 'fixture', fixture: 'shelves', x0: out, story: 0 })).ok).toBe(false);
+    const x0 = withHouse(s, 6);
+    expect(applyCommand(s, place({ what: 'fixture', fixture: 'shelves', x0, story: 0 })).ok).toBe(true);
+    const shelves = s.sites[s.sites.length - 1];
+    expect(shelves.capacity).toBe(BUILD.capacity.shelves);
+    expect(BUILD.capacity.shelves).toBe(BUILD.capacity.stockpile * 2);
+    expect(shelves.build).not.toBeNull();
+  });
+
+  it('cancelling something part-built gives back everything set in place, at once', () => {
+    const s = createState(3);
+    const x0 = freeSpot(s, 6, 100);
+    applyCommand(s, place({ what: 'house', x0, width: 6, stories: 1, name: 'Half' }));
+    const b = s.buildings.find((x) => x.name === 'Half')!;
+    b.build!.placed.wood = 4;
+    const before = s.items.filter((it) => it.type === 'wood').length;
+    expect(applyCommand(s, { type: 'demolish', playerId: 0, target: { kind: 'building', id: b.id } }).ok).toBe(true);
+    expect(s.buildings.some((x) => x.id === b.id)).toBe(false);
+    expect(s.items.filter((it) => it.type === 'wood').length).toBe(before + 4);
+  });
+
+  it('cancelling something not started leaves nothing behind', () => {
+    const s = createState(3);
+    const x0 = freeSpot(s, 6, 100);
+    applyCommand(s, place({ what: 'house', x0, width: 6, stories: 1, name: 'Never' }));
+    const b = s.buildings.find((x) => x.name === 'Never')!;
+    const items = s.items.length;
+    applyCommand(s, { type: 'demolish', playerId: 0, target: { kind: 'building', id: b.id } });
+    expect(s.buildings.some((x) => x.id === b.id)).toBe(false);
+    expect(s.items.length).toBe(items);
+  });
+
+  it('buildings can be renamed, but not to nothing', () => {
+    const s = createState(3);
+    const b = s.buildings.find((x) => x.kind === 'house')!;
+    expect(applyCommand(s, { type: 'rename', playerId: 0, buildingId: b.id, name: '  Mess Hall ' }).ok).toBe(true);
+    expect(b.name).toBe('Mess Hall');
+    expect(applyCommand(s, { type: 'rename', playerId: 0, buildingId: b.id, name: '   ' }).ok).toBe(false);
+  });
+
+  it('builders use loose materials when nothing is stored, and grumble about it', () => {
+    const s = createState(3);
+    const x0 = withHouse(s, 6);
+    s.notices = [];
+    s.reserved = 0;
+    for (const site of s.sites) site.store.wood = 0;
+    const gy = groundRow();
+    for (let i = 0; i < 4; i++) s.items.push({ id: s.nextId++, type: 'wood', x: x0 - 3 - i, y: gy, reservedBy: null });
+    applyCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 0 }));
+    const bed = s.sites[s.sites.length - 1];
+    postBuildCamp(s);
+    expect(runUntil(s, () => bed.build === null, 20 * 600)).toBe(true);
+    expect(s.workers.some((w) => w.moodlets.some((m) => m.kind === 'scavenged'))).toBe(true);
+  });
+
+  it('builders take from a stockpile before anything lying around', () => {
+    const s = createState(3);
+    const x0 = withHouse(s, 6);
+    s.notices = [];
+    s.reserved = 0;
+    const gy = groundRow();
+    for (let i = 0; i < 4; i++) s.items.push({ id: s.nextId++, type: 'wood', x: x0 - 3 - i, y: gy, reservedBy: null });
+    const loose = s.items.filter((it) => it.type === 'wood').length;
+    applyCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 0 }));
+    const bed = s.sites[s.sites.length - 1];
+    postBuildCamp(s);
+    expect(runUntil(s, () => bed.build === null, 20 * 600)).toBe(true);
+    expect(s.items.filter((it) => it.type === 'wood').length).toBe(loose);
+    expect(s.workers.some((w) => w.moodlets.some((m) => m.kind === 'scavenged'))).toBe(false);
   });
 });

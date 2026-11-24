@@ -1,4 +1,4 @@
-import { setArt } from './sprites';
+import { setArt, setWorldArt } from './sprites';
 import {
   CELL,
   GLYPH_NAMES,
@@ -28,6 +28,7 @@ interface SheetInfo {
 interface Manifest {
   version: number;
   sheets: Record<'body' | 'head' | 'beard' | 'hat' | 'items' | 'props' | 'glyphs', SheetInfo>;
+  atlases?: { world?: { file: string; sprites: Record<string, [number, number, number, number]> } };
 }
 
 async function loadPixels(url: string): Promise<ImageData> {
@@ -131,6 +132,24 @@ export async function loadArt(): Promise<void> {
   await small('glyphs', GLYPH_NAMES);
 
   setArt(art);
+
+  // world art: one atlas, each sprite a rectangle in it
+  const atlas = manifest.atlases?.world;
+  if (atlas) {
+    try {
+      const px = await loadPixels(`art/${atlas.file}${bust}`);
+      loaded.push(atlas.file);
+      const world: Record<string, Grid> = {};
+      for (const [name, [x, y, w, h]] of Object.entries(atlas.sprites)) {
+        const sub = new ImageData(w, h);
+        for (let r = 0; r < h; r++) sub.data.set(px.data.subarray(((y + r) * px.width + x) * 4, ((y + r) * px.width + x + w) * 4), r * w * 4);
+        world[name] = cells(sub, w, h, stray)[0][0];
+      }
+      setWorldArt(world);
+    } catch (e) {
+      console.warn(`Babel art: couldn't load ${atlas.file}; keeping the built-in world art.`, e);
+    }
+  }
   console.info(`Babel art: loaded ${loaded.join(', ')}.`);
   if (stray.n > 0) console.warn(`Babel art: ${stray.n} pixels weren't pure black, white or transparent and were rounded. Turn off anti-aliasing to keep them crisp.`);
 }

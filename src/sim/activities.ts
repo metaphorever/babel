@@ -246,7 +246,7 @@ export function nothingToHaul(s: SimState, n: Notice): boolean {
   if (o.verb === 'COOK' || o.verb === 'BREW') return !canProcess(s, PROCESS[o.verb]);
   if (o.verb !== 'HAUL') return false;
   const type = nounItem(o.noun as Noun);
-  if (o.from !== null) return !s.sites.some((x) => usable(x) && x.kind === 'stockpile' && x.level === o.from && x.store[type] > 0);
+  if (o.from !== null) return !s.sites.some((x) => usable(x) && (x.kind === 'stockpile' || x.kind === 'shelves') && x.level === o.from && x.store[type] > 0);
   return !s.items.some((it) => it.type === type && it.reservedBy === null);
 }
 
@@ -483,6 +483,38 @@ function nearestClaimed(s: SimState, w: Worker): Item | null {
   return best;
 }
 
+/** Marks a fetch from loose items on the ground instead of from a store (in activity.ref or .timer). */
+const LOOSE = -1;
+
+/** Loose items of a type that nobody has claimed. */
+function looseFree(s: SimState, type: ItemType): number {
+  let n = 0;
+  for (const it of s.items) if (it.type === type && it.reservedBy === null) n++;
+  return n;
+}
+
+/**
+ * Fetching from the ground, for when no store has what's needed: walk to
+ * each claimed item and pick it up. Workers would rather take from a
+ * stockpile, so every pickup costs a little mood.
+ */
+function gatherLoose(s: SimState, w: Worker): 'running' | 'done' | 'failed' {
+  const next = nearestClaimed(s, w);
+  if (!next) return w.carryCount > 0 ? 'done' : 'failed';
+  w.thought = `Hunting around for loose ${next.type}.`;
+  const m = moveTo(s, w, { x: next.x, y: next.y });
+  if (m === 'moving') return 'running';
+  if (m === 'unreachable') {
+    next.reservedBy = null;
+    return 'running';
+  }
+  s.items.splice(s.items.indexOf(next), 1);
+  w.carrying = next.type;
+  w.carryCount++;
+  addMoodlet(s, w, 'scavenged', `Had to pick ${next.type} up off the ground`, MOOD.scavenged.value, MOOD.scavenged.ticks);
+  return 'running';
+}
+
 function noDepot(level: Place): string {
   return level === 0 ? 'No stockpile with room at the base.' : `There's no stockpile on ${placeName(level)}.`;
 }
@@ -647,12 +679,23 @@ function buildJob(s: SimState, w: Worker): Result {
       const src = stockpiles(s)
         .filter((sp) => sp.level <= p.level - 1 && sp.store[m] > 0)
         .sort((x, y) => y.level - x.level || Math.abs(x.x0 - w.x) - Math.abs(y.x0 - w.x))[0];
-      if (!src) return failWork(s, w, `No ${m} in any stockpile to build with.`);
-      a.target = spotFor(src, w.id);
-      a.ref = src.id;
+      if (src) {
+        a.target = spotFor(src, w.id);
+        a.ref = src.id;
+      } else {
+        // nothing stored: make do with what's lying around
+        if (claimLoad(s, w, m, Math.min(carryCapacity(w), Math.max(1, want(m)))) === 0) return failWork(s, w, `No ${m} in any stockpile to build with.`);
+        a.ref = LOOSE;
+      }
       a.stage = 1;
       w.thought = `Fetching ${m} for floor ${p.level}.`;
     }
+  }
+  if (a.stage === 1 && a.ref === LOOSE) {
+    const g = gatherLoose(s, w);
+    if (g === 'running') return 'running';
+    if (g === 'failed') return failWork(s, w, "Couldn't get the material.");
+    a.stage = 2;
   }
   if (a.stage === 1) {
     const src = s.sites.find((x) => x.id === a.ref);
@@ -737,7 +780,7 @@ function canProcess(s: SimState, p: Process): boolean {
 function whyNotProcess(s: SimState, p: Process): string | null {
   if (sitesOf(s, p.station).length === 0) return `There's no ${p.stationName} to work at.`;
   if (!sitesOf(s, p.store).some((x) => !x.demolish && accepts(x, p.product))) return `There's no ${p.storeName} to keep the ${p.product} in.`;
-  if (!stockpiles(s).some((x) => x.level === 0 && x.store.grain > 0)) return 'No grain in the stockpiles.';
+  if (!stockpiles(s).some((x) => x.level === 0 && x.store.grain > 0) && looseFree(s, 'grain') === 0) return 'No grain in the stockpiles.';
   return null;
 }
 
@@ -755,10 +798,19 @@ function processJob(s: SimState, w: Worker, p: Process): Result {
       const why = whyNotProcess(s, p);
       if (why) return failWork(s, w, why, why.startsWith('No grain'));
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
+      if (a.ref === LOOSE) {
+        // picking grain up off the ground (once they have it, they carry on above)
+        if (gatherLoose(s, w) === 'failed') return failWork(s, w, "Couldn't get the grain.");
+        return 'running';
+      }
       let src = a.ref === null ? null : s.sites.find((x) => x.id === a.ref) ?? null;
       if (!src || src.store.grain <= 0) {
         src = sourceFor(s, 0, 'grain', w);
-        if (!src) return failWork(s, w, 'No grain in the stockpiles.', true);
+        if (!src) {
+          if (claimLoad(s, w, 'grain', 1) === 0) return failWork(s, w, 'No grain in the stockpiles.', true);
+          a.ref = LOOSE;
+          return 'running';
+        }
         a.ref = src.id;
       }
       w.thought = 'Fetching grain.';
@@ -868,7 +920,8 @@ function campJob(s: SimState, w: Worker): Result {
         for (const m of ['stone', 'wood'] as const) {
           if (wanted(s, j, m) <= 0) continue;
           const src = sourceFor(s, 0, m, w);
-          if (src) {
+          // a stockpile first; failing that, whatever's lying around
+          if (src || looseFree(s, m) > 0) {
             pick = { j, m, src };
             break;
           }
@@ -882,13 +935,23 @@ function campJob(s: SimState, w: Worker): Result {
       a.aim = pick.j.id;
       if (pick.j.demolish) {
         a.stage = 5;
-      } else {
-        a.target = spotFor(pick.src!, w.id);
-        a.timer = pick.src!.id;
+      } else if (pick.src) {
+        a.target = spotFor(pick.src, w.id);
+        a.timer = pick.src.id;
         a.stage = 1;
         w.thought = `Fetching ${pick.m} for ${pick.j.label.toLowerCase()}.`;
+      } else {
+        claimLoad(s, w, pick.m!, Math.min(carryCapacity(w), Math.max(1, wanted(s, pick.j, pick.m!))));
+        a.timer = LOOSE;
+        a.stage = 1;
       }
     }
+  }
+  if (a.stage === 1 && a.timer === LOOSE) {
+    const g = gatherLoose(s, w);
+    if (g === 'running') return 'running';
+    if (g === 'failed') return failWork(s, w, "Couldn't get the material.");
+    a.stage = 2;
   }
   if (a.stage === 1) {
     const src = s.sites.find((x) => x.id === a.timer);

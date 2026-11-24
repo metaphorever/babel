@@ -199,7 +199,7 @@ export function sitesOf(s: SimState, kind: SiteKind): Site[] {
 
 /** Finished stockpiles, including the patron's supplies (which can only be taken from). */
 export function stockpiles(s: SimState): Site[] {
-  return sitesOf(s, 'stockpile');
+  return s.sites.filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves') && usable(x));
 }
 
 export function storedTotal(site: Site): number {

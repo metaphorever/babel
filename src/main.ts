@@ -139,7 +139,7 @@ canvas.addEventListener('click', (e) => {
   else if (site?.kind === 'scriptorium' && !site.build) ui.wm.show('scriptorium');
   else if (site?.kind === 'foundation') ui.wm.show('tower');
   else if (site?.supplies || (site?.kind === 'stockpile' && site.level > 0)) ui.wm.show('stores');
-  else if (thing && (thing.kind === 'building' || site?.buildingId !== null || site?.kind === 'stockpile' || site?.build)) build.inspect(thing);
+  else if (thing && (thing.kind === 'building' || site?.buildingId !== null || site?.kind === 'stockpile' || site?.kind === 'shelves' || site?.build)) build.inspect(thing);
   else ui.select(null);
 });
 canvas.addEventListener(
@@ -174,7 +174,8 @@ function frame(now: number) {
   if (keys.has('s') || keys.has('arrowdown')) renderer.camY += pan;
   renderer.clampCamera(sim.state);
 
-  const mult = SPEEDS[speed];
+  // time stands still while a dialog asks something
+  const mult = build.modalOpen ? 0 : SPEEDS[speed];
   if (mult > 0) {
     acc += dt * mult;
     let n = 0;

@@ -3,7 +3,7 @@ import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCar
 import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isValidLine, langName, makeOrder, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
 import { SCRIBE, TOWER } from './tuning';
 import type { Dest, SimState } from './types';
-import { applyDemolish, applyPlace, validateDemolish, validatePlace, type DemolishTarget, type PlaceRequest } from './build';
+import { applyDemolish, applyPlace, applyRename, validateDemolish, validatePlace, validateRename, type DemolishTarget, type PlaceRequest } from './build';
 
 // Every player action is a command. The sim applies commands at the start of
 // a tick, so the same seed plus the same command log always replays the same
@@ -42,7 +42,9 @@ export type Command =
   /** Lay out a building, fixture, the scriptorium or the tower site. Workers build it. */
   | { type: 'place'; playerId: number; place: PlaceRequest }
   /** Mark something to be taken down. */
-  | { type: 'demolish'; playerId: number; target: DemolishTarget };
+  | { type: 'demolish'; playerId: number; target: DemolishTarget }
+  /** Rename one of your buildings (its label shows the name). */
+  | { type: 'rename'; playerId: number; buildingId: number; name: string };
 
 export interface StampedCommand {
   tick: number;
@@ -132,6 +134,10 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       const error = validateDemolish(s, cmd.target);
       return error ? { ok: false, error } : { ok: true };
     }
+    case 'rename': {
+      const error = validateRename(s, cmd.buildingId, cmd.name);
+      return error ? { ok: false, error } : { ok: true };
+    }
   }
 }
 
@@ -174,6 +180,9 @@ export function applyCommand(s: SimState, cmd: Command): CommandResult {
       break;
     case 'demolish':
       applyDemolish(s, cmd.target);
+      break;
+    case 'rename':
+      applyRename(s, cmd.buildingId, cmd.name);
       break;
   }
   return { ok: true };

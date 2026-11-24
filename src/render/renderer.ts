@@ -9,6 +9,15 @@ import { itemSprite, propSprite, thoughtSprite, workerSprite, worldSprite } from
 const STORY_PX = 24;
 const ROOF_PX = 6;
 
+/** Set pieces drawn whole from the world art. */
+const NATURE_ART = { home: 'nature.sign-home', forest: 'nature.forest', field: 'nature.field', well: 'nature.well' } as const;
+/** The notices pinned up in the job board's art (x, y, w, h), in the order they're posted. */
+const BOARD_NOTICES: [number, number, number, number][] = [[2, 4, 6, 7], [9, 4, 6, 7], [2, 13, 6, 3], [9, 13, 6, 3]];
+/** What's on the pantry's shelves in its art, in the order it's eaten last to first. */
+const PANTRY_LOAVES: [number, number, number, number][] = [[2, 4, 5, 3], [9, 4, 5, 3], [1, 9, 14, 3]];
+/** How long the supply wagon takes to roll in at the start of a new game. */
+const WAGON_ARRIVE_TICKS = 160;
+
 /** The placement preview: where something would go, and which tiles are in the way. */
 export interface Ghost {
   x0: number;
@@ -172,12 +181,6 @@ export class Renderer {
     this.pat.fill(p, x, y, w, h);
   }
 
-  /** Black outline with a patterned inside. */
-  private box(x: number, y: number, w: number, h: number, inner: PatternName = 'white'): void {
-    this.rect(x, y, w, h, 'black');
-    if (w > 2 && h > 2) this.rect(x + 1, y + 1, w - 2, h - 2, inner);
-  }
-
   private drawTiles(s: SimState, cx: number, cy: number, bw: number, bh: number): void {
     const x0 = Math.max(0, Math.floor(cx / TILE));
     const x1 = Math.min(s.width - 1, Math.floor((cx + bw) / TILE));
@@ -189,28 +192,15 @@ export class Renderer {
         if (t === Tile.Air) continue;
         const px = x * TILE;
         const py = y * TILE;
+        let name: string;
         if (t === Tile.Dirt) {
-          const above = y > 0 ? s.tiles[(y - 1) * s.width + x] : Tile.Air;
           let depth = 0;
-          for (let k = 1; k <= 4 && y - k >= 0 && s.tiles[(y - k) * s.width + x] === Tile.Dirt; k++) depth = k;
-          this.rect(px, py, TILE, TILE, depth >= 3 ? 'checker' : depth >= 1 ? 'light' : 'sparse');
-          if (above !== Tile.Dirt) this.rect(px, py, TILE, 1);
-        } else if (t === Tile.Deck) {
-          // wooden planks: a dark top edge, grain lines, a plank joint
-          this.rect(px, py, TILE, TILE, 'hstripe');
-          this.rect(px, py, TILE, 2);
-          this.rect(px + ((x * 5) % 7), py + 2, 1, TILE - 2);
-          this.rect(px, py + TILE - 1, TILE, 1);
-        } else if (t === Tile.Wall) {
-          this.rect(px, py, TILE, TILE, 'brick');
-          this.rect(px, py, 1, TILE);
-          this.rect(px + TILE - 1, py, 1, TILE);
-        } else if (t === Tile.Ladder) {
-          this.rect(px + 1, py, 1, TILE);
-          this.rect(px + 6, py, 1, TILE);
-          this.rect(px + 1, py + 2, 6, 1);
-          this.rect(px + 1, py + 6, 6, 1);
-        }
+          for (let k = 1; k <= 3 && y - k >= 0 && s.tiles[(y - k) * s.width + x] === Tile.Dirt; k++) depth = k;
+          name = depth === 0 ? 'terrain.dirt-top' : depth >= 3 ? 'terrain.dirt-deep' : 'terrain.dirt';
+        } else if (t === Tile.Deck) name = 'tower.deck';
+        else if (t === Tile.Wall) name = 'tower.wall';
+        else name = 'tower.ladder';
+        this.g.drawImage(worldSprite(name), px, py);
       }
     }
   }
@@ -301,58 +291,31 @@ export class Renderer {
       if (site.demolish) this.comingDown(left, base, width, height);
     };
     switch (site.kind) {
-      case 'home': {
-        this.rect(left + 12, base - 18, 2, 18);
-        this.box(left + 2, base - 18, 20, 7, 'white');
-        // arrow pointing left (the road home)
-        this.rect(left + 5, base - 15, 13, 1);
-        this.rect(left + 6, base - 16, 1, 3);
-        this.rect(left + 7, base - 17, 1, 5);
-        break;
-      }
-      case 'forest': {
-        for (let x = left + 2; x < left + width - 8; x += 13) {
-          const h = 22 + ((x * 7) % 9);
-          this.tree(x, base, h);
-        }
-        break;
-      }
-      case 'field': {
-        for (let x = left + 1; x < left + width - 1; x += 2) {
-          const h = 5 + ((x * 3) % 3);
-          this.rect(x, base - h, 1, h);
-          if ((x >> 1) % 2 === 0) this.rect(x - 1, base - h - 1, 3, 2, 'checker');
-        }
-        break;
-      }
+      case 'home':
+      case 'forest':
+      case 'field':
       case 'well': {
-        this.box(left + 1, base - 7, 14, 7, 'brick');
-        this.rect(left + 2, base - 20, 1, 13);
-        this.rect(left + 13, base - 20, 1, 13);
-        this.rect(left, base - 22, 16, 2);
-        this.rect(left + 7, base - 19, 1, 6);
-        this.box(left + 5, base - 13, 5, 4, 'checker');
+        // set pieces: drawn whole, standing on the ground at the site's left edge
+        const spr = worldSprite(NATURE_ART[site.kind]);
+        this.g.drawImage(spr, left, base - spr.height);
         break;
       }
       case 'board': {
-        withProgress(20, () => {
-          this.rect(left + 2, base - 14, 1, 14);
-          this.rect(left + 13, base - 14, 1, 14);
-          this.box(left, base - 20, 16, 11, 'light');
-          const n = Math.min(s.notices.length, 6);
-          for (let i = 0; i < n; i++) {
-            const nx = left + 2 + (i % 3) * 4;
-            const ny = base - 18 + Math.floor(i / 3) * 4;
-            this.box(nx, ny, 4, 4, 'white');
+        const spr = worldSprite('building.board');
+        withProgress(spr.height, () => {
+          this.g.drawImage(spr, left, base - spr.height);
+          // the art has four notices pinned up: show as many as are posted
+          const top = base - spr.height;
+          for (let i = Math.min(s.notices.length, BOARD_NOTICES.length); i < BOARD_NOTICES.length; i++) {
+            const [nx, ny, nw, nh] = BOARD_NOTICES[i];
+            this.rect(left + nx, top + ny, nw, nh, 'white');
           }
         });
         break;
       }
       case 'stockpile': {
         if (site.supplies) {
-          // the patron's wagon, with what's left piled beside it
-          const wagon = worldSprite('nature.wagon');
-          this.g.drawImage(wagon, left, base - wagon.height);
+          this.drawWagon(s, left, base);
           break;
         }
         withProgress(8, () => {
@@ -370,35 +333,45 @@ export class Renderer {
         break;
       }
       case 'scriptorium': {
-        withProgress(32, () => {
-          const spr = worldSprite('building.scriptorium');
-          this.g.drawImage(spr, left, base - spr.height);
-          // the queue of work: one sheet per design waiting on the shelf (the sprite's shelf is at y 18)
-          this.rect(left + 30, base - 15, 16, 2, 'white');
-          const n = Math.min(s.designs.length, 5);
-          for (let i = 0; i < n; i++) this.g.drawImage(propSprite('sheet'), left + 30 + i * 3, base - 17);
-        });
+        const spr = worldSprite('building.scriptorium');
+        withProgress(spr.height, () => this.g.drawImage(spr, left, base - spr.height));
         break;
       }
       case 'pantry': {
-        withProgress(16, () => {
-          // shelves of bread, filled in as it's stocked
-          this.box(left, base - 16, 16, 16, 'white');
-          this.rect(left + 1, base - 9, 14, 1);
-          this.rect(left + 1, base - 4, 14, 1);
-          const spr = itemSprite('bread');
-          const n = Math.min(site.store.bread, 4);
-          for (let i = 0; i < n; i++) this.g.drawImage(spr, left + 2 + (i % 2) * 6, base - 12 - (i >= 2 ? -5 : 0));
+        const spr = worldSprite('fixture.pantry');
+        withProgress(spr.height, () => {
+          this.g.drawImage(spr, left, base - spr.height);
+          // the art shows four loaves: each stands for a quarter of a full pantry
+          const top = base - spr.height;
+          const per = Math.max(1, (site.capacity ?? 20) / PANTRY_LOAVES.length);
+          PANTRY_LOAVES.forEach(([lx, ly, lw, lh], i) => {
+            if (site.store.bread <= i * per) this.rect(left + lx, top + ly, lw, lh, 'white');
+          });
         });
         break;
       }
       case 'bar': {
-        withProgress(16, () => {
-          const spr = worldSprite('fixture.bar');
+        const spr = worldSprite('fixture.bar');
+        withProgress(spr.height, () => {
           this.g.drawImage(spr, left, base - spr.height);
-          const mug = itemSprite('beer');
-          const n = Math.min(site.store.beer, 3);
-          for (let i = 0; i < n; i++) this.g.drawImage(mug, left + 1 + i * 5, base - 10 - mug.height + 1);
+          // a mug on the counter while there's beer to pour
+          if (site.store.beer > 0) {
+            const mug = itemSprite('beer');
+            this.g.drawImage(mug, left + 8 - Math.floor(mug.width / 2), base - spr.height + 8 - mug.height);
+          }
+        });
+        break;
+      }
+      case 'shelves': {
+        const spr = worldSprite('fixture.shelves');
+        withProgress(spr.height, () => {
+          this.g.drawImage(spr, left, base - spr.height);
+          // a shelf each, bottom to top: stone, wood, grain
+          (['stone', 'wood', 'grain'] as const).forEach((type, i) => {
+            const item = itemSprite(type);
+            const n = Math.min(3, Math.ceil(site.store[type] / 6));
+            for (let k = 0; k < n; k++) this.g.drawImage(item, left + 2 + k * 4, base - 1 - i * 5 - item.height);
+          });
         });
         break;
       }
@@ -410,13 +383,25 @@ export class Renderer {
         break;
       }
       case 'quarry': {
-        // a stepped rock face rising to the right
+        // a stepped rock face rising to the right, cut from the rock texture
+        const rock = worldSprite('nature.rock');
+        const g = this.g;
+        const steps: [number, number][] = [];
         for (let x = left; x < left + width + 8; x += 4) {
           const t = (x - left) / (width + 8);
-          const h = Math.floor(6 + t * 40 + ((x * 13) % 7));
-          this.rect(x, base - h, 4, h, 'dark');
-          this.rect(x, base - h, 4, 1);
+          steps.push([x, Math.floor(6 + t * 40 + ((x * 13) % 7))]);
         }
+        const tallest = Math.max(...steps.map(([, h]) => h));
+        g.save();
+        g.beginPath();
+        for (const [x, h] of steps) g.rect(x, base - h, 4, h);
+        g.clip();
+        // tile on the world grid, so the texture doesn't swim as the face steps up
+        const tx0 = Math.floor(left / rock.width) * rock.width;
+        const ty0 = Math.floor((base - tallest) / rock.height) * rock.height;
+        for (let ty = ty0; ty < base; ty += rock.height) for (let tx = tx0; tx < left + width + 8; tx += rock.width) g.drawImage(rock, tx, ty);
+        g.restore();
+        for (const [x, h] of steps) this.rect(x, base - h, 4, 1);
         break;
       }
     }
@@ -512,28 +497,11 @@ export class Renderer {
       const bx = Math.round(cx + 30 + up * (bw - 60));
       const by = Math.round(cy + 26 + Math.abs(up - 0.5) * 2 * Math.min(60, bh / 4));
       if (inSky(bx, by + 8)) {
-        if (d < 0.5) {
-          this.disc(bx, by, 6, 'white');
-          // rays
-          for (const [rx, ry] of [[0, -9], [0, 9], [-9, 0], [9, 0], [-7, -7], [7, -7], [-7, 7], [7, 7]]) this.rect(bx + rx, by + ry, 1, 1);
-        } else {
-          this.disc(bx, by, 6, 'white');
-          // carve the crescent with the night sky
-          this.disc(bx + 3, by - 1, 5, pattern ?? 'dark', false);
-        }
+        const spr = worldSprite(d < 0.5 ? 'sky.sun' : 'sky.moon');
+        this.g.drawImage(spr, bx - Math.floor(spr.width / 2), by - Math.floor(spr.height / 2));
       }
     }
     this.drawClouds(s, cy, bh);
-  }
-
-  /** A filled circle with a black rim (rim optional). */
-  private disc(x: number, y: number, rad: number, inner: PatternName, rim = true): void {
-    for (let dy = -rad; dy <= rad; dy++) {
-      const half = Math.floor(Math.sqrt(rad * rad - dy * dy));
-      if (rim) this.rect(x - half, y + dy, half * 2 + 1, 1);
-      const ih = rim ? half - 1 : half;
-      if (ih >= 0 && (!rim || (dy > -rad && dy < rad))) this.rect(x - ih, y + dy, ih * 2 + 1, 1, inner);
-    }
   }
 
   /** Clouds drift in above the first few floors, so height reads at a glance. */
@@ -550,16 +518,22 @@ export class Renderer {
     }
   }
 
-  private tree(x: number, base: number, h: number): void {
-    this.rect(x + 4, base - h + 8, 2, h - 8);
-    const widths = [3, 5, 7, 9, 9, 9, 7, 5, 3];
-    const top = base - h;
-    widths.forEach((w, i) => {
-      const lx = x + 5 - Math.ceil(w / 2);
-      const edge = i === 0 || i === widths.length - 1;
-      this.rect(lx, top + i * 2, w, 2, edge ? 'black' : 'black');
-      if (!edge) this.rect(lx + 1, top + i * 2, w - 2, 2, 'checker');
-    });
+  /**
+   * The patron's supply wagon. In a new game it rolls in along the road home
+   * over the first few seconds (a walk cycle: the horse's legs and the
+   * wheels), then stands where the supplies are.
+   */
+  private drawWagon(s: SimState, left: number, base: number): void {
+    let x = left;
+    let frame = 0;
+    if (s.start === 'opening' && s.tick < WAGON_ARRIVE_TICKS) {
+      const spr = worldSprite('nature.wagon');
+      const from = -spr.width;
+      x = Math.round(from + ((left - from) * s.tick) / WAGON_ARRIVE_TICKS);
+      frame = Math.floor(s.tick / 4) % 2;
+    }
+    const spr = worldSprite(frame ? 'nature.wagon-step' : 'nature.wagon');
+    this.g.drawImage(spr, x, base - spr.height);
   }
 
   private drawItems(s: SimState): void {

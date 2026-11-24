@@ -14,6 +14,8 @@ import { allWorldArt } from '../src/render/worldArt';
 import { PAINT_H, PAINT_W, decodeMacPaint } from './macpaint';
 import { bitsToPng, gridsToPng } from './png';
 import { buildPages, readPage, renderPage, slotsToArt } from './sheets';
+import { KEEP_BUILT_IN, LOOSE, SHEET_SHOTS, readLoose, sheetFromShot } from './shots';
+import { extraWorldArt } from '../src/render/worldArt';
 
 const SRC = join(process.cwd(), 'art-src');
 const OUT = join(process.cwd(), 'public', 'art');
@@ -27,7 +29,10 @@ for (const page of buildPages()) {
     .filter((p) => existsSync(p) && statSync(p).isFile())
     .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
   let bits: Uint8Array;
-  if (candidates.length === 0) {
+  if (SHEET_SHOTS[page.name]) {
+    // a screenshot of the sheet wins over the .bin round trip
+    bits = sheetFromShot(page, SHEET_SHOTS[page.name]);
+  } else if (candidates.length === 0) {
     console.log(`  built-in ${page.name} (no file found)`);
     bits = renderPage(page);
   } else {
@@ -39,6 +44,13 @@ for (const page of buildPages()) {
   for (const [k, v] of readPage(page, bits)) slots.set(k, v);
 }
 const { art, world } = slotsToArt(slots);
+const builtIn = new Map([...allWorldArt(), ...extraWorldArt()].map((s) => [s.name, s.grid]));
+for (const name of KEEP_BUILT_IN) world[name] = builtIn.get(name)!;
+for (const s of extraWorldArt()) world[s.name] = s.grid;
+for (const l of LOOSE) {
+  world[l.name] = readLoose(l);
+  console.log(`  cut      ${l.name} from shots/${l.file}`);
+}
 
 // ------------------------------------------------- write the game's PNGs
 const write = (file: string, data: Uint8Array) => {
@@ -60,8 +72,8 @@ let x = 0;
 let y = 0;
 let rowH = 0;
 const placed: { grid: Grid; x: number; y: number }[] = [];
-for (const s of allWorldArt()) {
-  const g = world[s.name];
+for (const [name, g] of Object.entries(world)) {
+  const s = { name };
   const w = g[0].length;
   const h = g.length;
   if (x + w > ATLAS_W) {

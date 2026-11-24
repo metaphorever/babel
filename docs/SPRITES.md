@@ -8,7 +8,19 @@ Moving MacPaint files in and out of the emulator turned out to be a pain, so **a
 - **Say what it is.** Keep the dotted frame labels in the shot when drawing on a sheet, or name the file after what it shows (`forest.png`, `cloud-parts.png`).
 - **Masks are optional now.** Without a mask, white that touches the outside edge of the drawing is see-through and enclosed white is solid paper. Draw a mask box only when that guess would be wrong (a see-through gap inside a shape, or solid white that touches the edge).
 - **Set pieces can be one big picture.** The forest, for example, may be a single large drawing rather than one tree repeated. (The forest never runs out of wood, so it doesn't need to show trees being cut down.)
-- **Clouds will be built from parts,** the way workers are, so the sky varies. Not built yet.
+- **Clouds will be built from parts,** the way workers are, so the sky varies. Not built yet. `art-src/shots/cloud-reference.png` shows the look: overlapping blobs, mostly flat bottoms, fluffy rounded tops, light shading toward the underside.
+
+### How a delivery is cut up (since 2026-11-23)
+
+[`tools/shots.ts`](../tools/shots.ts) lists what's in each screenshot, and `npm run art:import` does the rest:
+- **Sheet screenshots** (`world-clover.png`, `clover-buildings.png`) are lined up against their sheet by the title text, then read box by box, exactly like a `.bin` page. A box the screenshot doesn't reach reads as "not drawn" and keeps the built-in art.
+- **Loose pieces** (drawn outside any box, or set pieces in their own file) get a rectangle in the screenshot by hand, with their mask either a second drawing to the right or worked out (white touching the edge is see-through). Each delivery, Claude updates this list.
+- The result is `public/art/world.png` (one atlas) and the manifest, which the game loads.
+
+**What the first delivery taught (2026-11-23):**
+- **Inside the boxes is best,** but anything else is fine if the commit says what it is. The new dirt top was drawn just right of its box; it was found by comparing every box with the old art.
+- **The forest PNG had 19 grey pixels** (a smoothing step somewhere, or a scaled copy). They're rounded to black or white, which is harmless, but a straight 1:1 screenshot avoids it.
+- **New boxes since the sheets were made:** storage shelves (16×16, a new fixture). It isn't on your MacPaint page; draw it loose in the next delivery, at 16×16, standing on the bottom row. The game puts stone, wood and grain on it, one shelf each, bottom to top, about 5 pixels apart.
 
 ### Reference pictures to draw over
 
@@ -103,8 +115,10 @@ It won't overwrite a page that already exists. Add `-- --force` to start a page 
 | Art | In the game? |
 |---|---|
 | Workers, items, props, thought symbols | Yes, now |
-| Buildings and fixtures | Yes, from the built-in world art: generic buildings are assembled from the wall, door, window and roof parts (one 8-pixel tile each, so any width works), plus the scriptorium, the old shack, the supply wagon and every fixture. Two-story buildings stack two stories of wall with the deck between. New art for these replaces the built-in grids. |
-| Terrain, nature, the tower and the sky | Not yet: still drawn in code. |
+| Buildings and fixtures | Yes, the user's art (first delivery, 2026-11-23): generic buildings assembled from the wall, door, window and roof parts (one 8-pixel tile each, so any width works), the scriptorium, the job board, the old shack and every fixture. Storage shelves are still a placeholder. |
+| Terrain, nature, the tower's tiles, sun and moon | Yes, the user's art: dirt (top, middle, deep), the forest and field set pieces, the quarry's rock (a 16×16 texture tiled over the stepped rock face), the well, the road home sign, the supply wagon (two frames, rolling in at the start of a new game), the sun and the moon. The tower's deck, wall and ladder use their sheet boxes, which haven't been redrawn yet. |
+| Things the game draws over the art | The job board shows only as many of its four drawn notices as are posted; the pantry hides its loaves as it empties (each is a third of a full pantry); the bar gets a mug on the counter while there's beer. The scriptorium no longer shows its queue of designs (the new art has no shelf for it). |
+| Clouds | Not yet: still drawn in code, until the parts are drawn. |
 
 ## Changing the layout
 

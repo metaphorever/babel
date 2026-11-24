@@ -48,7 +48,8 @@ export const MAP = {
   field: 12,
   well: 2,
   shack: 6,
-  supplies: 4,
+  /** Wide enough for the supply wagon's art (70 px). */
+  supplies: 9,
   /** Clear ground left between features. */
   minGap: 3,
 };
@@ -63,7 +64,7 @@ export const BUILD = {
   board: { width: 2, cost: { stone: 0, wood: 2 } },
   /** The first board stands this many tiles right of the scriptorium (next to its door). */
   boardGap: 1,
-  house: { minWidth: 3, maxWidth: 16, defaultWidth: 6, woodPerTilePerStory: 1, stonePerStory: 0 },
+  house: { minWidth: 3, maxWidth: 16, defaultWidth: 6, woodPerTilePerStory: 1, stonePerStory: 0, maxName: 24 },
   /** Every fixture is two tiles wide. */
   fixtureWidth: 2,
   fixtures: {
@@ -74,9 +75,11 @@ export const BUILD = {
     bar: { cost: { stone: 0, wood: 3 } },
     /** A stockpile is just marked-out ground (or floor): free, and ready at once. */
     stockpile: { cost: { stone: 0, wood: 0 } },
+    /** Storage shelves: indoors only, and they hold twice what a stockpile does. */
+    shelves: { cost: { stone: 0, wood: 3 } },
   },
-  /** How much a fixture holds. Stockpiles indoors hold more than out in the open. */
-  capacity: { pantry: 20, bar: 12, stockpileOutdoor: 24, stockpileIndoor: 48 },
+  /** How much a fixture holds. A stockpile holds the same anywhere; shelves hold twice as much. */
+  capacity: { pantry: 20, bar: 12, stockpile: 24, shelves: 48 },
   /** Work ticks to set one unit of material in place, or take one apart. */
   unitTicks: 30,
   /** Demolishing gives back this share of what went in (rounded down). */
@@ -93,6 +96,7 @@ export const FIXTURE_LABEL = {
   brewery: 'Brewing station',
   bar: 'Bar',
   stockpile: 'Stockpile',
+  shelves: 'Storage shelves',
 } as const;
 
 export const MOVE = {
@@ -296,6 +300,8 @@ export const MOOD = {
   missedJobCap: 20,
   missedJobTicks: 1800,
   failedJob: { value: -3, ticks: 900 },
+  /** Had to pick materials up off the ground: they'd rather take from a stockpile. */
+  scavenged: { value: -3, ticks: 1200 },
 };
 
 export const POPULATION = {

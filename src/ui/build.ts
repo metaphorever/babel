@@ -19,7 +19,7 @@ export type Placing =
   | { what: 'house'; width: number; stories: 1 | 2 }
   | { what: 'fixture'; fixture: FixtureKind };
 
-const FIXTURES: FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile'];
+const FIXTURES: FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile', 'shelves'];
 
 function costText(c: { stone: number; wood: number }): string {
   const parts = [c.wood ? `${c.wood} wood` : '', c.stone ? `${c.stone} stone` : ''].filter(Boolean);
@@ -86,19 +86,27 @@ export class BuildUi {
     this.renderPalette();
   }
 
+  /** Redraw the Build window, only if it changed (rebuilding it under the mouse would swallow clicks). */
   private renderPalette(): void {
-    const s = this.s;
+    const next = h('div');
+    this.fillPalette(next);
+    if (next.innerHTML === this.palette.innerHTML) return;
     clear(this.palette);
+    this.palette.append(...next.childNodes);
+  }
+
+  private fillPalette(into: HTMLElement): void {
+    const s = this.s;
     const hasDesk = s.sites.some((x) => x.kind === 'scriptorium');
     if (!hasDesk) {
-      this.palette.append(
+      into.append(
         h('p', {}, 'First, the scriptorium and the job board. They go up together, with the board by the door.'),
         h('div', { class: 'row' }, h('button', { class: 'btn btn-default', onclick: () => this.start({ what: 'scriptorium' }) }, 'Place the scriptorium…')),
       );
       return;
     }
     if (!s.tower) {
-      this.palette.append(
+      into.append(
         h('div', { class: 'section-label' }, 'The tower'),
         h('p', { class: 'hint' }, 'Choose where the tower stands. It can never be moved.'),
         h('div', { class: 'row' }, h('button', { class: 'btn btn-default', onclick: () => this.start({ what: 'tower' }) }, 'Choose the tower site…')),
@@ -112,7 +120,7 @@ export class BuildUi {
       const nw = Math.max(BUILD.house.minWidth, Math.min(BUILD.house.maxWidth, w));
       this.start({ what: 'house', width: nw, stories: st });
     };
-    this.palette.append(
+    into.append(
       h('div', { class: 'section-label' }, 'Buildings'),
       h(
         'div',
@@ -139,9 +147,9 @@ export class BuildUi {
         ),
       );
     }
-    this.palette.append(
+    into.append(
       grid,
-      h('div', { class: 'hint' }, 'Fixtures go inside a finished building; a stockpile can also stand on open ground (inside, it holds twice as much).'),
+      h('div', { class: 'hint' }, `Fixtures go inside a finished building. A stockpile can also be marked out on open ground (it holds ${BUILD.capacity.stockpile} anywhere); storage shelves hold ${BUILD.capacity.shelves}, indoors only.`),
       h(
         'div',
         { class: 'row row-end' },
@@ -245,15 +253,27 @@ export class BuildUi {
         this.say(fp.error, true);
         return true;
       }
-      this.confirmPlace(req);
+      // fixtures are small and many (six beds...): they go straight down, and you keep placing
+      if (req.what === 'fixture') this.placeFixture(req);
+      else this.confirmPlace(req);
       return true;
     }
     if (this.demolishing) {
       const t = this.renderer.thingAt(this.s, wx, wy);
-      if (t) this.confirmDemolish(t);
+      if (t) this.takeDown(t);
       return true;
     }
     return false;
+  }
+
+  private placeFixture(req: Extract<PlaceRequest, { what: 'fixture' }>): void {
+    const r = this.sim.enqueue({ type: 'place', playerId: 0, place: req });
+    if (!r.ok) {
+      this.say(r.error, true);
+      return;
+    }
+    const free = placeCost(req).stone + placeCost(req).wood === 0;
+    this.say(`${FIXTURE_LABEL[req.fixture]} ${free ? 'marked out' : 'planned'}. Click to place another, or Esc to stop.${free ? '' : ' Post “build camp” work to have it built.'}`);
   }
 
   private confirmPlace(req: PlaceRequest): void {
@@ -319,6 +339,65 @@ export class BuildUi {
     return { x0: t.site.x0, x1: t.site.x1, y: t.site.y, height: t.site.buildingId !== null ? 16 : 24 };
   }
 
+  /**
+   * Take something away. Finished things are demolished (after a dialog).
+   * Unfinished ones are cancelled: with nothing set in place yet, at once;
+   * part-built, after a dialog, with every unit already used left to haul.
+   */
+  takeDown(t: Thing): void {
+    const thing = t.kind === 'building' ? t.building : t.site;
+    if (!thing.build) {
+      this.confirmDemolish(t);
+      return;
+    }
+    const target = t.kind === 'building' ? { kind: 'building' as const, id: t.building.id } : { kind: 'site' as const, id: t.site.id };
+    const label = t.kind === 'building' ? t.building.name : t.site.label;
+    const cancel = () => {
+      const r = this.sim.enqueue({ type: 'demolish', playerId: 0, target });
+      this.say(r.ok ? `Cancelled: ${label}.` : r.error, !r.ok);
+    };
+    const placed = thing.build.placed;
+    if (placed.stone + placed.wood === 0) {
+      cancel();
+      return;
+    }
+    this.modal(
+      'Cancel',
+      [h('p', {}, `Cancel ${label}? It’s ${Math.floor(worksFraction(thing.build) * 100)}% built.`), h('p', { class: 'hint' }, `Nothing is lost: the ${costText(placed)} already set in place will be left there to haul.`)],
+      [
+        { label: 'Keep Building', run: () => undefined },
+        { label: 'Cancel It', primary: true, run: cancel },
+      ],
+    );
+  }
+
+  /** The button for taking something away: "Cancel…" until it's finished, then "Demolish…". */
+  private takeDownButton(t: Thing): HTMLElement {
+    const thing = t.kind === 'building' ? t.building : t.site;
+    return h('button', { class: 'btn', disabled: !!thing.demolish, onclick: () => this.takeDown(t) }, thing.build ? 'Cancel…' : 'Demolish…');
+  }
+
+  private rename(b: Building): void {
+    const input = h('input', { type: 'text', value: b.name, maxlength: BUILD.house.maxName, 'aria-label': 'Name' });
+    this.modal(
+      'Rename',
+      [h('div', { class: 'row' }, h('label', {}, 'Name ', input))],
+      [
+        { label: 'Cancel', run: () => undefined },
+        {
+          label: 'Rename',
+          primary: true,
+          run: () => {
+            const r = this.sim.enqueue({ type: 'rename', playerId: 0, buildingId: b.id, name: input.value });
+            if (!r.ok) this.say(r.error, true);
+            this.refreshInfo();
+          },
+        },
+      ],
+      input,
+    );
+  }
+
   confirmDemolish(t: Thing): void {
     const target = t.kind === 'building' ? { kind: 'building' as const, id: t.building.id } : { kind: 'site' as const, id: t.site.id };
     const check = this.sim.enqueue.bind(this.sim);
@@ -354,22 +433,36 @@ export class BuildUi {
     this.refreshInfo();
   }
 
+  /**
+   * Redraw the building window, but only when what it shows has changed:
+   * rebuilding it under the mouse would swallow clicks.
+   */
   private refreshInfo(): void {
     const win = this.wm.get('thing')!;
     if (!win.open || !this.infoTarget) return;
-    const s = this.s;
+    const next = h('div');
+    const title = this.renderInfo(next);
+    win.title.textContent = title;
+    if (next.innerHTML === this.infoBody.innerHTML) return;
     clear(this.infoBody);
-    const t = this.infoTarget;
+    this.infoBody.append(...next.childNodes);
+  }
+
+  /** The building window's contents; returns its title. */
+  private renderInfo(into: HTMLElement): string {
+    const s = this.s;
+    const t = this.infoTarget!;
     const kv = (k: string, v: string) => h('div', { class: 'kv' }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v));
     if (t.kind === 'building') {
       const b = s.buildings.find((x) => x.id === t.building.id);
       if (!b) {
-        win.title.textContent = 'Gone';
-        this.infoBody.append(h('div', { class: 'hint' }, 'It has been taken down.'));
-        return;
+        into.append(h('div', { class: 'hint' }, 'It has been taken down.'));
+        return 'Gone';
       }
-      win.title.textContent = b.name;
-      this.infoBody.append(
+      into.append(
+        b.kind === 'house'
+          ? h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Name'), h('span', { class: 'v' }, b.name, ' ', h('button', { class: 'btn btn-small', onclick: () => this.rename(b) }, 'Rename…')))
+          : '',
         kv('Label', buildingLabel(s, b)),
         kv('Size', `${b.x1 - b.x0 + 1} tiles wide, ${b.stories === 1 ? 'one story' : 'two stories'}`),
         kv('State', statusOf(b)),
@@ -377,28 +470,27 @@ export class BuildUi {
           'div',
           { class: 'row row-end' },
           b.kind === 'house' && !b.build ? h('button', { class: 'btn', onclick: () => this.wm.show('build') }, 'Add a fixture…') : null,
-          h('button', { class: 'btn', disabled: !!b.demolish, onclick: () => this.confirmDemolish({ kind: 'building', building: b }) }, 'Demolish…'),
+          this.takeDownButton({ kind: 'building', building: b }),
         ),
       );
-      return;
+      return b.name;
     }
     const site = s.sites.find((x) => x.id === t.site.id);
     if (!site) {
-      win.title.textContent = 'Gone';
-      this.infoBody.append(h('div', { class: 'hint' }, 'It has been taken down.'));
-      return;
+      into.append(h('div', { class: 'hint' }, 'It has been taken down.'));
+      return 'Gone';
     }
-    win.title.textContent = site.label;
     const b = s.buildings.find((x) => x.id === site.buildingId);
     const goods = (['stone', 'wood', 'grain', 'bread', 'beer'] as const).filter((k) => site.store[k] > 0).map((k) => `${site.store[k]} ${k}`);
-    this.infoBody.append(
+    into.append(
       kv('Where', b ? `${b.name}${site.y < groundRow() ? ', upstairs' : ''}` : 'Out in the open'),
       kv('State', statusOf(site)),
       site.capacity !== null && !site.supplies ? kv('Holds', `${storedTotal(site)} of ${site.capacity}`) : '',
       goods.length ? kv('Has', goods.join(', ')) : '',
       site.broken ? h('div', { class: 'hint' }, 'Broken beyond repair. Take it down for the materials.') : '',
-      h('div', { class: 'row row-end' }, h('button', { class: 'btn', disabled: !!site.demolish, onclick: () => this.confirmDemolish({ kind: 'site', site }) }, 'Demolish…')),
+      h('div', { class: 'row row-end' }, this.takeDownButton({ kind: 'site', site })),
     );
+    return site.label;
   }
 
   // ------------------------------------------------------- System 7 dialogs
@@ -507,6 +599,19 @@ export class BuildUi {
   openComposer(lines: DraftLine[]): void {
     this.scriptorium.openDraft(lines);
   }
+
+  /** For the tutorial: send a blueprint for the next floor to the scriptorium. */
+  drawBlueprint(): void {
+    const r = this.sim.enqueue({ type: 'blueprint', playerId: 0 });
+    this.say(r.ok ? 'A blueprint is being drawn. A courier carries it to the top of the tower.' : r.error, !r.ok);
+  }
+}
+
+/** Floors built, under way, and blueprints still being drawn or carried up. */
+function blueprintsSoFar(s: SimState): number {
+  const drawing = s.designs.filter((d) => d.carrier.kind === 'blueprint').length;
+  const carried = s.workers.reduce((n, w) => n + w.bag.filter((c) => c.kind === 'blueprint').length, 0) + s.outbox.filter((c) => c.kind === 'blueprint').length;
+  return s.floors + s.projects.length + drawing + carried;
 }
 
 function statusOf(x: Building | Site): string {
@@ -539,6 +644,26 @@ function steps(s: SimState): Step[] {
     {
       title: 'The stipend',
       text: `Your patron pays a stipend each dawn: ${stipend} gold while their patience is full. Patience wears thin over time, and the stipend shrinks with it. For the first ${PATRON.graceDays} days you have grace: patience won’t drop while the camp gets started. But the patron expects the tower’s first floor by then. Each finished floor wins patience back and brings a bonus; building anything else helps a little too.`,
+    },
+    {
+      title: 'Gathering',
+      text: 'Everything is built from stone, wood and grain, and none of it gathers itself. Your patron has pinned a few starter jobs to the board: mine stone at the quarry, chop wood in the forest, harvest grain in the field. When those run out, write more at the scriptorium.',
+      buttons: [
+        { label: 'Write “mine stone”…', run: (b) => b.openComposer([{ verb: 'MINE', noun: 'STONE', from: null, to: null, count: 12 }]) },
+        { label: 'Write “chop wood”…', run: (b) => b.openComposer([{ verb: 'CHOP', noun: 'WOOD', from: null, to: null, count: 12 }]) },
+        { label: 'Write “harvest grain”…', run: (b) => b.openComposer([{ verb: 'HARVEST', noun: 'GRAIN', from: null, to: null, count: 8 }]) },
+      ],
+    },
+    {
+      title: 'Stockpiles',
+      text: `You will need a place to store the supplies you’ll be using. Place one or more stockpile markers to show where supplies can be stored for later. Workers don’t like having to search for materials to make things, so be sure to write haul orders to get loose supplies moved to a storage area where they can be put to proper use. A stockpile holds ${BUILD.capacity.stockpile}; later, storage shelves inside a building hold ${BUILD.capacity.shelves}.`,
+      buttons: [
+        { label: 'Place a stockpile…', run: (b) => b.start({ what: 'fixture', fixture: 'stockpile' }) },
+        { label: 'Write “haul stone”…', run: (b) => b.openComposer([{ verb: 'HAUL', noun: 'STONE', from: null, to: null, count: -1 }]) },
+        { label: 'Write “haul wood”…', run: (b) => b.openComposer([{ verb: 'HAUL', noun: 'WOOD', from: null, to: null, count: -1 }]) },
+        { label: 'Write “haul grain”…', run: (b) => b.openComposer([{ verb: 'HAUL', noun: 'GRAIN', from: null, to: null, count: -1 }]) },
+      ],
+      done: (s) => s.sites.some((x) => x.kind === 'stockpile' && !x.supplies),
     },
     {
       title: 'The tower',
@@ -579,12 +704,6 @@ function steps(s: SimState): Step[] {
       ],
     },
     {
-      title: 'Stockpiles',
-      text: `Workers can only use what has been stored. Stockpiles can go outside (they hold ${BUILD.capacity.stockpileOutdoor}) or inside a building (they hold ${BUILD.capacity.stockpileIndoor}). Haulers fill the nearest one with room.`,
-      buttons: [{ label: 'Build a stockpile…', run: (b) => b.start({ what: 'fixture', fixture: 'stockpile' }) }],
-      done: (s) => s.sites.some((x) => x.kind === 'stockpile' && !x.supplies),
-    },
-    {
       title: 'Demolishing',
       text: 'The old shack is no use to anyone. Click Demolish and select the broken oven inside it.',
       buttons: [{ label: 'Demolish…', run: (b) => b.startDemolish() }],
@@ -595,6 +714,12 @@ function steps(s: SimState): Step[] {
       text: 'Now demolish the shack too. Demolishing gives back half the materials, left lying there for haulers. A pantry, bar or stockpile only comes down once it’s empty, and a building once its fixtures are gone.',
       buttons: [{ label: 'Demolish…', run: (b) => b.startDemolish() }],
       done: (s) => !s.buildings.some((x) => x.kind === 'shack' && !x.demolish),
+    },
+    {
+      title: 'Plans for the next floor',
+      text: 'You will need to draft and deliver plans for each new level of the tower before construction on it can begin. You can draft plans for more than one level at a time; they’re saved until they’re needed. Draft the plans for the second floor now.',
+      buttons: [{ label: 'Draw a blueprint', run: (b) => b.drawBlueprint() }],
+      done: (s) => blueprintsSoFar(s) >= 2,
     },
     {
       title: 'A warning',
