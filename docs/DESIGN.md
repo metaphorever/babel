@@ -584,14 +584,17 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 
 *The user: every fixture can be built in the tower; tower rooms start empty and need everything built in them, the ladder (or stairs) included.*
 
-- **A finished floor is an empty room.** No ladder and no stockpile come with it any more. The log says so: "Its room is empty: place a ladder on the ground floor to reach it."
+- **A finished floor is an empty room.** No ladder and no stockpile come with it any more. The log says so: "Tower Level 2 is finished! ... Its room is empty: place a ladder on Tower Ground Level to reach it."
 - **Rooms** are the tower's ground floor (as soon as the site is chosen) and every finished floor, inside the walls. Any fixture can go in one, placed the same way as in a building: point at the story. Storage shelves count a tower room as indoors.
 - **Ladders** are a fixture now: 2 wood, one tile wide, tower rooms only (two-story buildings still come with their own). A ladder stands in a room and climbs to the floor above, so it needs that floor to be finished. Floor 1 can be built from the ground, but to build floor 2, or to carry its blueprint to the top, workers need a ladder from the ground floor up to floor 1.
 - **"Build camp" builds them,** like every other fixture, wherever it stands. *Claude's call:* CAMP is everything the player places; TOWER is the floors themselves. If a separate tower crew should do tower fixtures, that's a small change.
 - **Taking a ladder down** planks over the hole. Anyone left above it with no other way down climbs down first.
 - **Fixtures that need height:** a fixture can have a lowest story it goes on (`minStory` in `BUILD.fixtures`, 0 = the ground floor), checked in buildings and in the tower alike. None uses it yet; the pulley lift will (the floor above the ground or higher).
 - **The tutorial's "plans for the next floor" step** now also explains that floors are empty rooms, and, once floor 1 stands, asks for a ladder on the tower's ground floor if there isn't one (with a button that starts placing it). It moves on when the plans are drafted and the ladder is placed.
-- **Open question: numbering.** The game calls the first deck above the ground "floor 1" (and the room under it the ground floor). The user's notes sometimes count the ground floor as floor 1 ("the pulley lift can only go on floor 2 or higher", in a two-story building). The two should agree before the tutorial text is final.
+- **Numbering (settled by the user, session 4):** the ground counts as the first level. The game says **"Tower Ground Level"**, then **"Tower Level 2"**, "Tower Level 3" and so on ("Ground Level" / "Level 2" where the tower goes without saying, as in the Tower window). It says "level", never "floor", to stay out of what-is-a-floor semantics. Orders use the word too: "haul stone from base to level 4" (French *niveau*, Greek *επίπεδο*).
+  - **In the code nothing moved:** levels stay 0-based (`site.level`, `s.floors`, `Project.level`, the FLOOR token's `n`). Index 0 is the ground, index n stands on the nth deck and reads as "Level n+1". `levelName()` in lang.ts is the one place that turns an index into words; use it for anything the player reads.
+  - **Tuning kept its behavior,** so the copy shifted by one: drift starts at Tower Level 4 (`DRIFT.lineFloor` = 3), French drifts in once the tower reaches Level 4, Greek at Level 6. The patron's goal reads "Tower Level 30", though `TOWER.maxFloors` (30 decks) lets the tower reach Level 31. Retune if those numbers should land on rounder levels.
+  - A pulley lift that "only goes on floor 2 or higher" is `minStory: 1`: Tower Level 2 or higher, or upstairs in a two-story building.
 
 ## 16. Roadmap: ideas the user has decided on, not built yet
 

@@ -1,4 +1,4 @@
-import { BUILD, FIXTURE_LABEL, PATRON, TOWER, currentStipend, type Building, type FixtureKind, type Sim, type SimState, type Site } from '../sim';
+import { BUILD, DRIFT, FIXTURE_LABEL, PATRON, TOWER, levelName, currentStipend, type Building, type FixtureKind, type Sim, type SimState, type Site } from '../sim';
 import { fixtureWidth, footprint, houseCost, placeCost, worksFraction, type PlaceRequest } from '../sim/build';
 import { deckRow } from '../sim/tower';
 import { buildingLabel, groundRow, siteTitle, storedTotal } from '../sim/world';
@@ -149,7 +149,7 @@ export class BuildUi {
     }
     into.append(
       grid,
-      h('div', { class: 'hint' }, `Fixtures go inside a finished building or a tower room. A stockpile can also be marked out on open ground (it holds ${BUILD.capacity.stockpile} anywhere); storage shelves hold ${BUILD.capacity.shelves}, indoors only. Each tower floor starts as an empty room: a ladder from the room below is the way up to it.`),
+      h('div', { class: 'hint' }, `Fixtures go inside a finished building or a tower room. A stockpile can also be marked out on open ground (it holds ${BUILD.capacity.stockpile} anywhere); storage shelves hold ${BUILD.capacity.shelves}, indoors only. Each tower level starts as an empty room: a ladder from the room below is the way up to it.`),
       h(
         'div',
         { class: 'row row-end' },
@@ -495,7 +495,7 @@ export class BuildUi {
         ? h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Name'), h('span', { class: 'v' }, site.label, ' ', h('button', { class: 'btn btn-small', onclick: () => this.rename({ kind: 'site', site }) }, 'Rename…')))
         : '',
       site.named ? kv('Number', `${FIXTURE_LABEL[site.kind as FixtureKind]} ${site.num}`) : '',
-      kv('Where', b ? `${b.name}${site.y < groundRow() ? ', upstairs' : ''}` : site.level > 0 ? `Tower floor ${site.level}` : 'Out in the open'),
+      kv('Where', b ? `${b.name}${site.y < groundRow() ? ', upstairs' : ''}` : site.level > 0 || (s.tower && site.x0 >= s.tower.x0 && site.x1 <= s.tower.x1) ? levelName(site.level) : 'Out in the open'),
       kv('State', statusOf(site)),
       site.capacity !== null && !site.supplies ? kv('Holds', `${storedTotal(site)} of ${site.capacity}`) : '',
       goods.length ? kv('Has', goods.join(', ')) : '',
@@ -619,12 +619,12 @@ export class BuildUi {
   }
 }
 
-/** Floors built, under way, and blueprints still being drawn or carried up. */
-/** A ladder planned (or built) on the tower's ground floor, up to floor 1. */
+/** A ladder planned (or built) on the Tower Ground Level, up to Level 2. */
 function ladderPlaced(s: SimState): boolean {
   return s.sites.some((x) => x.kind === 'ladder' && x.level === 0 && !x.demolish);
 }
 
+/** Levels built, under way, and blueprints still being drawn or carried up. */
 function blueprintsSoFar(s: SimState): number {
   const drawing = s.designs.filter((d) => d.carrier.kind === 'blueprint').length;
   const carried = s.workers.reduce((n, w) => n + w.bag.filter((c) => c.kind === 'blueprint').length, 0) + s.outbox.filter((c) => c.kind === 'blueprint').length;
@@ -661,7 +661,7 @@ function steps(s: SimState): Step[] {
   return [
     {
       title: 'The stipend',
-      text: `Your patron pays a stipend each dawn: ${stipend} gold while their patience is full. Patience wears thin over time, and the stipend shrinks with it. For the first ${PATRON.graceDays} days you have grace: patience won’t drop while the camp gets started. But the patron expects the tower’s first floor by then. Each finished floor wins patience back and brings a bonus; building anything else helps a little too.`,
+      text: `Your patron pays a stipend each dawn: ${stipend} gold while their patience is full. Patience wears thin over time, and the stipend shrinks with it. For the first ${PATRON.graceDays} days you have grace: patience won’t drop while the camp gets started. But the patron expects Tower Level 2 to be finished by then. Each finished level wins patience back and brings a bonus; building anything else helps a little too.`,
     },
     {
       title: 'Gathering',
@@ -685,7 +685,7 @@ function steps(s: SimState): Step[] {
     },
     {
       title: 'The tower',
-      text: 'The tower is why you’re here: the higher, the better. Choose its site now. Once chosen, it can never be moved, so leave room around it. Floors are built from blueprints: draw one in the Tower window, then post “build tower” work.',
+      text: 'The tower is why you’re here: the higher, the better. Choose its site now. Once chosen, it can never be moved, so leave room around it. Each level is built from a blueprint: draw one in the Tower window, then post “build tower” work.',
       buttons: [{ label: 'Choose the tower site…', run: (b) => b.start({ what: 'tower' }) }],
       done: (s) => s.tower !== null,
     },
@@ -734,19 +734,19 @@ function steps(s: SimState): Step[] {
       done: (s) => !s.buildings.some((x) => x.kind === 'shack' && !x.demolish),
     },
     {
-      title: 'Plans for the next floor',
+      title: 'Plans for the next level',
       text: (s) => {
         const plans =
           blueprintsSoFar(s) < 2
-            ? 'You will need to draft and deliver plans for each new level of the tower before construction on it can begin. You can draft plans for more than one level at a time; they’re saved until they’re needed. Draft the plans for the second floor now. '
-            : 'The plans for the second floor are drafted. ';
-        const rooms = 'Each new floor of the tower is an empty room: your workers have to build everything in it, including the ladder up to it. ';
+            ? 'You will need to draft and deliver plans for each new level of the tower before construction on it can begin. You can draft plans for more than one level at a time; they’re saved until they’re needed. Draft the plans for Tower Level 3 now. '
+            : 'The plans for Tower Level 3 are drafted. ';
+        const rooms = 'Each new level of the tower is an empty room: your workers have to build everything in it, including the ladder up to it. ';
         const ladder =
           s.floors === 0
-            ? 'Once floor 1 is finished, place a ladder on the tower’s ground floor, so workers can climb up to build floor 2 and carry the plans to the top.'
+            ? 'Once Tower Level 2 is finished, place a ladder on the Tower Ground Level, so workers can climb up to build Level 3 and carry its plans to the top.'
             : ladderPlaced(s)
-              ? 'The ladder up to floor 1 is planned; “build camp” work gets it built.'
-              : 'Right now there’s no way up to floor 1. Place a ladder on the tower’s ground floor, and post “build camp” work to get it built.';
+              ? 'The ladder up to Tower Level 2 is planned; “build camp” work gets it built.'
+              : 'Right now there’s no way up to Tower Level 2. Place a ladder on the Tower Ground Level, and post “build camp” work to get it built.';
         return plans + rooms + ladder;
       },
       buttons: (s) => [
@@ -757,7 +757,7 @@ function steps(s: SimState): Step[] {
     },
     {
       title: 'A warning',
-      text: 'One last thing. High in the tower, from the third floor up, your workers’ words start to drift into other languages. You’ll learn more when it happens.',
+      text: `One last thing. High in the tower, from ${levelName(DRIFT.lineFloor)} up, your workers’ words start to drift into other languages. You’ll learn more when it happens.`,
     },
   ];
 }

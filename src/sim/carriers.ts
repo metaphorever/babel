@@ -104,7 +104,7 @@ export function lineText(c: Carrier, i: number): string {
 }
 
 export function carrierText(c: Carrier): string {
-  if (c.kind === 'blueprint') return 'blueprint for the next floor';
+  if (c.kind === 'blueprint') return 'blueprint for the next level';
   return c.orders.map((_, i) => lineText(c, i)).join(' → ');
 }
 

@@ -10,6 +10,7 @@ import {
   allowsAll,
   allowsForever,
   countText,
+  levelName,
   isSpecialCount,
   LANGS,
   langName,
@@ -216,7 +217,7 @@ export class ScriptoriumPanel {
       h(
         'div',
         { class: 'row' },
-        h('button', { class: 'btn', onclick: () => this.blueprint() }, 'Draw a blueprint for the next floor'),
+        h('button', { class: 'btn', onclick: () => this.blueprint() }, 'Draw a blueprint for the next level'),
         this.bpError,
       ),
       h('div', { class: 'hint' }, 'Someone with DELIVER carries it to the top of the tower; then builders can start.'),
@@ -334,8 +335,8 @@ export class ScriptoriumPanel {
     ];
     // floors only where something up there keeps this good
     const floors = [...new Set(stores.filter((x) => x.level > 0).map((x) => x.level))].sort((a, b) => a - b);
-    if (floors.length > 0) opts.push({ key: placeKey('tower'), place: 'tower', text: `${dir} the tower (any floor)`, words: ['TOWER'] });
-    for (const k of floors) opts.push({ key: placeKey(k), place: k, text: `${dir} floor ${k}`, words: ['FLOOR'] });
+    if (floors.length > 0) opts.push({ key: placeKey('tower'), place: 'tower', text: `${dir} the tower (any level)`, words: ['TOWER'] });
+    for (const k of floors) opts.push({ key: placeKey(k), place: k, text: `${dir} ${levelName(k)}`, words: ['FLOOR'] });
     for (const x of stores) {
       const word = STORE_WORD[x.kind as keyof typeof STORE_WORD];
       const p: Place = x.named ? { name: x.label } : { fixture: word, n: x.num };

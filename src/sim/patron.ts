@@ -1,7 +1,7 @@
 import { log } from './actions';
 import { hasWriteLine, scribeLoop } from './carriers';
 import { knows, knowsWord } from './drift';
-import { LANGS, langName, type LangId } from './lang';
+import { LANGS, langName, levelName, type LangId } from './lang';
 import { addWorker } from './sim';
 import { ARRIVALS, PATRON, POPULATION, TIME } from './tuning';
 import { dayOf } from './time';
@@ -95,7 +95,7 @@ export function updatePatron(s: SimState): void {
     if (s.tick === s.graceUntil - 1) log(s, "The patron's grace period is over. Their patience will start to wear thin.");
   } else s.patience = Math.max(0, s.patience - PATRON.patienceDrain[s.difficulty]);
   if (before > 0 && s.patience === 0) log(s, 'The patron has run out of patience. No more stipend until the tower grows again.');
-  else if (before >= 25 && s.patience < 25) log(s, 'The patron is growing impatient. Finish a floor soon.');
+  else if (before >= 25 && s.patience < 25) log(s, 'The patron is growing impatient. Finish a level of the tower soon.');
 
   // the patron pays at dawn
   if (s.tick >= s.nextStipend) {
@@ -128,7 +128,7 @@ export function patronFloorDone(s: SimState, level: number): void {
   const bonus = PATRON.floorBonusBase + PATRON.floorBonusPerLevel * level;
   s.gold += bonus;
   s.income += bonus;
-  log(s, `The patron is pleased with floor ${level} and sends ${bonus} gold.`);
+  log(s, `The patron is pleased with ${levelName(level)} and sends ${bonus} gold.`);
 }
 
 /** The patron gives the colony a few days to get started (until floor 1 is finished). */

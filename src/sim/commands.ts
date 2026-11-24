@@ -81,7 +81,7 @@ function buildCarrier(s: SimState, cmd: Extract<Command, { type: 'compose' }>, d
 
 /** What's wrong with a place in an order, if anything. Places that don't exist (yet) are fine: the order just fails when it's carried out. */
 function placeError(p: Place): string | null {
-  if (typeof p === 'number') return Number.isInteger(p) && p >= 0 && p <= TOWER.maxFloors ? null : 'No such floor.';
+  if (typeof p === 'number') return Number.isInteger(p) && p >= 0 && p <= TOWER.maxFloors ? null : 'No such level.';
   if (p === 'tower') return null;
   if (typeof p !== 'object' || p === null) return 'No such place.';
   if ('fixture' in p) return FIXTURE_WORDS.includes(p.fixture) && Number.isInteger(p.n) && p.n >= 1 && p.n <= 999 ? null : 'No such fixture.';
@@ -191,7 +191,7 @@ export function applyCommand(s: SimState, cmd: Command): CommandResult {
     case 'blueprint': {
       // a drawing for the next floor; a courier has to carry it to the top
       queueDesign(s, newBlueprint(s));
-      log(s, 'Sent to the scriptorium: a blueprint for the next floor.');
+      log(s, 'Sent to the scriptorium: a blueprint for the next level.');
       break;
     }
     case 'place':

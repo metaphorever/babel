@@ -1,6 +1,6 @@
 import { log } from './actions';
 import { newCarrier, pinNotice, scribeLoop } from './carriers';
-import { ALL, makeOrder, type Noun, type WorkVerb } from './lang';
+import { ALL, levelName, makeOrder, type Noun, type WorkVerb } from './lang';
 import { giveCarrier } from './scrolls';
 import { BUILD, FIXTURE_LABEL, MAP, PATRON, TOWER, type FixtureSpec } from './tuning';
 import { deckRow, ladderRows, standRow } from './tower';
@@ -93,9 +93,9 @@ export function fixtureWidth(kind: FixtureKind): number {
   return fixtureSpec(kind).width ?? BUILD.fixtureWidth;
 }
 
-/** "the ground floor", "floor 2": a story of a building or the tower, as the player reads it. */
+/** "the ground floor", "Tower Level 2": a story of a building or the tower, as the player reads it. */
 function storyName(story: number, tower: boolean): string {
-  if (tower) return story === 0 ? "the tower's ground floor" : `floor ${story} of the tower`;
+  if (tower) return levelName(story);
   return story === 0 ? 'the ground floor' : 'upstairs';
 }
 
@@ -209,8 +209,8 @@ function towerFootprint(s: SimState, req: Extract<PlaceRequest, { what: 'fixture
     fp.blocked[i] = wall || taken || ladder;
   }
   const label = FIXTURE_LABEL[req.fixture];
-  if (level > s.floors) fp.error = `Floor ${level} isn't built yet.`;
-  else if (req.fixture === 'ladder' && level + 1 > s.floors) fp.error = `A ladder needs a finished floor above it to climb to${s.projects.length ? `: floor ${level + 1} is still being built` : ''}.`;
+  if (level > s.floors) fp.error = `${levelName(level)} isn't built yet.`;
+  else if (req.fixture === 'ladder' && level + 1 > s.floors) fp.error = `A ladder needs a finished level above it to climb to${s.projects.length ? `: ${levelName(level + 1)} is still being built` : ''}.`;
   else if (level < (fixtureSpec(req.fixture).minStory ?? 0)) fp.error = `${label} can't go on ${storyName(level, true)}.`;
   else if (fp.blocked.some((b, i) => b && (fp.x0 + i <= t.x0 || fp.x0 + i >= t.x1))) fp.error = 'Fixtures go inside the tower’s walls.';
   else if (fp.blocked.some(Boolean)) fp.error = 'Something is already there.';
@@ -383,7 +383,7 @@ function finishBuild(s: SimState, j: Job): void {
     site.build = null;
     const b = buildingOf(s, site);
     if (site.kind === 'ladder') layLadder(s, site);
-    log(s, `${site.kind === 'board' || site.kind === 'scriptorium' ? `The ${site.label.toLowerCase()}` : site.label} is built${b ? ` in ${b.name}` : site.kind === 'ladder' ? `: the way up to floor ${site.level + 1}` : ''}.`);
+    log(s, `${site.kind === 'board' || site.kind === 'scriptorium' ? `The ${site.label.toLowerCase()}` : site.label} is built${b ? ` in ${b.name}` : site.kind === 'ladder' ? `: the way up to ${levelName(site.level + 1)}` : ''}.`);
     if (site.kind === 'scriptorium' || site.kind === 'board') checkFounding(s);
   }
   pleasePatron(s, units);

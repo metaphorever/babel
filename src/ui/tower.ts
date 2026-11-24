@@ -1,4 +1,4 @@
-import { currentStipend, type Sim, type SimState } from '../sim';
+import { currentStipend, levelName, type Sim, type SimState } from '../sim';
 import { activeProject, projectFraction, standRow } from '../sim/tower';
 import { siteTitle } from '../sim/world';
 import { bar, clear, h } from './dom';
@@ -45,21 +45,21 @@ export class TowerPanel {
     const s = this.s;
     clear(this.body);
     const kv = (k: string, v: Node | string) => h('div', { class: 'kv' }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v));
-    this.body.append(kv('Height', s.floors === 0 ? 'Just the foundation' : `${s.floors} ${s.floors === 1 ? 'floor' : 'floors'}`));
-    this.body.append(kv('Patron’s goal', 'Floor 30: catch a cloud in a jar'));
+    this.body.append(kv('Height', s.floors === 0 ? 'Just the Ground Level' : `${s.floors + 1} levels, up to ${levelName(s.floors, true)}`));
+    this.body.append(kv('Patron’s goal', 'Tower Level 30: catch a cloud in a jar'));
     this.body.append(
       h('div', { class: 'section-label' }, 'The patron'),
       h('div', { class: 'need' }, h('span', { class: 'k' }, 'Patience'), bar(s.patience), h('span', { class: 'num' }, `${Math.round(s.patience)}%`)),
       kv('Stipend', s.patience > 0 ? `${currentStipend(s)} gold each dawn` : 'Stopped until the tower grows'),
       kv('Difficulty', s.difficulty),
-      h('div', { class: 'hint' }, 'Patience drains steadily. Each finished floor wins some back and brings a bonus. While the patron is pleased, newcomers arrive on the road.'),
+      h('div', { class: 'hint' }, 'Patience drains steadily. Each finished level wins some back and brings a bonus. While the patron is pleased, newcomers arrive on the road.'),
     );
 
     const p = activeProject(s);
     this.body.append(h('div', { class: 'section-label' }, 'Under construction'));
     if (p) {
       this.body.append(
-        h('div', { class: 'need' }, h('span', { class: 'k' }, `Floor ${p.level}`), bar(projectFraction(p) * 100), h('span', { class: 'num' }, `${Math.floor(projectFraction(p) * 100)}%`)),
+        h('div', { class: 'need' }, h('span', { class: 'k' }, levelName(p.level, true)), bar(projectFraction(p) * 100), h('span', { class: 'num' }, `${Math.floor(projectFraction(p) * 100)}%`)),
         kv('Stone', `${p.placed.stone} / ${p.needs.stone} set (walls)`),
         kv('Wood', `${p.placed.wood} / ${p.needs.wood} set (deck)`),
       );
@@ -71,7 +71,7 @@ export class TowerPanel {
     } else {
       this.body.append(h('div', { class: 'hint' }, 'Nothing under way. A blueprint has to be written and carried to the top before anyone can build.'));
     }
-    for (const q of s.projects.slice(1)) this.body.append(kv(`Floor ${q.level}`, 'planned, waiting its turn'));
+    for (const q of s.projects.slice(1)) this.body.append(kv(levelName(q.level, true), 'planned, waiting its turn'));
 
     // blueprints still in the scriptorium or on their way up
     const writing = s.designs.filter((d) => d.carrier.kind === 'blueprint').length;
@@ -96,6 +96,6 @@ export class TowerPanel {
         ),
       );
     }
-    this.body.append(t, h('div', { class: 'hint' }, 'Builders fetch from the highest stockpile below the floor they’re building. Each floor starts as an empty room: place a ladder up to it, and a stockpile in it, then haul stone and wood up so builders don’t have to climb all the way down.'));
+    this.body.append(t, h('div', { class: 'hint' }, 'Builders fetch from the highest stockpile below the level they’re building. Each level starts as an empty room: place a ladder up to it, and a stockpile in it, then haul stone and wood up so builders don’t have to climb all the way down.'));
   }
 }

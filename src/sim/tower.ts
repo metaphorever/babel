@@ -1,4 +1,5 @@
 import { log } from './actions';
+import { levelName } from './lang';
 import { patronFloorDone } from './patron';
 import { TOWER, WORLD } from './tuning';
 import { Tile, type BuildMaterial, type Pt, type Project, type SimState } from './types';
@@ -73,7 +74,7 @@ export function startFloorFromBlueprint(s: SimState): Project | null {
   if (planned >= TOWER.maxFloors || !s.tower) return null;
   const p = newProject(s, planned + 1);
   s.projects.push(p);
-  log(s, `A blueprint for floor ${p.level} is up. Builders can start.`);
+  log(s, `A blueprint for ${levelName(p.level)} is up. Builders can start.`);
   return p;
 }
 
@@ -110,8 +111,7 @@ function completeFloor(s: SimState, p: Project): void {
   s.floors = p.level;
   s.projects = s.projects.filter((x) => x !== p);
   patronFloorDone(s, p.level);
-  const below = p.level === 1 ? 'the ground floor' : `floor ${p.level - 1}`;
-  log(s, `Floor ${p.level} is finished! The tower stands ${p.level} ${p.level === 1 ? 'floor' : 'floors'} tall. Its room is empty: place a ladder on ${below} to reach it.`);
+  log(s, `${levelName(p.level)} is finished! The tower stands ${p.level + 1} levels tall. Its room is empty: place a ladder on ${levelName(p.level - 1)} to reach it.`);
 }
 
 /** The rows a ladder on this level fills: from its room up through the deck of the floor above. */

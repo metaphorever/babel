@@ -11,7 +11,7 @@ import type { Command } from '../src/sim/commands';
 import { giveCarrier, writingCostFor } from '../src/sim/scrolls';
 import { addConfusion, allWords, readOrder, updateDrift } from '../src/sim/drift';
 import { eligibleNotices } from '../src/sim/activities';
-import { ALL, FOREVER, makeOrder, orderText, parseOrder, type Noun, type Verb, type WorkVerb } from '../src/sim/lang';
+import { ALL, FOREVER, levelName, makeOrder, orderText, parseOrder, type Noun, type Verb, type WorkVerb } from '../src/sim/lang';
 import { deckRow, newProject, placeMaterial } from '../src/sim/tower';
 import { findJob, finishNow, type PlaceRequest } from '../src/sim/build';
 
@@ -449,7 +449,11 @@ describe('the tower', () => {
 
   it('orders with places read back the way they were written', () => {
     const o = makeOrder('HAUL', 'STONE', { from: 0, to: 3 });
-    expect(orderText(o)).toBe('haul stone from base to floor 3');
+    expect(orderText(o)).toBe('haul stone from base to level 4');
+    // the ground counts as the first level: index 3 reads as level 4
+    expect(levelName(0)).toBe('Tower Ground Level');
+    expect(levelName(1)).toBe('Tower Level 2');
+    expect(levelName(3, true)).toBe('Level 4');
     expect(parseOrder(o)).toEqual({ verb: 'HAUL', noun: 'STONE', who: null, from: 0, to: 3 });
   });
 

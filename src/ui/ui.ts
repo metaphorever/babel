@@ -1,5 +1,7 @@
 import {
   availableGold,
+  DRIFT,
+  levelName,
   ALL,
   FOREVER,
   carrierText,
@@ -129,7 +131,7 @@ export class Ui {
       h('button', { class: 'menu-item', onclick: () => this.wm.toggle(id) }, label);
     this.gold = h('span', { class: 'menu-stat' });
     this.clock = h('span', { class: 'menu-stat' });
-    this.patron = h('span', { class: 'menu-stat', title: "The patron's patience. It drains steadily; every finished floor wins some back. The stipend shrinks with it." });
+    this.patron = h('span', { class: 'menu-stat', title: "The patron's patience. It drains steadily; every finished level wins some back. The stipend shrinks with it." });
     this.alerts = h('button', { class: 'menu-item menu-alert', onclick: () => this.wm.show('roster') });
     const speeds = h('span', { class: 'speeds' });
     ['❚❚', '▶', '▶▶', '▶▶▶'].forEach((label, i) => {
@@ -394,7 +396,7 @@ export class Ui {
       t,
       h('div', { class: 'hint' }, room.length ? `Stockpiles at the base: ${used} of ${cap0} full.` : 'No stockpiles yet. Goods lying around can still be used, but workers would rather take from a stockpile.'),
       supplies ? h('div', { class: 'hint' }, "The patron's supplies are counted in. Nothing can be added to them.") : '',
-      h('div', { class: 'hint' }, 'The Tower window shows each floor.'),
+      h('div', { class: 'hint' }, 'The Tower window shows each level.'),
     );
   }
 
@@ -429,7 +431,7 @@ export class Ui {
         h('li', {}, h('b', {}, 'B'), ' the Build window · ', h('b', {}, 'Esc'), ' stop placing · ', h('b', {}, '[ ]'), ' building width'),
         h('li', {}, h('b', {}, 'Space'), ' pause · ', h('b', {}, '1 2 3'), ' speed · ', h('b', {}, 'N'), ' show all names'),
       ),
-      h('p', { class: 'hint' }, 'To build anything on the ground: place it from the Build window, then post “build camp” work. Fixtures (beds, ovens, pantries, the bar...) go inside finished buildings. To build the tower: draw a blueprint (Tower window or Scriptorium), then post “build tower” work. Languages drift from floor 3 up (see the Languages window). Keep the patron pleased by finishing floors, and keep your workers fed or they’ll quit. Not in yet: mailboxes, upper job boards, COPY.'),
+      h('p', { class: 'hint' }, `To build anything on the ground: place it from the Build window, then post “build camp” work. Fixtures (beds, ovens, pantries, the bar...) go inside finished buildings. To build the tower: draw a blueprint (Tower window or Scriptorium), then post “build tower” work. Languages drift from ${levelName(DRIFT.lineFloor)} up (see the Languages window). Keep the patron pleased by finishing levels, and keep your workers fed or they’ll quit. Not in yet: mailboxes, upper job boards, COPY.`),
     );
   }
 

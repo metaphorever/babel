@@ -34,7 +34,11 @@ export type Verb = WorkVerb | FlowVerb;
 export type Noun = 'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER' | 'BOARD' | 'TOWER' | 'CAMP';
 /** Little words that introduce details: where from, where to. */
 export type Prep = 'FROM' | 'TO';
-/** Places. FLOOR carries its number on the token. TOWER (a noun too) means any floor. */
+/**
+ * Places. FLOOR (the word "level") carries its level index on the token; it
+ * reads one higher, since the ground counts as the first level. TOWER (a
+ * noun too) means any level.
+ */
 export type PlaceWord = 'BASE' | 'FLOOR';
 /** Fixtures that hold goods, by kind: the token carries the fixture's permanent number ("stockpile 3"). */
 export type FixtureWord = 'STOCKPILE' | 'SHELVES' | 'PANTRY' | 'BAR';
@@ -89,21 +93,21 @@ const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
     MINE: 'mine', CHOP: 'chop', HARVEST: 'harvest', COOK: 'cook', BREW: 'brew', HAUL: 'haul', BUILD: 'build',
     WRITE: 'write', DELIVER: 'deliver', REPEAT: 'repeat', CHECK: 'check', TEACH: 'teach', LEARN: 'learn from',
     STONE: 'stone', WOOD: 'wood', GRAIN: 'grain', BREAD: 'bread', BEER: 'beer', BOARD: 'board', TOWER: 'tower', CAMP: 'camp',
-    FROM: 'from', TO: 'to', BASE: 'base', FLOOR: 'floor', STOCKPILE: 'stockpile', SHELVES: 'shelves', PANTRY: 'pantry', BAR: 'bar',
+    FROM: 'from', TO: 'to', BASE: 'base', FLOOR: 'level', STOCKPILE: 'stockpile', SHELVES: 'shelves', PANTRY: 'pantry', BAR: 'bar',
     WANT: 'want', WATER: 'water', SLEEP: 'sleep', HOME: 'home', GOLD: 'gold', WHAT: 'what?',
   },
   fr: {
     MINE: 'creuser', CHOP: 'couper', HARVEST: 'récolter', COOK: 'cuire', BREW: 'brasser', HAUL: 'porter', BUILD: 'bâtir',
     WRITE: 'écrire', DELIVER: 'livrer', REPEAT: 'répéter', CHECK: 'voir', TEACH: 'enseigner', LEARN: 'apprendre de',
     STONE: 'pierre', WOOD: 'bois', GRAIN: 'blé', BREAD: 'pain', BEER: 'bière', BOARD: 'tableau', TOWER: 'tour', CAMP: 'camp',
-    FROM: 'de', TO: 'à', BASE: 'base', FLOOR: 'étage', STOCKPILE: 'réserve', SHELVES: 'étagère', PANTRY: 'garde-manger', BAR: 'comptoir',
+    FROM: 'de', TO: 'à', BASE: 'base', FLOOR: 'niveau', STOCKPILE: 'réserve', SHELVES: 'étagère', PANTRY: 'garde-manger', BAR: 'comptoir',
     WANT: 'veux', WATER: 'eau', SLEEP: 'dormir', HOME: 'maison', GOLD: 'or', WHAT: 'quoi ?',
   },
   el: {
     MINE: 'σκάψε', CHOP: 'κόψε', HARVEST: 'θέρισε', COOK: 'ψήσε', BREW: 'ζύμωσε', HAUL: 'κουβάλα', BUILD: 'χτίσε',
     WRITE: 'γράψε', DELIVER: 'παράδωσε', REPEAT: 'επανάλαβε', CHECK: 'δες', TEACH: 'δίδαξε', LEARN: 'μάθε από',
     STONE: 'πέτρα', WOOD: 'ξύλο', GRAIN: 'σιτάρι', BREAD: 'ψωμί', BEER: 'μπίρα', BOARD: 'πίνακας', TOWER: 'πύργος', CAMP: 'καταυλισμός',
-    FROM: 'από', TO: 'σε', BASE: 'βάση', FLOOR: 'όροφος', STOCKPILE: 'σωρός', SHELVES: 'ράφια', PANTRY: 'κελάρι', BAR: 'ταβέρνα',
+    FROM: 'από', TO: 'σε', BASE: 'βάση', FLOOR: 'επίπεδο', STOCKPILE: 'σωρός', SHELVES: 'ράφια', PANTRY: 'κελάρι', BAR: 'ταβέρνα',
     WANT: 'θέλω', WATER: 'νερό', SLEEP: 'ύπνος', HOME: 'σπίτι', GOLD: 'χρυσός', WHAT: 'τι;',
   },
 };
@@ -112,7 +116,8 @@ const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
 export function word(tok: Token): string {
   if (tok.t === 'WHO' || tok.t === 'NAMED') return tok.name ?? '?';
   const w = WORDS[tok.lang][tok.t];
-  return tok.n !== undefined ? `${w} ${tok.n}` : w;
+  if (tok.n === undefined) return w;
+  return `${w} ${tok.t === 'FLOOR' ? tok.n + 1 : tok.n}`;
 }
 
 /** The same word in another language (for glosses). */
@@ -122,8 +127,9 @@ export function wordIn(t: TokenId, lang: LangId, n?: number): string {
 
 /**
  * A place in an order (after FROM or TO):
- * - a level: 0 is the base (anywhere on the ground), n is tower floor n;
- * - 'tower': any tower floor;
+ * - a level: 0 is the base (anywhere on the ground), n is the tower level
+ *   above the nth deck, which the player reads as "Level n+1" (levelName);
+ * - 'tower': any tower level;
  * - one storage fixture by its permanent number ("stockpile 3");
  * - one fixture by the name the player gave it.
  * No place at all means the nearest (TO) or whatever's lying around (FROM).
@@ -137,8 +143,19 @@ export function placeTokens(place: Place, lang: LangId = 'en'): Token[] {
   return [{ t: 'NAMED', lang, name: place.name }];
 }
 
+/**
+ * A tower level as the player reads it. The ground counts as the first
+ * level: index 0 (the ground) is "Tower Ground Level", index n (on top of
+ * the nth deck) is "Tower Level n+1". Inside the code, levels stay 0-based.
+ * Short drops "Tower", for places where the tower goes without saying.
+ */
+export function levelName(level: number, short = false): string {
+  if (level === 0) return short ? 'Ground Level' : 'Tower Ground Level';
+  return `${short ? '' : 'Tower '}Level ${level + 1}`;
+}
+
 export function placeName(place: Place): string {
-  if (typeof place === 'number') return place === 0 ? 'the base' : `floor ${place}`;
+  if (typeof place === 'number') return place === 0 ? 'the base' : levelName(place);
   if (place === 'tower') return 'the tower';
   if ('fixture' in place) return `${word({ t: place.fixture, lang: 'en' })} ${place.n}`;
   return place.name;

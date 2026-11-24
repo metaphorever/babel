@@ -65,7 +65,7 @@ Built and tested: the random map, the opening text and founding, placement mode 
 
 ## Where session 4 left things
 
-- **Tower rooms** (DESIGN.md §15.12): finished floors are empty; any fixture goes in them, and the ladder is now a fixture the player places. **To settle with the user:** whether the ground floor is "floor 1" or "the ground floor" (the game says the latter).
+- **Tower rooms** (DESIGN.md §15.12): finished floors are empty; any fixture goes in them, and the ladder is now a fixture the player places. **Numbering is settled:** the ground counts as level 1; the game says "Tower Ground Level", then "Tower Level 2" and up, always through `levelName()` (DESIGN.md §15.12). Levels stay 0-based in the code.
 - **Hauling bread and beer is built:** bread goes to pantries, beer to bars, by number or name like stockpiles.
 - **Addressing is built** (DESIGN.md §15.11): permanent fixture numbers, fixture renaming, and hauls TO/FROM the nearest store, the base, the tower, a floor, or one store by number or name. A haul with no TO now goes to the nearest store, not the base.
 - **The scriptorium** stacks its queue between its columns again. **Babel Extras**, a new MacPaint page, has blank storage shelves, placeholder stairs and a house deck. Two-story houses now draw their own deck.
@@ -88,4 +88,4 @@ Built and tested: the random map, the opening text and founding, placement mode 
 
 These are DESIGN.md §14, plus:
 - **The right edge of the map:** decided in session 4: the road to far-away lands (DESIGN.md §16), now 12 tiles wide.
-- **Floor numbering:** the game calls the first deck "floor 1"; the user sometimes counts the ground floor as floor 1. Settle it before the tutorial text is final.
+- **Level tuning vs. copy:** with the ground counted as level 1, drift starts at Tower Level 4 and the cap is Level 31 against a "Level 30" goal. Ask the user whether to retune to rounder levels.

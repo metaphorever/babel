@@ -1,4 +1,4 @@
-import { CONFUSION, MOOD, TOWER, Tile, WORLD, darkness, hourOf, type Building, type SimState, type Site, type Worker } from '../sim';
+import { CONFUSION, MOOD, levelName, TOWER, Tile, WORLD, darkness, hourOf, type Building, type SimState, type Site, type Worker } from '../sim';
 import { activeProject, deckRow, projectFraction } from '../sim/tower';
 import { worksFraction } from '../sim/build';
 import { buildingLabel, groundRow } from '../sim/world';
@@ -696,16 +696,16 @@ export class Renderer {
       tag(buildingLabel(s, b) + status(b.build, b.demolish), (mid - cx) * z, (ground - cy) * z + 6 * this.dpr);
     }
     if (s.tower) {
-      // floor numbers down the right side of the tower, and the floor under way
+      // level numbers down the right side of the tower (the ground is level 1), and the level under way
       const right = ((s.tower.x1 + 1) * TILE + 3 - cx) * z;
       // a tag whose left edge sits at x
       const tagLeft = (text: string, x: number, y: number) => tag(text, x + (ctx.measureText(text).width + 6 * this.dpr) / 2, y);
       for (let k = 1; k <= s.floors; k++) {
-        tagLeft(`${k}`, right, (deckRow(k) * TILE - cy) * z - 4 * this.dpr);
+        tagLeft(`${k + 1}`, right, (deckRow(k) * TILE - cy) * z - 4 * this.dpr);
       }
       const p = activeProject(s);
       if (p) {
-        tagLeft(`Floor ${p.level}: ${Math.floor(projectFraction(p) * 100)}%`, right, (deckRow(p.level) * TILE - cy) * z - 4 * this.dpr);
+        tagLeft(`${levelName(p.level, true)}: ${Math.floor(projectFraction(p) * 100)}%`, right, (deckRow(p.level) * TILE - cy) * z - 4 * this.dpr);
       }
     }
     for (const w of s.workers) {

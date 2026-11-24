@@ -1,4 +1,4 @@
-import { FIXTURE_WORD_KIND, STORES_FOR, type Place } from './lang';
+import { FIXTURE_WORD_KIND, STORES_FOR, levelName, type Place } from './lang';
 import { randInt } from './rng';
 import { BUILD, FIXTURE_LABEL, MAP, TOWER, WORLD } from './tuning';
 import { FIXTURE_KINDS, Tile, type Building, type FixtureKind, type ItemType, type NatureKind, type Pt, type SimState, type Site, type SiteKind } from './types';
@@ -101,8 +101,8 @@ function freeNumber(s: SimState, kind: SiteKind): number {
 export function siteWhere(s: SimState, site: Site): string {
   const b = buildingOf(s, site);
   if (b) return b.name;
-  if (site.level > 0) return `Tower L${site.level}`;
-  return s.tower && site.x0 >= s.tower.x0 && site.x1 <= s.tower.x1 ? 'Tower ground floor' : 'Base';
+  if (site.level > 0) return levelName(site.level);
+  return s.tower && site.x0 >= s.tower.x0 && site.x1 <= s.tower.x1 ? levelName(0) : 'Base';
 }
 
 /** A fixture's full name, as menus show it: "Stockpile 3 (Mess Hall)". */
