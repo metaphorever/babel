@@ -36,11 +36,22 @@ export type Noun = 'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER' | 'BOARD' | 'TO
 export type Prep = 'FROM' | 'TO';
 /** Places. FLOOR carries its number on the token. TOWER (a noun too) means any floor. */
 export type PlaceWord = 'BASE' | 'FLOOR';
-/** Storage fixtures, by kind: the token carries the fixture's permanent number ("stockpile 3"). */
-export type FixtureWord = 'STOCKPILE' | 'SHELVES';
+/** Fixtures that hold goods, by kind: the token carries the fixture's permanent number ("stockpile 3"). */
+export type FixtureWord = 'STOCKPILE' | 'SHELVES' | 'PANTRY' | 'BAR';
+export type StoreKind = 'stockpile' | 'shelves' | 'pantry' | 'bar';
 /** Which fixture kind each fixture word names. */
-export const FIXTURE_WORD_KIND: Record<FixtureWord, 'stockpile' | 'shelves'> = { STOCKPILE: 'stockpile', SHELVES: 'shelves' };
-export const FIXTURE_WORDS: readonly FixtureWord[] = ['STOCKPILE', 'SHELVES'];
+export const FIXTURE_WORD_KIND: Record<FixtureWord, StoreKind> = { STOCKPILE: 'stockpile', SHELVES: 'shelves', PANTRY: 'pantry', BAR: 'bar' };
+export const FIXTURE_WORDS: readonly FixtureWord[] = ['STOCKPILE', 'SHELVES', 'PANTRY', 'BAR'];
+/** The word for a kind of store. */
+export const STORE_WORD: Record<StoreKind, FixtureWord> = { stockpile: 'STOCKPILE', shelves: 'SHELVES', pantry: 'PANTRY', bar: 'BAR' };
+/** Where each good that can be hauled is kept: materials and grain in stockpiles and on shelves, bread in pantries, beer in bars. */
+export const STORES_FOR: Record<'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER', readonly StoreKind[]> = {
+  STONE: ['stockpile', 'shelves'],
+  WOOD: ['stockpile', 'shelves'],
+  GRAIN: ['stockpile', 'shelves'],
+  BREAD: ['pantry'],
+  BEER: ['bar'],
+};
 /** Words workers think and say, so you can read what they want. */
 export type SayWord = 'WANT' | 'WATER' | 'SLEEP' | 'HOME' | 'GOLD' | 'WHAT';
 /**
@@ -69,7 +80,7 @@ export const DRIFTABLE: readonly Exclude<TokenId, NameWord>[] = [
   'MINE', 'CHOP', 'HARVEST', 'COOK', 'BREW', 'HAUL', 'BUILD',
   'WRITE', 'DELIVER', 'REPEAT', 'CHECK', 'TEACH', 'LEARN',
   'STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER', 'BOARD', 'TOWER', 'CAMP',
-  'FROM', 'TO', 'BASE', 'FLOOR', 'STOCKPILE', 'SHELVES',
+  'FROM', 'TO', 'BASE', 'FLOOR', 'STOCKPILE', 'SHELVES', 'PANTRY', 'BAR',
   'WANT', 'WATER', 'SLEEP', 'HOME', 'GOLD', 'WHAT',
 ];
 
@@ -78,21 +89,21 @@ const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
     MINE: 'mine', CHOP: 'chop', HARVEST: 'harvest', COOK: 'cook', BREW: 'brew', HAUL: 'haul', BUILD: 'build',
     WRITE: 'write', DELIVER: 'deliver', REPEAT: 'repeat', CHECK: 'check', TEACH: 'teach', LEARN: 'learn from',
     STONE: 'stone', WOOD: 'wood', GRAIN: 'grain', BREAD: 'bread', BEER: 'beer', BOARD: 'board', TOWER: 'tower', CAMP: 'camp',
-    FROM: 'from', TO: 'to', BASE: 'base', FLOOR: 'floor', STOCKPILE: 'stockpile', SHELVES: 'shelves',
+    FROM: 'from', TO: 'to', BASE: 'base', FLOOR: 'floor', STOCKPILE: 'stockpile', SHELVES: 'shelves', PANTRY: 'pantry', BAR: 'bar',
     WANT: 'want', WATER: 'water', SLEEP: 'sleep', HOME: 'home', GOLD: 'gold', WHAT: 'what?',
   },
   fr: {
     MINE: 'creuser', CHOP: 'couper', HARVEST: 'récolter', COOK: 'cuire', BREW: 'brasser', HAUL: 'porter', BUILD: 'bâtir',
     WRITE: 'écrire', DELIVER: 'livrer', REPEAT: 'répéter', CHECK: 'voir', TEACH: 'enseigner', LEARN: 'apprendre de',
     STONE: 'pierre', WOOD: 'bois', GRAIN: 'blé', BREAD: 'pain', BEER: 'bière', BOARD: 'tableau', TOWER: 'tour', CAMP: 'camp',
-    FROM: 'de', TO: 'à', BASE: 'base', FLOOR: 'étage', STOCKPILE: 'réserve', SHELVES: 'étagère',
+    FROM: 'de', TO: 'à', BASE: 'base', FLOOR: 'étage', STOCKPILE: 'réserve', SHELVES: 'étagère', PANTRY: 'garde-manger', BAR: 'comptoir',
     WANT: 'veux', WATER: 'eau', SLEEP: 'dormir', HOME: 'maison', GOLD: 'or', WHAT: 'quoi ?',
   },
   el: {
     MINE: 'σκάψε', CHOP: 'κόψε', HARVEST: 'θέρισε', COOK: 'ψήσε', BREW: 'ζύμωσε', HAUL: 'κουβάλα', BUILD: 'χτίσε',
     WRITE: 'γράψε', DELIVER: 'παράδωσε', REPEAT: 'επανάλαβε', CHECK: 'δες', TEACH: 'δίδαξε', LEARN: 'μάθε από',
     STONE: 'πέτρα', WOOD: 'ξύλο', GRAIN: 'σιτάρι', BREAD: 'ψωμί', BEER: 'μπίρα', BOARD: 'πίνακας', TOWER: 'πύργος', CAMP: 'καταυλισμός',
-    FROM: 'από', TO: 'σε', BASE: 'βάση', FLOOR: 'όροφος', STOCKPILE: 'σωρός', SHELVES: 'ράφια',
+    FROM: 'από', TO: 'σε', BASE: 'βάση', FLOOR: 'όροφος', STOCKPILE: 'σωρός', SHELVES: 'ράφια', PANTRY: 'κελάρι', BAR: 'ταβέρνα',
     WANT: 'θέλω', WATER: 'νερό', SLEEP: 'ύπνος', HOME: 'σπίτι', GOLD: 'χρυσός', WHAT: 'τι;',
   },
 };
@@ -149,7 +160,9 @@ function tokenPlace(tok: Token): Place | null {
     case 'FLOOR': return tok.n ?? 0;
     case 'TOWER': return 'tower';
     case 'STOCKPILE':
-    case 'SHELVES': return { fixture: tok.t, n: tok.n ?? 0 };
+    case 'SHELVES':
+    case 'PANTRY':
+    case 'BAR': return { fixture: tok.t, n: tok.n ?? 0 };
     case 'NAMED': return { name: tok.name ?? '' };
     default: return null;
   }
@@ -227,7 +240,7 @@ export const VALID_JOBS: Record<WorkVerb, readonly Noun[]> = {
   HARVEST: ['GRAIN'],
   COOK: ['BREAD'],
   BREW: ['BEER'],
-  HAUL: ['STONE', 'WOOD', 'GRAIN'],
+  HAUL: ['STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER'],
   BUILD: ['TOWER', 'CAMP'],
 };
 

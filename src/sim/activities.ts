@@ -1,5 +1,5 @@
 import { addMoodlet, dropCarried, log, moveTo, settle } from './actions';
-import { ALL, FOREVER, isSpecialCount, isWorkVerb, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
+import { ALL, FOREVER, STORES_FOR, isSpecialCount, isWorkVerb, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
 import { carrierText } from './carriers';
 import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed, unreadableLine } from './scrolls';
 import { addConfusion, knows, readOrder } from './drift';
@@ -246,7 +246,7 @@ export function nothingToHaul(s: SimState, n: Notice): boolean {
   if (o.verb === 'COOK' || o.verb === 'BREW') return !canProcess(s, PROCESS[o.verb]);
   if (o.verb !== 'HAUL') return false;
   const type = nounItem(o.noun as Noun);
-  if (o.from !== null) return !storesAt(s, o.from).some((x) => x.store[type] > 0);
+  if (o.from !== null) return !storesAt(s, o.from, type).some((x) => x.store[type] > 0);
   return !s.items.some((it) => it.type === type && it.reservedBy === null);
 }
 
@@ -516,10 +516,11 @@ function gatherLoose(s: SimState, w: Worker): 'running' | 'done' | 'failed' {
 }
 
 /** Why nothing can go to a place: there's no such store, or it's full. */
-function noDepot(s: SimState, to: Place | null): string {
-  if (to === null) return 'No stockpile with room anywhere.';
-  const there = storesAt(s, to);
-  if (typeof to === 'number' || to === 'tower') return there.length === 0 ? `There's no stockpile on ${placeName(to)}.` : `No stockpile with room on ${placeName(to)}.`;
+function noDepot(s: SimState, to: Place | null, type: ItemType): string {
+  const store = STORES_FOR[type.toUpperCase() as keyof typeof STORES_FOR][0];
+  if (to === null) return `No ${store} with room anywhere.`;
+  const there = storesAt(s, to, type);
+  if (typeof to === 'number' || to === 'tower') return there.length === 0 ? `There's no ${store} on ${placeName(to)}.` : `No ${store} with room on ${placeName(to)}.`;
   return there.length === 0 ? `There's no ${placeName(to)}.` : `${cap(siteRef(there[0]))} is full.`;
 }
 
@@ -530,7 +531,7 @@ function cap(t: string): string {
 function haulJob(s: SimState, w: Worker, type: ItemType, toPlace: Place | null): Result {
   const a = w.activity;
   if (a.stage === 0) {
-    if (!depotFor(s, toPlace, w)) return failWork(s, w, noDepot(s, toPlace));
+    if (!depotFor(s, toPlace, type, w)) return failWork(s, w, noDepot(s, toPlace, type));
     if (w.carrying === type) {
       // picking a haul back up after a break: deliver what's in hand
       a.stage = 2;
@@ -560,10 +561,10 @@ function haulJob(s: SimState, w: Worker, type: ItemType, toPlace: Place | null):
     }
   }
   if (a.stage === 2) {
-    const pile = depotFor(s, toPlace, w);
+    const pile = depotFor(s, toPlace, type, w);
     if (!pile) {
       dropCarried(s, w);
-      return failWork(s, w, noDepot(s, toPlace));
+      return failWork(s, w, noDepot(s, toPlace, type));
     }
     w.thought = `Taking ${w.carryCount > 1 ? `${w.carryCount} ` : ''}${type} to ${siteRef(pile)}.`;
     const m = moveTo(s, w, spotFor(pile, w.id));
@@ -594,9 +595,9 @@ function haulJob(s: SimState, w: Worker, type: ItemType, toPlace: Place | null):
 function haulBetween(s: SimState, w: Worker, type: ItemType, fromPlace: Place, toPlace: Place | null): Result {
   const a = w.activity;
   // with no TO, the nearest store that isn't one it's coming from
-  const sources = storesAt(s, fromPlace);
+  const sources = storesAt(s, fromPlace, type);
   if (a.stage === 0) {
-    if (!depotFor(s, toPlace, w, sources)) return failWork(s, w, noDepot(s, toPlace));
+    if (!depotFor(s, toPlace, type, w, sources)) return failWork(s, w, noDepot(s, toPlace, type));
     if (w.carrying === type) a.stage = 2;
     else {
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
@@ -610,7 +611,7 @@ function haulBetween(s: SimState, w: Worker, type: ItemType, fromPlace: Place, t
       const m = moveTo(s, w, spotFor(src, w.id));
       if (m === 'moving') return 'running';
       if (m === 'unreachable') return failWork(s, w, `Can't reach ${siteRef(src)}.`);
-      const room = depotFor(s, toPlace, w, sources);
+      const room = depotFor(s, toPlace, type, w, sources);
       const take = Math.min(carryCapacity(w), src.store[type], room ? roomFor(room) : 0);
       if (take <= 0) return failWork(s, w, `Somebody took the last ${type}.`);
       src.store[type] -= take;
@@ -620,10 +621,10 @@ function haulBetween(s: SimState, w: Worker, type: ItemType, fromPlace: Place, t
     }
   }
   if (a.stage === 2) {
-    const dst = depotFor(s, toPlace, w, sources);
+    const dst = depotFor(s, toPlace, type, w, sources);
     if (!dst) {
       dropCarried(s, w);
-      return failWork(s, w, noDepot(s, toPlace));
+      return failWork(s, w, noDepot(s, toPlace, type));
     }
     w.thought = `Taking ${w.carryCount} ${type} to ${siteRef(dst)}.`;
     const m = moveTo(s, w, spotFor(dst, w.id));

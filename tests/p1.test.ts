@@ -503,3 +503,46 @@ describe('session 4: the opening', () => {
     }
   });
 });
+
+describe('session 4: hauling bread and beer', () => {
+  const compose = (s: SimState, noun: 'BREAD' | 'BEER' | 'STONE', to: Place) =>
+    validateCommand(s, { type: 'compose', playerId: 0, lines: [{ verb: 'HAUL', noun, to, count: 1 }], wage: 0, dest: { kind: 'board', addressee: null } });
+
+  it('bread only goes to pantries and beer only to bars', () => {
+    const s = createState(3);
+    expect(compose(s, 'BREAD', { fixture: 'PANTRY', n: 1 }).ok).toBe(true);
+    expect(compose(s, 'BEER', { fixture: 'BAR', n: 1 }).ok).toBe(true);
+    expect(compose(s, 'BREAD', { fixture: 'STOCKPILE', n: 1 }).ok).toBe(false);
+    expect(compose(s, 'STONE', { fixture: 'PANTRY', n: 1 }).ok).toBe(false);
+    expect(orderText(makeOrder('HAUL', 'BREAD', { to: { fixture: 'PANTRY', n: 2 } }, 'fr'))).toBe('porter pain à garde-manger 2');
+  });
+
+  it('bread can be carried from one pantry to another', () => {
+    const s = createState(3);
+    const x0 = withHouse(s, 6);
+    applyCommand(s, place({ what: 'fixture', fixture: 'pantry', x0, story: 0 }));
+    const p2 = s.sites[s.sites.length - 1];
+    p2.build = null;
+    expect(p2.label).toBe('Pantry 2');
+    const p1 = s.sites.find((x) => x.label === 'Pantry 1')!;
+    p1.store.bread = 16;
+    s.notices = [];
+    s.reserved = 0;
+    pinNotice(s, makeOrder('HAUL', 'BREAD', { from: { fixture: 'PANTRY', n: 1 }, to: { fixture: 'PANTRY', n: 2 } }), 4, 1, null);
+    expect(runUntil(s, () => p2.store.bread >= 2, 20 * 900)).toBe(true);
+  });
+
+  it('loose beer is hauled to a bar, never a stockpile', () => {
+    const s = createState(3);
+    const bar = s.sites.find((x) => x.kind === 'bar')!;
+    bar.store.beer = 0;
+    s.notices = [];
+    s.reserved = 0;
+    const gy = groundRow();
+    for (let i = 0; i < 3; i++) s.items.push({ id: s.nextId++, type: 'beer', x: 20 + i, y: gy, reservedBy: null });
+    pinNotice(s, makeOrder('HAUL', 'BEER'), ALL, 1, null);
+    expect(runUntil(s, () => !s.items.some((it) => it.type === 'beer') && !s.workers.some((w) => w.carrying === 'beer'), 20 * 900)).toBe(true);
+    expect(s.sites.filter((x) => x.kind === 'stockpile').every((x) => x.store.beer === 0)).toBe(true);
+    expect(bar.store.beer + s.takings / 5).toBeGreaterThanOrEqual(3);
+  });
+});

@@ -94,7 +94,7 @@ export interface Reading {
   guesses: number;
 }
 
-const HAULABLE: Noun[] = ['STONE', 'WOOD', 'GRAIN'];
+const HAULABLE: Noun[] = ['STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER'];
 
 /**
  * How a worker reads an order. An unknown verb means they can't read it at

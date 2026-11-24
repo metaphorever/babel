@@ -1,4 +1,4 @@
-import { FIXTURE_WORD_KIND, type Place } from './lang';
+import { FIXTURE_WORD_KIND, STORES_FOR, type Place } from './lang';
 import { randInt } from './rng';
 import { BUILD, FIXTURE_LABEL, MAP, TOWER, WORLD } from './tuning';
 import { FIXTURE_KINDS, Tile, type Building, type FixtureKind, type ItemType, type NatureKind, type Pt, type SimState, type Site, type SiteKind } from './types';
@@ -276,9 +276,15 @@ export function stockpileOn(s: SimState, level: number): Site | null {
   return stockpilesAt(s, level).find((x) => !x.supplies) ?? null;
 }
 
-/** The stores an order's place means (null = every store). Finished ones only. */
-export function storesAt(s: SimState, place: Place | null): Site[] {
-  const all = stockpiles(s);
+/** Finished stores that keep this good, plus the patron's supplies (only ever taken from). */
+export function storesFor(s: SimState, type: ItemType): Site[] {
+  const kinds: readonly string[] = STORES_FOR[type.toUpperCase() as keyof typeof STORES_FOR];
+  return s.sites.filter((x) => usable(x) && (x.supplies ? x.store[type] > 0 || kinds.includes(x.kind) : kinds.includes(x.kind)));
+}
+
+/** The stores of this good that an order's place means (null = all of them). Finished ones only. */
+export function storesAt(s: SimState, place: Place | null, type: ItemType): Site[] {
+  const all = storesFor(s, type);
   if (place === null) return all;
   if (typeof place === 'number') return all.filter((x) => x.level === place);
   if (place === 'tower') return all.filter((x) => x.level > 0);
@@ -289,12 +295,12 @@ export function storesAt(s: SimState, place: Place | null): Site[] {
 
 /** The nearest store at a place with this good in it (supplies count). */
 export function sourceFor(s: SimState, place: Place, type: ItemType, from: Pt): Site | null {
-  return nearest(storesAt(s, place).filter((x) => x.store[type] > 0), from);
+  return nearest(storesAt(s, place, type).filter((x) => x.store[type] > 0), from);
 }
 
 /** The nearest store at a place (null = anywhere) with room for more, other than the ones in `not`. */
-export function depotFor(s: SimState, place: Place | null, from: Pt, not: readonly Site[] = []): Site | null {
-  return nearest(storesAt(s, place).filter((x) => roomIn(x) > 0 && !not.includes(x)), from);
+export function depotFor(s: SimState, place: Place | null, type: ItemType, from: Pt, not: readonly Site[] = []): Site | null {
+  return nearest(storesAt(s, place, type).filter((x) => roomIn(x) > 0 && !not.includes(x)), from);
 }
 
 export function buildingOf(s: SimState, site: Site): Building | null {

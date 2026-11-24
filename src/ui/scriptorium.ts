@@ -20,7 +20,10 @@ import {
   placeKey,
   placeName,
   placeTokens,
+  STORE_WORD,
+  STORES_FOR,
   type Place,
+  type Site,
   type LangId,
   type TokenId,
   type Dest,
@@ -312,24 +315,37 @@ export class ScriptoriumPanel {
    * around / the nearest store), anywhere at the base or in the tower, one
    * floor, or one store by number or name, left to right, base first.
    */
-  private placeOptions(dir: 'from' | 'to'): PlaceOption[] {
+  /**
+   * The stores that keep what a haul line carries (stockpiles and shelves
+   * for stone, wood and grain; pantries for bread; bars for beer), left to
+   * right, base first.
+   */
+  private storesFor(noun: Noun | null): Site[] {
+    const kinds: readonly string[] = noun && noun in STORES_FOR ? STORES_FOR[noun as keyof typeof STORES_FOR] : [];
+    return this.s.sites.filter((x) => kinds.includes(x.kind) && x.num > 0).sort((a, b) => a.level - b.level || a.x0 - b.x0);
+  }
+
+  private placeOptions(dir: 'from' | 'to', noun: Noun | null): PlaceOption[] {
     const s = this.s;
+    const stores = this.storesFor(noun);
     const opts: PlaceOption[] = [
-      { key: '', place: null, text: dir === 'from' ? 'lying around' : 'to the nearest store', words: [] },
+      { key: '', place: null, text: dir === 'from' ? 'lying around' : `to the nearest ${noun && noun in STORES_FOR ? STORES_FOR[noun as keyof typeof STORES_FOR][0] : 'store'}`, words: [] },
       { key: placeKey(0), place: 0, text: `${dir} the base (any)`, words: ['BASE'] },
     ];
-    if (s.floors > 0) opts.push({ key: placeKey('tower'), place: 'tower', text: `${dir} the tower (any floor)`, words: ['TOWER'] });
-    for (let k = 1; k <= s.floors; k++) opts.push({ key: placeKey(k), place: k, text: `${dir} floor ${k}`, words: ['FLOOR'] });
-    const stores = s.sites.filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves') && x.num > 0).sort((a, b) => a.level - b.level || a.x0 - b.x0);
+    // floors only where something up there keeps this good
+    const floors = [...new Set(stores.filter((x) => x.level > 0).map((x) => x.level))].sort((a, b) => a - b);
+    if (floors.length > 0) opts.push({ key: placeKey('tower'), place: 'tower', text: `${dir} the tower (any floor)`, words: ['TOWER'] });
+    for (const k of floors) opts.push({ key: placeKey(k), place: k, text: `${dir} floor ${k}`, words: ['FLOOR'] });
     for (const x of stores) {
-      const p: Place = x.named ? { name: x.label } : { fixture: x.kind === 'stockpile' ? 'STOCKPILE' : 'SHELVES', n: x.num };
-      opts.push({ key: placeKey(p), place: p, text: `${dir} ${siteTitle(s, x)}${x.build ? ', being built' : ''}`, words: x.named ? [] : [p && typeof p === 'object' && 'fixture' in p ? p.fixture : 'STOCKPILE'] });
+      const word = STORE_WORD[x.kind as keyof typeof STORE_WORD];
+      const p: Place = x.named ? { name: x.label } : { fixture: word, n: x.num };
+      opts.push({ key: placeKey(p), place: p, text: `${dir} ${siteTitle(s, x)}${x.build ? ', being built' : ''}`, words: x.named ? [] : [word] });
     }
     return opts;
   }
 
   private placeSelect(i: number, dir: 'from' | 'to', line: DraftLine): HTMLSelectElement {
-    const opts = this.placeOptions(dir);
+    const opts = this.placeOptions(dir, line.noun);
     const current = line[dir];
     // a place the line already names that isn't there any more stays on the menu
     if (current !== null && !opts.some((o) => o.key === placeKey(current))) opts.push({ key: placeKey(current), place: current, text: `${dir} ${placeName(current)} (not there now)`, words: [] });
@@ -346,7 +362,7 @@ export class ScriptoriumPanel {
   /** Stores that exist, so the place menus can be redrawn when one is added, renamed or taken away. */
   private storesSig(): string {
     return this.s.sites
-      .filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves') && x.num > 0)
+      .filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves' || x.kind === 'pantry' || x.kind === 'bar') && x.num > 0)
       .map((x) => `${x.id}:${x.label}:${x.build ? 0 : 1}`)
       .join('|');
   }
@@ -375,7 +391,15 @@ export class ScriptoriumPanel {
         const nounSel = h('select', { 'aria-label': `Line ${i + 1} what` });
         for (const n of nouns) nounSel.append(h('option', { value: n, disabled: !this.canWrite(n) && n !== line.noun }, this.label(n.toLowerCase(), n)));
         nounSel.value = line.noun ?? nouns[0];
-        nounSel.addEventListener('change', () => ((line.noun = nounSel.value as Noun), this.updateSummary()));
+        nounSel.addEventListener('change', () => {
+          line.noun = nounSel.value as Noun;
+          // a particular store may not keep the new good (bread doesn't go on a stockpile): start those over
+          const keeps = (p: Place | null) => p === null || typeof p !== 'object' || this.storesFor(line.noun).some((x) => placeKey(x.named ? { name: x.label } : { fixture: STORE_WORD[x.kind as keyof typeof STORE_WORD], n: x.num }) === placeKey(p));
+          if (!keeps(line.from)) line.from = null;
+          if (!keeps(line.to)) line.to = null;
+          if (takesPlaces(line.verb)) this.renderLines();
+          else this.updateSummary();
+        });
         nounEl = nounSel;
       } else if (nouns.length === 1 && line.verb !== 'CHECK') {
         nounEl = h('span', { class: 'slot-fixed' }, nouns[0].toLowerCase());

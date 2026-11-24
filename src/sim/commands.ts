@@ -1,6 +1,6 @@
 import { log } from './actions';
 import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCarrier, queueDesign } from './carriers';
-import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isValidLine, langName, makeOrder, placeKey, FIXTURE_WORDS, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
+import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isValidLine, langName, makeOrder, placeKey, placeName, FIXTURE_WORDS, FIXTURE_WORD_KIND, STORES_FOR, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
 import { BUILD, SCRIBE, TOWER } from './tuning';
 import type { Dest, SimState } from './types';
 import { applyDemolish, applyPlace, applyRename, applyRenameFixture, validateDemolish, validatePlace, validateRename, validateRenameFixture, type DemolishTarget, type PlaceRequest } from './build';
@@ -102,6 +102,9 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
         if (places.length > 0 && !takesPlaces(l.verb)) return { ok: false, error: `"${l.verb.toLowerCase()}" doesn't take a from or to.` };
         const bad = places.map(placeError).find((e) => e !== null);
         if (bad) return { ok: false, error: bad };
+        // a store by number has to be the kind that keeps this good
+        const wrong = places.find((p) => typeof p === 'object' && 'fixture' in p && l.noun && l.noun in STORES_FOR && !STORES_FOR[l.noun as keyof typeof STORES_FOR].includes(FIXTURE_WORD_KIND[p.fixture]));
+        if (wrong && l.noun) return { ok: false, error: `${placeName(wrong)} doesn't keep ${l.noun.toLowerCase()}.` };
         if (l.from !== undefined && l.from !== null && placeKey(l.from) === placeKey(l.to ?? null)) return { ok: false, error: 'From and to are the same place.' };
       }
       if (cmd.lines[0].verb === 'REPEAT') return { ok: false, error: 'Repeat what? Put it after the lines to repeat.' };

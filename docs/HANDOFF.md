@@ -17,7 +17,7 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
   - **Every push to `main` deploys:** `.github/workflows/pages.yml` runs the tests, builds, and publishes to GitHub Pages.
   - **Commit author:** "Clover <metaphorever@gmail.com>". The user chose to publish that as is.
 - **GitHub CLI:** on this machine it's at `C:\Program Files\GitHub CLI\gh.exe` and is logged in as `metaphorever`. Shells started before it was installed may need the full path.
-- **Tests:** keep them passing (`npm test`, 92 now). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
+- **Tests:** keep them passing (`npm test`, 95 now). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
 - **Playtest feedback:** the user playtests on the live site and sends batches of notes. Fix bugs, record design decisions in DESIGN.md, and keep "provisional" notes up to date.
 
 ## Code rules that matter
@@ -65,6 +65,7 @@ Built and tested: the random map, the opening text and founding, placement mode 
 
 ## Where session 4 left things
 
+- **Hauling bread and beer is built:** bread goes to pantries, beer to bars, by number or name like stockpiles.
 - **Addressing is built** (DESIGN.md §15.11): permanent fixture numbers, fixture renaming, and hauls TO/FROM the nearest store, the base, the tower, a floor, or one store by number or name. A haul with no TO now goes to the nearest store, not the base.
 - **The scriptorium** stacks its queue between its columns again. **Babel Extras**, a new MacPaint page, has blank storage shelves, placeholder stairs and a house deck. Two-story houses now draw their own deck.
 - **Roadmap recorded** (DESIGN.md §16): stairs, the trader, pilgrimages, an About/credits window ([CREDITS.md](CREDITS.md) has the text).
@@ -79,11 +80,11 @@ Built and tested: the random map, the opening text and founding, placement mode 
 2. **More art:** clouds built from parts (reference: `art-src/shots/cloud-reference.png`), the Babel Extras page, and the tower's deck and wall (with the portrait sprint). Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art to catch anything missed.
 3. **The portrait card:** the worker inspector showing a 64x64 portrait built from layers (body, hair, head, beard, hat) picked from each worker's look seed, once the user has drawn parts.
 4. **P0 leftovers:** mailboxes and upper job boards (then the first board can be demolished), the COPY order, and night changing behavior (workers preferring to sleep at night).
-5. **The roadmap** (DESIGN.md §16): the About window is the quickest win; then hauling bread and beer (the trader needs it); alerts (§16.5); stairs; the trader and pilgrimages.
+5. **The roadmap** (DESIGN.md §16): the About window is the quickest win; alerts (§16.5); stairs; the trader and pilgrimages.
 6. **Later:** tables (mood when eating and drinking), typography (start with GNU Unifont, check its license), procedural sound effects and public-domain music, and acts of god at height.
 
 ## Open questions
 
 These are DESIGN.md §14, plus:
 - **The right edge of the map:** decided in session 4: the road to far-away lands (DESIGN.md §16), now 12 tiles wide.
-- **Hauling bread and beer:** cooks and brewers carry what they make straight to a pantry or bar. There's no "haul bread" yet, so food can't be moved between pantries, carried up the tower, or paid to the trader. It comes before the trader (DESIGN.md §16.2).
+- **Food up the tower:** bread and beer can now be hauled between pantries and bars (session 4), but there are no pantries or bars on tower floors, since fixtures only go in buildings on the ground. That will matter as the tower grows.
