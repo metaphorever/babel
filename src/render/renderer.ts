@@ -399,6 +399,15 @@ export class Renderer {
         });
         break;
       }
+      case 'ladder': {
+        // a tower ladder: once built it's ladder tiles in the world; until then, its shape fills in as it's built
+        if (!site.build && !site.demolish) break;
+        const rows = TOWER.floorHeight;
+        withProgress(rows * TILE, () => {
+          for (let r = 0; r < rows; r++) this.g.drawImage(worldSprite('tower.ladder'), left, base - (r + 1) * TILE);
+        });
+        break;
+      }
       case 'bed':
       case 'oven':
       case 'brewery': {
@@ -673,6 +682,8 @@ export class Renderer {
     for (const site of s.sites) {
       // fixtures inside a building are listed on the building's label
       if (site.buildingId !== null) continue;
+      // a finished ladder is part of the tower; it needs no label
+      if (site.kind === 'ladder' && !site.build && !site.demolish) continue;
       const mid = ((site.x0 + site.x1 + 1) / 2) * TILE;
       const ground = (site.y + 1) * TILE;
       // upper-floor stockpiles get a short label, tucked under their deck

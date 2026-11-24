@@ -17,7 +17,7 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
   - **Every push to `main` deploys:** `.github/workflows/pages.yml` runs the tests, builds, and publishes to GitHub Pages.
   - **Commit author:** "Clover <metaphorever@gmail.com>". The user chose to publish that as is.
 - **GitHub CLI:** on this machine it's at `C:\Program Files\GitHub CLI\gh.exe` and is logged in as `metaphorever`. Shells started before it was installed may need the full path.
-- **Tests:** keep them passing (`npm test`, 95 now). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
+- **Tests:** keep them passing (`npm test`, 96 now). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
 - **Playtest feedback:** the user playtests on the live site and sends batches of notes. Fix bugs, record design decisions in DESIGN.md, and keep "provisional" notes up to date.
 
 ## Code rules that matter
@@ -45,7 +45,7 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
 All of this is playable now:
 - **The core:** the deterministic core, utility-AI workers with needs, moods, traits, skills and knacks, and the 1-bit renderer.
 - **Orders:** physical orders (notices, cards, scrolls); scribes and couriers; the patron's standing charter, which recovers from drifted scribes; counts that can be a number, all or forever.
-- **The tower:** built from blueprints, with floor stockpiles and hauling from and to places.
+- **The tower:** built from blueprints, with hauling from and to places. *(Since session 4, floors are empty rooms: see DESIGN.md §15.12.)*
 - **Language drift:** French (from 3 floors) and Greek (from 5), drift from floor 3 up; misreads, confusion, TEACH/LEARN, your lexicon, and writing in other languages.
 - **The patron and workers:** patience, a stipend paid at dawn, difficulty; quitting and newcomers.
 - **Time and art:** a day/night cycle with a night sky; MacPaint art sheets with a converter.
@@ -65,6 +65,7 @@ Built and tested: the random map, the opening text and founding, placement mode 
 
 ## Where session 4 left things
 
+- **Tower rooms** (DESIGN.md §15.12): finished floors are empty; any fixture goes in them, and the ladder is now a fixture the player places. **To settle with the user:** whether the ground floor is "floor 1" or "the ground floor" (the game says the latter).
 - **Hauling bread and beer is built:** bread goes to pantries, beer to bars, by number or name like stockpiles.
 - **Addressing is built** (DESIGN.md §15.11): permanent fixture numbers, fixture renaming, and hauls TO/FROM the nearest store, the base, the tower, a floor, or one store by number or name. A haul with no TO now goes to the nearest store, not the base.
 - **The scriptorium** stacks its queue between its columns again. **Babel Extras**, a new MacPaint page, has blank storage shelves, placeholder stairs and a house deck. Two-story houses now draw their own deck.
@@ -87,4 +88,4 @@ Built and tested: the random map, the opening text and founding, placement mode 
 
 These are DESIGN.md §14, plus:
 - **The right edge of the map:** decided in session 4: the road to far-away lands (DESIGN.md §16), now 12 tiles wide.
-- **Food up the tower:** bread and beer can now be hauled between pantries and bars (session 4), but there are no pantries or bars on tower floors, since fixtures only go in buildings on the ground. That will matter as the tower grows.
+- **Floor numbering:** the game calls the first deck "floor 1"; the user sometimes counts the ground floor as floor 1. Settle it before the tutorial text is final.

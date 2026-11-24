@@ -1,5 +1,5 @@
 import { BUILD, FIXTURE_LABEL, PATRON, TOWER, currentStipend, type Building, type FixtureKind, type Sim, type SimState, type Site } from '../sim';
-import { footprint, houseCost, placeCost, worksFraction, type PlaceRequest } from '../sim/build';
+import { fixtureWidth, footprint, houseCost, placeCost, worksFraction, type PlaceRequest } from '../sim/build';
 import { deckRow } from '../sim/tower';
 import { buildingLabel, groundRow, siteTitle, storedTotal } from '../sim/world';
 import { buildingHeight, TILE, type Renderer, type Thing } from '../render/renderer';
@@ -19,7 +19,7 @@ export type Placing =
   | { what: 'house'; width: number; stories: 1 | 2 }
   | { what: 'fixture'; fixture: FixtureKind };
 
-const FIXTURES: FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile', 'shelves'];
+const FIXTURES: FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile', 'shelves', 'ladder'];
 
 function costText(c: { stone: number; wood: number }): string {
   const parts = [c.wood ? `${c.wood} wood` : '', c.stone ? `${c.stone} stone` : ''].filter(Boolean);
@@ -149,7 +149,7 @@ export class BuildUi {
     }
     into.append(
       grid,
-      h('div', { class: 'hint' }, `Fixtures go inside a finished building. A stockpile can also be marked out on open ground (it holds ${BUILD.capacity.stockpile} anywhere); storage shelves hold ${BUILD.capacity.shelves}, indoors only.`),
+      h('div', { class: 'hint' }, `Fixtures go inside a finished building or a tower room. A stockpile can also be marked out on open ground (it holds ${BUILD.capacity.stockpile} anywhere); storage shelves hold ${BUILD.capacity.shelves}, indoors only. Each tower floor starts as an empty room: a ladder from the room below is the way up to it.`),
       h(
         'div',
         { class: 'row row-end' },
@@ -203,9 +203,10 @@ export class BuildUi {
       case 'house':
         return { what: 'house', x0: tx - Math.floor(p.width / 2), width: p.width, stories: p.stories, name: 'Building' };
       case 'fixture': {
-        // above the first deck means upstairs
-        const story = wy < deckRow(1) * TILE ? 1 : 0;
-        return { what: 'fixture', fixture: p.fixture, x0: tx - Math.floor(BUILD.fixtureWidth / 2) + (BUILD.fixtureWidth % 2 === 0 ? 1 : 0), story };
+        // which story the mouse is in: each deck belongs to the story below it
+        const story = Math.max(0, Math.floor((deckRow(0) - 1 - Math.floor(wy / TILE)) / TOWER.floorHeight));
+        const w = fixtureWidth(p.fixture);
+        return { what: 'fixture', fixture: p.fixture, x0: tx - Math.floor(w / 2) + (w % 2 === 0 ? 1 : 0), story };
       }
     }
   }
@@ -219,7 +220,7 @@ export class BuildUi {
       case 'house':
         return buildingHeight(req.stories);
       case 'fixture':
-        return 16;
+        return req.fixture === 'ladder' ? TOWER.floorHeight * TILE : 16;
     }
   }
 
@@ -619,6 +620,11 @@ export class BuildUi {
 }
 
 /** Floors built, under way, and blueprints still being drawn or carried up. */
+/** A ladder planned (or built) on the tower's ground floor, up to floor 1. */
+function ladderPlaced(s: SimState): boolean {
+  return s.sites.some((x) => x.kind === 'ladder' && x.level === 0 && !x.demolish);
+}
+
 function blueprintsSoFar(s: SimState): number {
   const drawing = s.designs.filter((d) => d.carrier.kind === 'blueprint').length;
   const carried = s.workers.reduce((n, w) => n + w.bag.filter((c) => c.kind === 'blueprint').length, 0) + s.outbox.filter((c) => c.kind === 'blueprint').length;
@@ -639,8 +645,9 @@ function statusOf(x: Building | Site): string {
 
 interface Step {
   title: string;
-  text: string;
-  buttons?: { label: string; run: (b: BuildUi) => void }[];
+  /** Fixed, or worked out from the game as it stands (redrawn when it changes). */
+  text: string | ((s: SimState) => string);
+  buttons?: { label: string; run: (b: BuildUi) => void }[] | ((s: SimState) => { label: string; run: (b: BuildUi) => void }[]);
   /** Moves on by itself once this is true. Without it, there's a Next button. */
   done?: (s: SimState) => boolean;
 }
@@ -728,9 +735,25 @@ function steps(s: SimState): Step[] {
     },
     {
       title: 'Plans for the next floor',
-      text: 'You will need to draft and deliver plans for each new level of the tower before construction on it can begin. You can draft plans for more than one level at a time; they’re saved until they’re needed. Draft the plans for the second floor now.',
-      buttons: [{ label: 'Draw a blueprint', run: (b) => b.drawBlueprint() }],
-      done: (s) => blueprintsSoFar(s) >= 2,
+      text: (s) => {
+        const plans =
+          blueprintsSoFar(s) < 2
+            ? 'You will need to draft and deliver plans for each new level of the tower before construction on it can begin. You can draft plans for more than one level at a time; they’re saved until they’re needed. Draft the plans for the second floor now. '
+            : 'The plans for the second floor are drafted. ';
+        const rooms = 'Each new floor of the tower is an empty room: your workers have to build everything in it, including the ladder up to it. ';
+        const ladder =
+          s.floors === 0
+            ? 'Once floor 1 is finished, place a ladder on the tower’s ground floor, so workers can climb up to build floor 2 and carry the plans to the top.'
+            : ladderPlaced(s)
+              ? 'The ladder up to floor 1 is planned; “build camp” work gets it built.'
+              : 'Right now there’s no way up to floor 1. Place a ladder on the tower’s ground floor, and post “build camp” work to get it built.';
+        return plans + rooms + ladder;
+      },
+      buttons: (s) => [
+        ...(blueprintsSoFar(s) < 2 ? [{ label: 'Draw a blueprint', run: (b: BuildUi) => b.drawBlueprint() }] : []),
+        ...(s.floors >= 1 && !ladderPlaced(s) ? [{ label: 'Place a ladder…', run: (b: BuildUi) => b.start({ what: 'fixture', fixture: 'ladder' }) }] : []),
+      ],
+      done: (s) => blueprintsSoFar(s) >= 2 && (s.floors === 0 || ladderPlaced(s)),
     },
     {
       title: 'A warning',
@@ -742,7 +765,7 @@ function steps(s: SimState): Step[] {
 class Tutorial {
   private step = -1;
   private body: HTMLElement;
-  private shown = -2;
+  private shown = '';
 
   constructor(
     private wm: WindowManager,
@@ -766,7 +789,7 @@ class Tutorial {
 
   private next(): void {
     this.step++;
-    this.shown = -2;
+    this.shown = '';
     this.refresh();
   }
 
@@ -782,14 +805,18 @@ class Tutorial {
       this.next();
       return;
     }
-    if (this.shown === this.step) return;
-    this.shown = this.step;
+    const s = this.sim.state;
+    const text = typeof st.text === 'function' ? st.text(s) : st.text;
+    const buttons = typeof st.buttons === 'function' ? st.buttons(s) : st.buttons ?? [];
+    const key = `${this.step}|${text}|${buttons.map((b) => b.label).join('|')}`;
+    if (this.shown === key) return;
+    this.shown = key;
     const win = this.wm.get('tutorial')!;
     win.title.textContent = `Tutorial ${this.step + 1} of ${all.length}: ${st.title}`;
     clear(this.body);
     this.body.append(
-      h('p', {}, st.text),
-      h('div', { class: 'row' }, ...(st.buttons ?? []).map((b) => h('button', { class: 'btn', onclick: () => b.run(this.ui) }, b.label))),
+      h('p', {}, text),
+      h('div', { class: 'row' }, ...buttons.map((b) => h('button', { class: 'btn', onclick: () => b.run(this.ui) }, b.label))),
       h(
         'div',
         { class: 'row row-end' },

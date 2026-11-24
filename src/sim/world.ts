@@ -101,7 +101,8 @@ function freeNumber(s: SimState, kind: SiteKind): number {
 export function siteWhere(s: SimState, site: Site): string {
   const b = buildingOf(s, site);
   if (b) return b.name;
-  return site.level > 0 ? `Tower L${site.level}` : 'Base';
+  if (site.level > 0) return `Tower L${site.level}`;
+  return s.tower && site.x0 >= s.tower.x0 && site.x1 <= s.tower.x1 ? 'Tower ground floor' : 'Base';
 }
 
 /** A fixture's full name, as menus show it: "Stockpile 3 (Mess Hall)". */

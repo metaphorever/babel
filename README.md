@@ -64,7 +64,8 @@ In the browser console, `babel.sim.state` holds the live game state, for poking 
 - [x] Skills, knacks and multi-unit trips (bonus yields, strong haulers)
 - [x] Cards, scrolls, scribes, the patron's charter (WRITE, DELIVER, REPEAT, CHECK BOARD)
 - [x] Scrolls on the board for Anyone, line counts, hand delivery replaces, standing charter
-- [x] Tower floors from blueprints, builders, floor stockpiles, HAUL FROM/TO, couriers ([DELIVER] [REPEAT])
+- [x] Tower floors from blueprints, builders, HAUL FROM/TO, couriers ([DELIVER] [REPEAT])
+- [x] Tower rooms: floors finish empty; ladders, stockpiles and every other fixture are placed in them
 - [ ] Mailboxes and upper job boards
 - [x] Language drift (French, Greek), confusion, misreads, TEACH/LEARN, lexicon, writing in other languages
 - [x] Patron stipend, patience and floor bonuses; difficulty; quitting; newcomers

@@ -372,7 +372,7 @@ All the numbers in this section are placeholders until playtests say otherwise.
 
 **How P0 builds the tower (provisional):**
 - **A floor starts with a blueprint.** The scribe draws it, which is slow, and someone with DELIVER carries it to the top finished floor. Only then can anyone build. Blueprints stack: post three and floors 1 to 3 are planned in order.
-- **`[BUILD] [TOWER]`** works on the lowest floor under way. The builder fetches stone (for the walls of the story below) or wood (for the deck) from the highest stockpile below that floor, climbs up, and sets it in place from the story below. Builders count what's already being carried up, so they don't all fetch the same thing. When the last unit is set, a ladder goes in (alternating sides, so every trip up crosses each floor) and the floor gets its own stockpile.
+- **`[BUILD] [TOWER]`** works on the lowest floor under way. The builder fetches stone (for the walls of the story below) or wood (for the deck) from the highest stockpile below that floor, climbs up, and sets it in place from the story below. Builders count what's already being carried up, so they don't all fetch the same thing. When the last unit is set, the floor is finished. *(P0 then added a ladder and a stockpile automatically; since session 4 the floor is an empty room, see §15.12.)*
 - **`[HAUL] [STONE] [FROM] [base] [TO] [floor 3]`** moves goods between stockpiles. That's how you keep builders from climbing to the ground for every armload. Without FROM, haul picks up whatever is lying around. Without TO, it goes to the base.
 - **Couriers:** a worker holding `[DELIVER] [REPEAT]` waits at the scriptorium and carries whatever is in the outbox. A scribe whose scroll has no DELIVER line leaves what they write in the outbox. So `[WRITE] [REPEAT]` plus a courier divides the labour.
 - **Starting stock:** the patron's gift is 10 stone and 8 wood in the base stockpile, enough to start floor 1.
@@ -399,7 +399,7 @@ All the numbers in this section are placeholders until playtests say otherwise.
 - **Quitting:** a worker whose mood stays below 30 for a minute gives notice, which shows as a bindle-on-a-stick cloud, a menubar alert and a countdown in the inspector. If their mood climbs above 40 within 2 minutes, they decide to stay. Otherwise they drop what they're carrying, leave their scrolls behind, send undelivered carriers to the outbox, and walk home with their purse.
 - **Desperation:** a need above 90 (starving, parched, exhausted) adds a big mood penalty on top of the usual one. A colony with no food falls apart in about 10 minutes.
 
-**Later: building floors tile by tile.** The automatic stockpile on each finished floor is a P0 stand-in. In the full game, every floor is built empty, and the player chooses what goes on each tile: individual stockpiles (stone only, wood only and so on), beds, kitchens, larders, wells, workshops, mailboxes and boards. Placing one is a blueprint like any other, carried up and built by workers. This is what makes each floor's layout a logistics decision.
+**Later: building floors tile by tile.** *(Partly done in session 4, §15.12: floors are empty rooms and the player places fixtures in them, ladders included.)* The automatic stockpile on each finished floor was a P0 stand-in. In the full game, every floor is built empty, and the player chooses what goes on each tile: individual stockpiles (stone only, wood only and so on), beds, kitchens, larders, wells, workshops, mailboxes and boards. Placing one is a blueprint like any other, carried up and built by workers. This is what makes each floor's layout a logistics decision.
 
 **Also in P0, from the first playtests:**
 - **Counts can be "all" or "forever"** ([§5.4.1](#541-notices-cards-and-scrolls)). "All" keeps going while there's something to do and finishes when the source runs dry: hauling, building, cooking, writing, teaching, learning. "Forever" never finishes. Neither promises gold up front; both pay from the treasury as the work is done.
@@ -549,7 +549,7 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 - **Ovens and pantries:** "cook bread" fetches a grain from a stockpile, bakes at the nearest oven and carries the bread to the nearest pantry with room. Pantries hold 20. Eating takes from the nearest pantry (or the supplies).
 - **Beer:** "brew beer" is the same at a brewing station, into a bar (holds 12). A worker with money and the mood for it buys a beer (5 gold), which lifts their mood and takes the edge off thirst. *Decided here: what workers pay at the bar goes back to the treasury,* since the bar is the colony's own. That's a change from P0's tavern, whose gold left the economy. It makes brewing worth doing; watch whether it makes gold too easy.
 - **Beds:** one worker per bed, nearest free bed first. Otherwise they sleep rough.
-- **Stockpiles:** hold 24 anywhere (all goods together): a stockpile is just designated space. *Changed in session 3* (it was 24 outside, 48 inside). **Storage shelves** (3 wood, indoors only) hold 48; they are the way to store more. Haulers fill the nearest one with room (see §15.11 for naming a particular one). "From base" takes from the nearest base stockpile with that good. Tower floors keep their automatic, unlimited stockpile (the P0 stand-in).
+- **Stockpiles:** hold 24 anywhere (all goods together): a stockpile is just designated space. *Changed in session 3* (it was 24 outside, 48 inside). **Storage shelves** (3 wood, indoors only) hold 48; they are the way to store more. Haulers fill the nearest one with room (see §15.11 for naming a particular one). "From base" takes from the nearest base stockpile with that good. Tower floors no longer get an automatic stockpile (§15.12).
 - **The old shack's oven** is broken and can't be used.
 
 **Cancelling** (session 3): something not finished is cancelled, not demolished, and its button says "Cancel…". With nothing set in place it just disappears, with no dialog. Part-built, a dialog asks first; then everything already set in place is left lying there in full (no loss) and the plan is gone at once.
@@ -580,13 +580,26 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 - **An order naming a store that isn't there** (demolished, or never built) fails with "There's no stockpile 3", like any job that can't be done. It works again as soon as something takes that number or name. With no TO, a haul FROM somewhere never goes back to where it came from.
 - **Each good has its own stores** (session 4, later the same day): stone, wood and grain go to stockpiles and storage shelves, **bread to pantries, beer to bars**. HAUL now takes bread and beer too, and PANTRY and BAR are numbered place words like STOCKPILE (*garde-manger*, *comptoir*; *κελάρι*, *ταβέρνα*). A haul naming the wrong kind of store ("haul bread to stockpile 1") is refused when it's written. The scriptorium's menus offer only the stores that keep the good on that line, and changing the good resets a store that doesn't keep it. Floors appear in the menus only where something up there keeps that good. Ovens and other fixtures are numbered but can't be named in orders yet, since no order needs them (cook *at* oven 2 would).
 
+### 15.12 Tower rooms (session 4, 2026-11-24)
+
+*The user: every fixture can be built in the tower; tower rooms start empty and need everything built in them, the ladder (or stairs) included.*
+
+- **A finished floor is an empty room.** No ladder and no stockpile come with it any more. The log says so: "Its room is empty: place a ladder on the ground floor to reach it."
+- **Rooms** are the tower's ground floor (as soon as the site is chosen) and every finished floor, inside the walls. Any fixture can go in one, placed the same way as in a building: point at the story. Storage shelves count a tower room as indoors.
+- **Ladders** are a fixture now: 2 wood, one tile wide, tower rooms only (two-story buildings still come with their own). A ladder stands in a room and climbs to the floor above, so it needs that floor to be finished. Floor 1 can be built from the ground, but to build floor 2, or to carry its blueprint to the top, workers need a ladder from the ground floor up to floor 1.
+- **"Build camp" builds them,** like every other fixture, wherever it stands. *Claude's call:* CAMP is everything the player places; TOWER is the floors themselves. If a separate tower crew should do tower fixtures, that's a small change.
+- **Taking a ladder down** planks over the hole. Anyone left above it with no other way down climbs down first.
+- **Fixtures that need height:** a fixture can have a lowest story it goes on (`minStory` in `BUILD.fixtures`, 0 = the ground floor), checked in buildings and in the tower alike. None uses it yet; the pulley lift will (the floor above the ground or higher).
+- **The tutorial's "plans for the next floor" step** now also explains that floors are empty rooms, and, once floor 1 stands, asks for a ladder on the tower's ground floor if there isn't one (with a button that starts placing it). It moves on when the plans are drafted and the ladder is placed.
+- **Open question: numbering.** The game calls the first deck above the ground "floor 1" (and the room under it the ground floor). The user's notes sometimes count the ground floor as floor 1 ("the pulley lift can only go on floor 2 or higher", in a two-story building). The two should agree before the tutorial text is final.
+
 ## 16. Roadmap: ideas the user has decided on, not built yet
 
 *Recorded 2026-11-24 (session 4). Claude's suggestions are marked as such.*
 
 ### 16.1 Stairs
 
-A fixture for the tower (and two-story houses) that's a faster way up than the ladder. Costs stone and takes longer to build. Placeholder art is on the Babel Extras sheet (24×32, one floor tall). *To decide when it's built:* how much faster, whether it replaces the ladder or sits beside it, and its width.
+A fixture for the tower (and two-story houses) that's a faster way up than the ladder. Costs stone and takes longer to build. *Since session 4 the ladder is a fixture the player places (§15.12), so stairs slot in beside it: the same rule (stands in a room, climbs to the floor above), a different cost and speed.* Placeholder art is on the Babel Extras sheet (24×32, one floor tall). *To decide when it's built:* how much faster, whether it replaces the ladder or sits beside it, and its width.
 
 ### 16.2 The trader
 
@@ -600,7 +613,7 @@ The supply wagon comes back now and then with new things to trade.
 - **Trade items** get their own art (the user will draw it), shown in the wagon bed the way the patron's supplies are.
 - **The right edge** is the road to far-away lands: the trader comes in that way, and pilgrims leave by it. *Done:* it's now 12 tiles wide (it was 8; the wagon is 9), and the placement message says "The road to far-away lands is in the way."
 
-**Hauling bread and beer** (built in session 4). Cooks and brewers still carry what they make straight to the nearest pantry or bar. Hauling is for everything else: moving bread or beer between pantries or bars, emptying one that's being demolished, picking up bread or beer lying on the ground, and, later, paying the trader. *Not yet:* pantries and bars up the tower, since fixtures only go in buildings on the ground.
+**Hauling bread and beer** (built in session 4). Cooks and brewers still carry what they make straight to the nearest pantry or bar. Hauling is for everything else: moving bread or beer between pantries or bars, emptying one that's being demolished, picking up bread or beer lying on the ground, and, later, paying the trader. Pantries and bars can go in tower rooms too (§15.12), so food can be carried up.
 
 ### 16.3 Pilgrimages
 

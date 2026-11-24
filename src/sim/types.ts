@@ -25,9 +25,13 @@ export interface Pt {
 
 /** Natural features: placed when the map is made, never built or removed. */
 export type NatureKind = 'home' | 'forest' | 'field' | 'well' | 'quarry';
-/** Fixtures: fixed in place inside a building (stockpiles can also stand outside). */
-export type FixtureKind = 'bed' | 'oven' | 'pantry' | 'brewery' | 'bar' | 'stockpile' | 'shelves';
-export const FIXTURE_KINDS: readonly FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile', 'shelves'];
+/**
+ * Fixtures: fixed in place inside a building or a tower room (stockpiles
+ * can also stand outside). Ladders go only in the tower: each one climbs
+ * from its room up to the floor above.
+ */
+export type FixtureKind = 'bed' | 'oven' | 'pantry' | 'brewery' | 'bar' | 'stockpile' | 'shelves' | 'ladder';
+export const FIXTURE_KINDS: readonly FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile', 'shelves', 'ladder'];
 /** Fixtures that store stone, wood and grain. */
 export const STORAGE_KINDS: readonly FixtureKind[] = ['stockpile', 'shelves'];
 

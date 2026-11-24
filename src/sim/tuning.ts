@@ -33,9 +33,19 @@ export const TOWER = {
   /** Writing a blueprint takes this long (in scribe work units). */
   blueprintCost: 220,
   /** Each finished floor gets a small stockpile on its deck: this far in from the left wall, this wide. */
-  stockpileInset: 6,
-  stockpileWidth: 5,
 };
+
+/**
+ * What a kind of fixture costs, how wide it is (fixtureWidth if not given),
+ * and the lowest story it can go on (0 = the ground floor; 1 = the floor
+ * above, upstairs in a building or tower floor 1). Some later fixtures,
+ * like the pulley lift, only make sense higher up.
+ */
+export interface FixtureSpec {
+  cost: { stone: number; wood: number };
+  width?: number;
+  minStory?: number;
+}
 
 /** The map, made fresh for each new game (P1). Widths are in tiles. */
 export const MAP = {
@@ -79,9 +89,11 @@ export const BUILD = {
     bar: { cost: { stone: 0, wood: 3 } },
     /** A stockpile is just marked-out ground (or floor): free, and ready at once. */
     stockpile: { cost: { stone: 0, wood: 0 } },
-    /** Storage shelves: indoors only, and they hold twice what a stockpile does. */
+    /** Storage shelves: indoors only (a building or a tower room), and they hold twice what a stockpile does. */
     shelves: { cost: { stone: 0, wood: 3 } },
-  },
+    /** A ladder: tower rooms only, one tile wide, from its room up through the deck above. */
+    ladder: { cost: { stone: 0, wood: 2 }, width: 1 },
+  } as Record<'bed' | 'oven' | 'pantry' | 'brewery' | 'bar' | 'stockpile' | 'shelves' | 'ladder', FixtureSpec>,
   /** How much a fixture holds. A stockpile holds the same anywhere; shelves hold twice as much. */
   capacity: { pantry: 20, bar: 12, stockpile: 24, shelves: 48 },
   /** Work ticks to set one unit of material in place, or take one apart. */
@@ -101,6 +113,7 @@ export const FIXTURE_LABEL = {
   bar: 'Bar',
   stockpile: 'Stockpile',
   shelves: 'Storage shelves',
+  ladder: 'Ladder',
 } as const;
 
 export const MOVE = {

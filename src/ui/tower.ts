@@ -96,6 +96,6 @@ export class TowerPanel {
         ),
       );
     }
-    this.body.append(t, h('div', { class: 'hint' }, 'Builders fetch from the highest stockpile below the floor they’re building. Haul stone and wood up the tower so they don’t have to climb all the way down.'));
+    this.body.append(t, h('div', { class: 'hint' }, 'Builders fetch from the highest stockpile below the floor they’re building. Each floor starts as an empty room: place a ladder up to it, and a stockpile in it, then haul stone and wood up so builders don’t have to climb all the way down.'));
   }
 }

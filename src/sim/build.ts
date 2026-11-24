@@ -2,8 +2,9 @@ import { log } from './actions';
 import { newCarrier, pinNotice, scribeLoop } from './carriers';
 import { ALL, makeOrder, type Noun, type WorkVerb } from './lang';
 import { giveCarrier } from './scrolls';
-import { BUILD, FIXTURE_LABEL, MAP, PATRON, TOWER } from './tuning';
-import { deckRow } from './tower';
+import { BUILD, FIXTURE_LABEL, MAP, PATRON, TOWER, type FixtureSpec } from './tuning';
+import { deckRow, ladderRows, standRow } from './tower';
+import { findPath } from './path';
 import { FIXTURE_KINDS, Tile, type BuildMaterial, type Building, type FixtureKind, type ItemType, type Pt, type SimState, type Site, type Works } from './types';
 import { buildingOf, groundRow, newBuilding, newSite, setTile, siteCenter, spotFor, storedTotal, storyRow, tileAt } from './world';
 
@@ -19,7 +20,11 @@ export type PlaceRequest =
   | { what: 'tower'; x0: number }
   /** An empty wooden building, named by the player. */
   | { what: 'house'; x0: number; width: number; stories: 1 | 2; name: string }
-  /** A fixture inside a finished building (story 0 or 1), or a stockpile out on open ground. */
+  /**
+   * A fixture inside a finished building (story 0 or 1), in a tower room
+   * (story = the tower level: 0 is the ground floor, n is floor n), or a
+   * stockpile out on open ground.
+   */
   | { what: 'fixture'; fixture: FixtureKind; x0: number; story: number };
 
 export interface Footprint {
@@ -31,6 +36,8 @@ export interface Footprint {
   blocked: boolean[];
   /** The building a fixture goes in, if any. */
   building: Building | null;
+  /** A fixture in a tower room: which level (0 = the tower's ground floor). null elsewhere. */
+  towerLevel: number | null;
   /** Why it can't go here, if it can't. */
   error: string | null;
 }
@@ -74,8 +81,22 @@ export function placeWidth(req: PlaceRequest): number {
     case 'house':
       return req.width;
     case 'fixture':
-      return BUILD.fixtureWidth;
+      return fixtureWidth(req.fixture);
   }
+}
+
+export function fixtureSpec(kind: FixtureKind): FixtureSpec {
+  return BUILD.fixtures[kind];
+}
+
+export function fixtureWidth(kind: FixtureKind): number {
+  return fixtureSpec(kind).width ?? BUILD.fixtureWidth;
+}
+
+/** "the ground floor", "floor 2": a story of a building or the tower, as the player reads it. */
+function storyName(story: number, tower: boolean): string {
+  if (tower) return story === 0 ? "the tower's ground floor" : `floor ${story} of the tower`;
+  return story === 0 ? 'the ground floor' : 'upstairs';
 }
 
 /** What stands on each tile of open ground, if anything. */
@@ -105,18 +126,31 @@ export function footprint(s: SimState, req: PlaceRequest): Footprint {
   const width = placeWidth(req);
   const x0 = req.x0;
   const x1 = x0 + width - 1;
-  const fp: Footprint = { x0, x1, y: groundRow(), blocked: new Array(width).fill(false), building: null, error: null };
+  const fp: Footprint = { x0, x1, y: groundRow(), blocked: new Array(width).fill(false), building: null, towerLevel: null, error: null };
   const off = (x: number) => x < 0 || x >= s.width;
 
   if (req.what === 'fixture') {
-    const story = Math.max(0, Math.min(1, Math.floor(req.story)));
+    const story = Math.max(0, Math.floor(req.story));
     fp.y = storyRow(story);
-    const b = buildingAt(s, x0, x1, story);
+    // inside the tower's walls: a tower room
+    if (s.tower && x1 >= s.tower.x0 && x0 <= s.tower.x1) return towerFootprint(s, req, fp, story);
+    if (req.fixture === 'ladder') {
+      fp.blocked.fill(true);
+      fp.error = 'Ladders go in the tower. A two-story building comes with its own.';
+      return fp;
+    }
+    const b = story <= 1 ? buildingAt(s, x0, x1, story) : null;
     if (!b && req.fixture === 'stockpile' && story === 0) return groundFootprint(s, fp);
     // anything else has to go inside a building
     if (!b) {
       fp.blocked.fill(true);
-      fp.error = req.fixture === 'stockpile' ? 'A stockpile goes inside a building, or on open ground.' : req.fixture === 'shelves' ? 'Storage shelves go inside a building.' : 'Fixtures go inside a building.';
+      fp.error = req.fixture === 'stockpile' ? 'A stockpile goes inside a building or the tower, or on open ground.' : req.fixture === 'shelves' ? 'Storage shelves go inside a building or the tower.' : 'Fixtures go inside a building or the tower.';
+      return fp;
+    }
+    const lowest = fixtureSpec(req.fixture).minStory ?? 0;
+    if (story < lowest) {
+      fp.blocked.fill(true);
+      fp.error = `${FIXTURE_LABEL[req.fixture]} can't go on ${storyName(story, false)}.`;
       return fp;
     }
     fp.building = b;
@@ -155,6 +189,32 @@ export function footprint(s: SimState, req: PlaceRequest): Footprint {
   for (let i = 0; i < width; i++) if (off(x0 + i)) fp.blocked[i] = true;
   const g = groundFootprint(s, fp);
   return g;
+}
+
+/**
+ * A fixture in a tower room. Rooms are the tower's ground floor and every
+ * finished floor, inside the walls. A ladder also needs a finished floor
+ * above it to climb to.
+ */
+function towerFootprint(s: SimState, req: Extract<PlaceRequest, { what: 'fixture' }>, fp: Footprint, level: number): Footprint {
+  const t = s.tower!;
+  fp.towerLevel = level;
+  fp.y = standRow(level);
+  for (let i = 0; i < fp.blocked.length; i++) {
+    const x = fp.x0 + i;
+    const wall = x <= t.x0 || x >= t.x1;
+    const taken = s.sites.some((f) => f.kind !== 'foundation' && f.y === fp.y && x >= f.x0 && x <= f.x1);
+    // a ladder already climbing from this room
+    const ladder = tileAt(s, x, fp.y) === Tile.Ladder;
+    fp.blocked[i] = wall || taken || ladder;
+  }
+  const label = FIXTURE_LABEL[req.fixture];
+  if (level > s.floors) fp.error = `Floor ${level} isn't built yet.`;
+  else if (req.fixture === 'ladder' && level + 1 > s.floors) fp.error = `A ladder needs a finished floor above it to climb to${s.projects.length ? `: floor ${level + 1} is still being built` : ''}.`;
+  else if (level < (fixtureSpec(req.fixture).minStory ?? 0)) fp.error = `${label} can't go on ${storyName(level, true)}.`;
+  else if (fp.blocked.some((b, i) => b && (fp.x0 + i <= t.x0 || fp.x0 + i >= t.x1))) fp.error = 'Fixtures go inside the tower’s walls.';
+  else if (fp.blocked.some(Boolean)) fp.error = 'Something is already there.';
+  return fp;
 }
 
 function groundFootprint(s: SimState, fp: Footprint): Footprint {
@@ -210,6 +270,7 @@ export function applyPlace(s: SimState, req: PlaceRequest): void {
         x0: fp.x0,
         x1: fp.x1,
         y: fp.y,
+        level: fp.towerLevel ?? 0,
         buildingId: fp.building?.id ?? null,
         capacity: capacityOf(req.fixture),
       });
@@ -217,7 +278,8 @@ export function applyPlace(s: SimState, req: PlaceRequest): void {
       // something that costs nothing (a stockpile is just marked-out ground) is ready at once
       if (cost.stone + cost.wood > 0) site.build = newWorks(s, cost);
       s.sites.push(site);
-      log(s, `Planned: ${site.label}${fp.building ? ` in ${fp.building.name}` : ' on open ground'}.`);
+      const where = fp.building ? ` in ${fp.building.name}` : fp.towerLevel !== null ? ` on ${storyName(fp.towerLevel, true)}` : ' on open ground';
+      log(s, `Planned: ${site.label}${where}.${req.fixture === 'ladder' ? ' Post "build camp" work to get it built.' : ''}`);
       break;
     }
   }
@@ -320,7 +382,8 @@ function finishBuild(s: SimState, j: Job): void {
     const site = s.sites.find((x) => x.id === j.id)!;
     site.build = null;
     const b = buildingOf(s, site);
-    log(s, `${site.kind === 'board' || site.kind === 'scriptorium' ? `The ${site.label.toLowerCase()}` : site.label} is built${b ? ` in ${b.name}` : ''}.`);
+    if (site.kind === 'ladder') layLadder(s, site);
+    log(s, `${site.kind === 'board' || site.kind === 'scriptorium' ? `The ${site.label.toLowerCase()}` : site.label} is built${b ? ` in ${b.name}` : site.kind === 'ladder' ? `: the way up to floor ${site.level + 1}` : ''}.`);
     if (site.kind === 'scriptorium' || site.kind === 'board') checkFounding(s);
   }
   pleasePatron(s, units);
@@ -330,6 +393,30 @@ function finishBuild(s: SimState, j: Job): void {
 function pleasePatron(s: SimState, units: number): void {
   if (s.patience >= PATRON.otherBuildCap) return;
   s.patience = Math.min(PATRON.otherBuildCap, s.patience + units * PATRON.otherBuildPerUnit);
+}
+
+/** A finished tower ladder: from its room up through a hole in the deck above. */
+function layLadder(s: SimState, site: Site): void {
+  const r = ladderRows(site.level);
+  for (let y = r.top; y <= r.bottom; y++) setTile(s, site.x0, y, Tile.Ladder);
+}
+
+/**
+ * Take a tower ladder out: the hole in the deck is planked over. Anyone
+ * left above with no other way down climbs down before it goes.
+ */
+function removeLadder(s: SimState, site: Site): void {
+  const r = ladderRows(site.level);
+  for (let y = r.top; y <= r.bottom; y++) if (tileAt(s, site.x0, y) === Tile.Ladder) setTile(s, site.x0, y, y === r.top ? Tile.Deck : Tile.Air);
+  const down = { x: site.x0, y: site.y };
+  for (const w of s.workers) {
+    if (w.y >= site.y || findPath(s, { x: w.x, y: w.y }, { x: down.x, y: down.y }) !== null) continue;
+    w.x = down.x;
+    w.y = down.y;
+    w.path = [];
+    w.pathGoal = null;
+    w.stepProgress = 0;
+  }
 }
 
 /** The second story's floor: a deck across the building with a ladder up its left end. */
@@ -345,7 +432,7 @@ function finishDemolition(s: SimState, j: Job): void {
   let dropped = 0;
   for (const m of ['stone', 'wood'] as const) {
     for (let i = 0; i < salvage(m); i++) {
-      s.items.push({ id: s.nextId++, type: m, x: j.x0 + ((at.x + i) % (j.x1 - j.x0 + 1)), y: groundRow(), reservedBy: null });
+      s.items.push({ id: s.nextId++, type: m, x: j.x0 + ((at.x + i) % (j.x1 - j.x0 + 1)), y: j.y, reservedBy: null });
       dropped++;
     }
   }
@@ -354,6 +441,8 @@ function finishDemolition(s: SimState, j: Job): void {
     if (b.stories === 2 && !b.build) clearUpperFloor(s, b);
     s.buildings = s.buildings.filter((x) => x !== b);
   } else {
+    const site = s.sites.find((x) => x.id === j.id);
+    if (site?.kind === 'ladder') removeLadder(s, site);
     s.sites = s.sites.filter((x) => x.id !== j.id);
   }
   log(s, `${j.label} is taken down${dropped ? `: ${dropped} ${dropped === 1 ? 'unit' : 'units'} of material left lying there to haul` : ''}.`);
@@ -392,7 +481,6 @@ export function validateDemolish(s: SimState, t: DemolishTarget): string | null 
   if (site.kind === 'foundation') return 'The tower site can never be moved.';
   if (site.kind === 'board') return "The job board stays (for now: there's only one board until upper boards are built).";
   if (site.supplies) return "The patron's supplies go when they're used up.";
-  if (site.level > 0) return "A tower floor's stockpile is part of the floor.";
   if (!(FIXTURE_KINDS as readonly string[]).includes(site.kind)) return "That's part of the land.";
   if (site.demolish) return 'Already being taken down.';
   return null;

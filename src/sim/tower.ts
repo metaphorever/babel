@@ -1,13 +1,14 @@
 import { log } from './actions';
 import { patronFloorDone } from './patron';
 import { TOWER, WORLD } from './tuning';
-import { Tile, type BuildMaterial, type Pt, type Project, type SimState, type Site } from './types';
-import { newSite, setTile, tileAt } from './world';
+import { Tile, type BuildMaterial, type Pt, type Project, type SimState } from './types';
+import { setTile, tileAt } from './world';
 
 // Tower geometry. Floor k's deck sits 4k rows above the ground. Building
 // floor k means raising the stone walls of the story below it and laying
-// its wooden deck, working from the floor below. A ladder goes in last,
-// alternating sides so every trip up crosses each floor.
+// its wooden deck, working from the floor below. A finished floor is an
+// empty room: the ladder up to it, and everything else in it, are fixtures
+// the player places and workers build.
 
 export function deckRow(level: number): number {
   return WORLD.groundRow - level * TOWER.floorHeight;
@@ -22,11 +23,6 @@ export function standRow(level: number): number {
 export function towerSpan(s: SimState): { x0: number; x1: number } {
   if (!s.tower) throw new Error('no tower site yet');
   return s.tower;
-}
-
-export function ladderX(s: SimState, level: number): number {
-  const t = towerSpan(s);
-  return level % 2 === 1 ? t.x0 + 1 : t.x1 - 1;
 }
 
 /** Where builders stand to work on a floor: spread across the story below it. */
@@ -111,18 +107,19 @@ function drawProgress(s: SimState, p: Project): void {
 }
 
 function completeFloor(s: SimState, p: Project): void {
-  const deck = deckRow(p.level);
-  // the ladder runs from the story below up through a hole in the new deck
-  const lx = ladderX(s, p.level);
-  for (let y = deck; y <= deck + TOWER.floorHeight - 1; y++) setTile(s, lx, y, Tile.Ladder);
   s.floors = p.level;
   s.projects = s.projects.filter((x) => x !== p);
-  s.sites.push(floorStockpile(s, p.level));
   patronFloorDone(s, p.level);
-  log(s, `Floor ${p.level} is finished! The tower stands ${p.level} ${p.level === 1 ? 'floor' : 'floors'} tall.`);
+  const below = p.level === 1 ? 'the ground floor' : `floor ${p.level - 1}`;
+  log(s, `Floor ${p.level} is finished! The tower stands ${p.level} ${p.level === 1 ? 'floor' : 'floors'} tall. Its room is empty: place a ladder on ${below} to reach it.`);
 }
 
-function floorStockpile(s: SimState, level: number): Site {
-  const x0 = towerSpan(s).x0 + TOWER.stockpileInset;
-  return newSite(s, { kind: 'stockpile', label: 'Stockpile', x0, x1: x0 + TOWER.stockpileWidth - 1, y: standRow(level), level });
+/** The rows a ladder on this level fills: from its room up through the deck of the floor above. */
+export function ladderRows(level: number): { top: number; bottom: number } {
+  return { top: deckRow(level + 1), bottom: standRow(level) };
+}
+
+/** Is there a finished ladder from this level up to the next? */
+export function hasLadderUp(s: SimState, level: number): boolean {
+  return s.sites.some((x) => x.kind === 'ladder' && x.level === level && x.build === null && !x.demolish);
 }

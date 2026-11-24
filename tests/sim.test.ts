@@ -13,12 +13,23 @@ import { addConfusion, allWords, readOrder, updateDrift } from '../src/sim/drift
 import { eligibleNotices } from '../src/sim/activities';
 import { ALL, FOREVER, makeOrder, orderText, parseOrder, type Noun, type Verb, type WorkVerb } from '../src/sim/lang';
 import { deckRow, newProject, placeMaterial } from '../src/sim/tower';
+import { findJob, finishNow, type PlaceRequest } from '../src/sim/build';
 
 import type { Dest } from '../src/sim/types';
 import { ARRIVALS, PATRON, QUIT, SKILLS, TOWER, WORLD } from '../src/sim/tuning';
 import { currentStipend, patronFloorDone } from '../src/sim/patron';
 
 type State = ReturnType<typeof createState>;
+
+const placeCmd = (place: PlaceRequest): Command => ({ type: 'place', playerId: 0, place });
+
+/** Finish a floor of the tower by hand. */
+function buildFloor(s: State, level: number) {
+  s.projects.push(newProject(s, level));
+  const p = s.projects[s.projects.length - 1];
+  for (let i = 0; i < p.needs.stone; i++) placeMaterial(s, p, 'stone');
+  for (let i = 0; i < p.needs.wood; i++) placeMaterial(s, p, 'wood');
+}
 
 /** Everything stored at the base (not counting the patron's supplies). */
 function baseStore(s: State, type: 'stone' | 'wood' | 'grain'): number {
@@ -377,16 +388,40 @@ describe('the tower', () => {
     expect(tileAt(s, T.x1 + 1, row)).toBe(Tile.Air);
   });
 
-  it('a blueprint carried up starts a floor; builders finish it with a ladder', () => {
+  it('a blueprint carried up starts a floor; builders finish it, and its room is empty', () => {
     const s = createState(7);
     applyCommand(s, { type: 'blueprint', playerId: 0 });
     applyCommand(s, noticeCmd('BUILD', 'TOWER', 40, 1));
     expect(runUntil(s, () => s.projects.length > 0, 3000)).toBe(true);
     expect(runUntil(s, () => s.floors === 1, 20 * 400)).toBe(true);
-    // the new floor is walkable: there's a path from the ground to its stockpile
-    const top = stockpileOn(s, 1)!;
-    expect(top).not.toBeNull();
-    expect(findPath(s, { x: 60, y: groundRow() }, { x: top.x0, y: top.y })).not.toBeNull();
+    // no ladder and no stockpile come with it: nobody can get up yet
+    const t = s.tower!;
+    const up = { x: t.x0 + 8, y: groundRow() - TOWER.floorHeight };
+    expect(stockpileOn(s, 1)).toBeNull();
+    expect(findPath(s, { x: 60, y: groundRow() }, up)).toBeNull();
+    // a ladder on the tower's ground floor, built by "build camp" work, is the way up
+    expect(applyCommand(s, placeCmd({ what: 'fixture', fixture: 'ladder', x0: t.x0 + 2, story: 0 })).ok).toBe(true);
+    pinNotice(s, makeOrder('BUILD', 'CAMP'), ALL, 1, null);
+    s.sites.find((x) => x.kind === 'stockpile' && x.level === 0 && !x.supplies)!.store.wood += 5;
+    const ladder = s.sites.find((x) => x.kind === 'ladder')!;
+    expect(runUntil(s, () => ladder.build === null, 20 * 600)).toBe(true);
+    expect(findPath(s, { x: 60, y: groundRow() }, up)).not.toBeNull();
+  });
+
+  it('tower rooms take any fixture; ladders need a finished floor above, and only go in the tower', () => {
+    const s = createState(7);
+    const t = s.tower!;
+    const fixture = (fixture: 'ladder' | 'bed' | 'stockpile', x0: number, story: number) => applyCommand(s, placeCmd({ what: 'fixture', fixture, x0, story }));
+    expect(fixture('ladder', t.x0 + 2, 0).ok).toBe(false); // no floor 1 yet
+    expect(fixture('bed', t.x0 + 4, 0).ok).toBe(true); // the tower's ground floor is a room already
+    expect(fixture('bed', t.x0, 0).ok).toBe(false); // not in the wall
+    buildFloor(s, 1);
+    expect(fixture('ladder', t.x0 + 2, 0).ok).toBe(true);
+    expect(fixture('ladder', t.x0 + 2, 1).ok).toBe(false); // nothing above floor 1 to climb to
+    expect(fixture('stockpile', t.x0 + 6, 1).ok).toBe(true);
+    const pile = s.sites[s.sites.length - 1];
+    expect(pile.level).toBe(1);
+    expect(fixture('ladder', 20, 0).ok).toBe(false); // out on open ground
   });
 
   it('nobody builds without a blueprint', () => {
@@ -399,12 +434,14 @@ describe('the tower', () => {
 
   it('haul can move goods between stockpiles', () => {
     const s = createState(7);
-    // build floor 1 quickly by hand, then haul stone up to it
-    s.projects.push(newProject(s, 1));
-    const p = s.projects[0];
-    for (let i = 0; i < p.needs.stone; i++) placeMaterial(s, p, 'stone');
-    for (let i = 0; i < p.needs.wood; i++) placeMaterial(s, p, 'wood');
+    // build floor 1 quickly by hand, with a ladder up and a stockpile in its room, then haul stone up to it
+    buildFloor(s, 1);
     expect(s.floors).toBe(1);
+    const t = s.tower!;
+    expect(applyCommand(s, placeCmd({ what: 'fixture', fixture: 'ladder', x0: t.x0 + 2, story: 0 })).ok).toBe(true);
+    const ladder = s.sites[s.sites.length - 1];
+    finishNow(s, findJob(s, 'site', ladder.id)!);
+    expect(applyCommand(s, placeCmd({ what: 'fixture', fixture: 'stockpile', x0: t.x0 + 6, story: 1 })).ok).toBe(true);
     const w = s.workers[2];
     applyCommand(s, scrollCmdPlaces('HAUL', 'STONE', 0, 1, 3, w.id));
     expect(runUntil(s, () => (stockpileOn(s, 1)?.store.stone ?? 0) >= 3, 20 * 300)).toBe(true);
