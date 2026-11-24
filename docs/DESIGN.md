@@ -533,7 +533,7 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 - **`?start=prebuilt`** lays out a P0-style colony instead (fixed map, everything built). The tests use it.
 
 **The opening:**
-- **Before anything is built,** workers wait by the supplies, eat from them, drink at the well and sleep rough. There's no board and no charter yet.
+- **Before anything is built,** workers mill around by the supplies, eat from them and drink at the well. *Session 4:* they don't lie down to sleep until the scriptorium is placed (the first order), unless they're worn out (fatigue 80, `AI.openingSleepAbove`). There's no board and no charter yet.
 - **Placing the scriptorium** marks out it and the board beside its door (6 + 1 gap + 2 tiles). The patron's clerk hands four workers a card, "build camp ×all", wage 1. When both stand, the charter is decreed: the worker with a knack for writing becomes the scribe, and three starter notices go up (mine stone, chop wood, harvest grain).
 - **Placement order:** the scriptorium comes first; nothing else can be placed until it is. The tower site comes next in the tutorial, but any time is allowed.
 

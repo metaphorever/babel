@@ -34,7 +34,7 @@ export function scoreOptions(s: SimState, w: Worker, inProgress: boolean): Score
   if (asleep) {
     // once asleep, stay asleep until rested unless something is urgent
     add('sleep', 'Keep sleeping', Math.max(urgency(w.fatigue), 30) + 20);
-  } else if (w.fatigue >= NEEDS.noticeThreshold) {
+  } else if (w.fatigue >= (waitingForOrders(s) ? AI.openingSleepAbove : NEEDS.noticeThreshold)) {
     add('sleep', 'Sleep', urgency(w.fatigue));
   }
 
@@ -76,6 +76,15 @@ export function scoreOptions(s: SimState, w: Worker, inProgress: boolean): Score
 
   out.sort((a, b) => b.score - a.score);
   return out;
+}
+
+/**
+ * The very start of a new game, before the scriptorium is placed: nobody has
+ * been given anything to do yet, so workers mill around (and eat and drink)
+ * rather than lie down, unless they're really worn out.
+ */
+function waitingForOrders(s: SimState): boolean {
+  return s.start === 'opening' && !s.sites.some((x) => x.kind === 'scriptorium');
 }
 
 function labelOf(order: { t: string }[]): string {

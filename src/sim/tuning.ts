@@ -262,6 +262,8 @@ export const AI = {
   barMoodWeight: 0.35,
   wanderBase: 8,
   noise: 4, // random jitter on each candidate so equal workers differ
+  /** Before the scriptorium is placed, workers mill around and only sleep if they're this tired. */
+  openingSleepAbove: 80,
 };
 
 export const SKILLS = {

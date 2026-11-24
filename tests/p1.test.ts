@@ -491,3 +491,15 @@ describe('session 4: fixtures by number and name in orders', () => {
     expect(s.items.filter((it) => it.type === 'stone').length).toBe(4);
   });
 });
+
+describe('session 4: the opening', () => {
+  it('workers mill around rather than sleep until the scriptorium is placed', () => {
+    for (const seed of [1, 7, 42]) {
+      const s = createState(seed, 'normal', 'opening');
+      for (const w of s.workers) w.fatigue = 40;
+      run(s, 20 * 60);
+      expect(s.workers.some((w) => w.activity.kind === 'sleep')).toBe(false);
+      expect(s.workers.some((w) => w.activity.kind === 'wander' || w.activity.kind === 'idle')).toBe(true);
+    }
+  });
+});
