@@ -65,7 +65,7 @@ Built and tested: the random map, the opening text and founding, placement mode 
 
 ## Where session 4 left things
 
-- **Tower rooms** (DESIGN.md §15.12): finished floors are empty; any fixture goes in them, and the ladder is now a fixture the player places. **Numbering is settled:** the ground counts as level 1; the game says "Tower Ground Level", then "Tower Level 2" and up, always through `levelName()` (DESIGN.md §15.12). Levels stay 0-based in the code.
+- **Tower rooms** (DESIGN.md §15.12): finished floors are empty; any fixture goes in them, and the ladder is now a fixture the player places. **Numbering is settled:** the first floor you build is "Tower Ground Level", the next "Tower Level 2" and up. Rooms are named through `levelName()`, floors being built through `floorName()` (DESIGN.md §15.12). Levels stay 0-based in the code.
 - **Hauling bread and beer is built:** bread goes to pantries, beer to bars, by number or name like stockpiles.
 - **Addressing is built** (DESIGN.md §15.11): permanent fixture numbers, fixture renaming, and hauls TO/FROM the nearest store, the base, the tower, a floor, or one store by number or name. A haul with no TO now goes to the nearest store, not the base.
 - **The scriptorium** stacks its queue between its columns again. **Babel Extras**, a new MacPaint page, has blank storage shelves, placeholder stairs and a house deck. Two-story houses now draw their own deck.

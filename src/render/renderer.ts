@@ -1,12 +1,12 @@
-import { CONFUSION, MOOD, levelName, TOWER, Tile, WORLD, darkness, hourOf, type Building, type SimState, type Site, type Worker } from '../sim';
+import { CONFUSION, MOOD, floorName, TOWER, Tile, WORLD, darkness, hourOf, type Building, type SimState, type Site, type Worker } from '../sim';
 import { activeProject, deckRow, projectFraction } from '../sim/tower';
 import { worksFraction } from '../sim/build';
-import { buildingLabel, groundRow } from '../sim/world';
+import { buildingLabel, groundRow, HOUSE_STORY_ROWS } from '../sim/world';
 import { INK, PAPER, Patterns, type PatternName } from './patterns';
 import { itemSprite, nightSky, propSprite, thoughtSprite, workerSprite, worldSprite } from './sprites';
 
-/** Height in pixels of one story's walls (the deck above it makes up the rest of a floor). */
-const STORY_PX = 24;
+/** Height in pixels of one story of a building: its rooms stack straight on top of each other. */
+const STORY_PX = HOUSE_STORY_ROWS * 8;
 const ROOF_PX = 6;
 
 /** Set pieces drawn whole from the world art. */
@@ -40,7 +40,7 @@ export type Thing = { kind: 'site'; site: Site } | { kind: 'building'; building:
 
 /** How tall a building is drawn, roof included. */
 export function buildingHeight(stories: number): number {
-  return (stories - 1) * TOWER.floorHeight * 8 + STORY_PX + ROOF_PX;
+  return stories * STORY_PX + ROOF_PX;
 }
 
 export const TILE = 8; // native pixels per tile
@@ -166,7 +166,7 @@ export class Renderer {
     g.translate(-cx, -cy);
 
     this.drawSky(s, cx, cy, bw, bh);
-    // buildings go behind the tiles, so a two-story building's deck and ladder show over its walls
+    // buildings go behind the tiles, so a two-story building's ladder shows over its walls
     for (const b of s.buildings) this.drawBuilding(s, b);
     this.drawTiles(s, cx, cy, bw, bh);
     for (const site of s.sites) this.drawSite(s, site);
@@ -202,8 +202,11 @@ export class Renderer {
           let depth = 0;
           for (let k = 1; k <= 3 && y - k >= 0 && s.tiles[(y - k) * s.width + x] === Tile.Dirt; k++) depth = k;
           name = depth === 0 ? 'terrain.dirt-top' : depth >= 3 ? 'terrain.dirt-deep' : 'terrain.dirt';
-        } else if (t === Tile.Deck) name = s.tower && x >= s.tower.x0 && x <= s.tower.x1 ? 'tower.deck' : 'building.deck';
-        else if (t === Tile.Wall) name = 'tower.wall';
+        } else if (t === Tile.Deck) {
+          // a building's upstairs floor isn't drawn: its rooms sit straight on top of each other
+          if (!s.tower || x < s.tower.x0 || x > s.tower.x1) continue;
+          name = 'tower.deck';
+        } else if (t === Tile.Wall) name = 'tower.wall';
         else name = 'tower.ladder';
         this.g.drawImage(worldSprite(name), px, py);
       }
@@ -259,9 +262,8 @@ export class Renderer {
         this.g.drawImage(spr, left + Math.floor((n * TILE - spr.width) / 2), base - spr.height);
         return;
       }
-      const floorPx = TOWER.floorHeight * TILE;
       for (let k = 0; k < b.stories; k++) {
-        const y = base - k * floorPx - STORY_PX;
+        const y = base - (k + 1) * STORY_PX;
         for (let i = 0; i < n; i++) {
           const piece = i === 0 ? 'wall-left' : i === n - 1 ? 'wall-right' : k === 0 && i === 1 ? 'door' : i % 3 === 2 ? 'window' : 'wall';
           this.g.drawImage(worldSprite(`building.${piece}`), left + i * TILE, y);
@@ -725,7 +727,7 @@ export class Renderer {
       }
       const p = activeProject(s);
       if (p) {
-        tagLeft(`${levelName(p.level, true)}: ${Math.floor(projectFraction(p) * 100)}%`, right, (deckRow(p.level) * TILE - cy) * z - 4 * this.dpr);
+        tagLeft(`${floorName(p.level, true)}: ${Math.floor(projectFraction(p) * 100)}%`, right, (deckRow(p.level) * TILE - cy) * z - 4 * this.dpr);
       }
     }
     for (const w of s.workers) {

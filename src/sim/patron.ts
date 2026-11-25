@@ -1,7 +1,7 @@
 import { log } from './actions';
 import { hasWriteLine, scribeLoop } from './carriers';
 import { knows, knowsWord } from './drift';
-import { LANGS, langName, levelName, type LangId } from './lang';
+import { LANGS, floorName, langName, type LangId } from './lang';
 import { addWorker } from './sim';
 import { ARRIVALS, PATRON, POPULATION, TIME } from './tuning';
 import { dayOf } from './time';
@@ -132,7 +132,7 @@ export function patronFloorDone(s: SimState, level: number): void {
   const bonus = PATRON.floorBonusBase + PATRON.floorBonusPerLevel * level;
   s.gold += bonus;
   s.income += bonus;
-  log(s, `The patron is pleased with ${levelName(level)} and sends ${bonus} gold.`);
+  log(s, `The patron is pleased with ${floorName(level)} and sends ${bonus} gold.`);
 }
 
 /** The patron gives the colony a few days to get started (until floor 1 is finished). */

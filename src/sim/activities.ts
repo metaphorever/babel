@@ -1,5 +1,5 @@
 import { addMoodlet, dropCarried, log, moveTo, settle } from './actions';
-import { ALL, FOREVER, STORES_FOR, levelName, isSpecialCount, isWorkVerb, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
+import { ALL, FOREVER, STORES_FOR, floorName, isSpecialCount, isWorkVerb, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
 import { carrierText } from './carriers';
 import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed, unreadableLine } from './scrolls';
 import { addConfusion, knows, readOrder } from './drift';
@@ -722,7 +722,7 @@ function buildJob(s: SimState, w: Worker): Result {
         a.ref = LOOSE;
       }
       a.stage = 1;
-      w.thought = `Fetching ${m} for ${levelName(p.level)}.`;
+      w.thought = `Fetching ${m} for ${floorName(p.level)}.`;
     }
   }
   if (a.stage === 1 && a.ref === LOOSE) {
@@ -751,7 +751,7 @@ function buildJob(s: SimState, w: Worker): Result {
       dropCarried(s, w);
       return finishWork(s, w, 0);
     }
-    w.thought = `Carrying ${w.carryCount} ${w.carrying} up to ${levelName(p.level)}.`;
+    w.thought = `Carrying ${w.carryCount} ${w.carrying} up to ${floorName(p.level)}.`;
     const m = moveTo(s, w, buildSpot(s, p.level, w.id));
     if (m === 'moving') return 'running';
     if (m === 'unreachable') return failWork(s, w, "Can't reach the top of the tower.");
@@ -763,7 +763,7 @@ function buildJob(s: SimState, w: Worker): Result {
   if (--a.timer > 0) return 'running';
   const mat = w.carrying as BuildMaterial | null;
   if (p && mat && p.placed[mat] < p.needs[mat]) {
-    w.thought = `Building ${levelName(p.level)}.`;
+    w.thought = `Building ${floorName(p.level)}.`;
     placeMaterial(s, p, mat);
     a.ref = (a.ref ?? 0) + 1;
     w.carryCount--;

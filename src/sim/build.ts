@@ -1,12 +1,12 @@
 import { log } from './actions';
 import { newCarrier, pinNotice, scribeLoop } from './carriers';
-import { ALL, levelName, makeOrder, type Noun, type WorkVerb } from './lang';
+import { ALL, floorName, levelName, makeOrder, type Noun, type WorkVerb } from './lang';
 import { giveCarrier } from './scrolls';
 import { BUILD, FIXTURE_LABEL, MAP, PATRON, TOWER, type FixtureSpec } from './tuning';
-import { deckRow, ladderRows, standRow } from './tower';
+import { ladderRows, standRow } from './tower';
 import { findPath } from './path';
 import { FIXTURE_KINDS, Tile, type BuildMaterial, type Building, type FixtureKind, type ItemType, type Pt, type SimState, type Site, type Works } from './types';
-import { buildingOf, groundRow, newBuilding, newSite, setTile, siteCenter, spotFor, storedTotal, storyRow, tileAt } from './world';
+import { buildingOf, groundRow, houseDeckRow, newBuilding, newSite, setTile, siteCenter, spotFor, storedTotal, storyRow, tileAt } from './world';
 
 // Building on the ground (P1). The player places things; workers build them.
 // Placing is the one thing the player does directly: it's laying out the
@@ -210,7 +210,7 @@ function towerFootprint(s: SimState, req: Extract<PlaceRequest, { what: 'fixture
   }
   const label = FIXTURE_LABEL[req.fixture];
   if (level > s.floors) fp.error = `${levelName(level)} isn't built yet.`;
-  else if (req.fixture === 'ladder' && level + 1 > s.floors) fp.error = `A ladder needs a finished level above it to climb to${s.projects.length ? `: ${levelName(level + 1)} is still being built` : ''}.`;
+  else if (req.fixture === 'ladder' && level + 1 > s.floors) fp.error = `A ladder needs a finished level above it to climb to${s.projects.length ? `: ${floorName(level + 1)} is still being built` : ''}.`;
   else if (level < (fixtureSpec(req.fixture).minStory ?? 0)) fp.error = `${label} can't go on ${storyName(level, true)}.`;
   else if (fp.blocked.some((b, i) => b && (fp.x0 + i <= t.x0 || fp.x0 + i >= t.x1))) fp.error = 'Fixtures go inside the tower’s walls.';
   else if (fp.blocked.some(Boolean)) fp.error = 'Something is already there.';
@@ -421,9 +421,9 @@ function removeLadder(s: SimState, site: Site): void {
 
 /** The second story's floor: a deck across the building with a ladder up its left end. */
 function layUpperFloor(s: SimState, b: Building): void {
-  const deck = deckRow(1);
+  const deck = houseDeckRow();
   for (let x = b.x0; x <= b.x1; x++) setTile(s, x, deck, Tile.Deck);
-  for (let y = deck; y <= deck + TOWER.floorHeight - 1; y++) setTile(s, b.x0, y, Tile.Ladder);
+  for (let y = deck; y <= groundRow(); y++) setTile(s, b.x0, y, Tile.Ladder);
 }
 
 function finishDemolition(s: SimState, j: Job): void {
@@ -450,10 +450,10 @@ function finishDemolition(s: SimState, j: Job): void {
 
 /** Take the deck and ladder out. Anyone and anything up there comes down to the ground. */
 function clearUpperFloor(s: SimState, b: Building): void {
-  const deck = deckRow(1);
+  const deck = houseDeckRow();
   for (let x = b.x0; x <= b.x1; x++) setTile(s, x, deck, Tile.Air);
-  for (let y = deck; y <= deck + TOWER.floorHeight - 1; y++) if (tileAt(s, b.x0, y) === Tile.Ladder) setTile(s, b.x0, y, Tile.Air);
-  const inside = (x: number, y: number) => x >= b.x0 && x <= b.x1 && y < groundRow() && y >= deck - TOWER.floorHeight;
+  for (let y = deck; y <= groundRow(); y++) if (tileAt(s, b.x0, y) === Tile.Ladder) setTile(s, b.x0, y, Tile.Air);
+  const inside = (x: number, y: number) => x >= b.x0 && x <= b.x1 && y < groundRow() && y > storyRow(2);
   for (const w of s.workers) {
     if (!inside(w.x, w.y)) continue;
     w.y = groundRow();

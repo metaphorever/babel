@@ -1,6 +1,6 @@
 import { FIXTURE_WORD_KIND, STORES_FOR, levelName, type Place } from './lang';
 import { randInt } from './rng';
-import { BUILD, FIXTURE_LABEL, MAP, TOWER, WORLD } from './tuning';
+import { BUILD, FIXTURE_LABEL, MAP, WORLD } from './tuning';
 import { FIXTURE_KINDS, Tile, type Building, type FixtureKind, type ItemType, type NatureKind, type Pt, type SimState, type Site, type SiteKind } from './types';
 
 export function tileAt(s: SimState, x: number, y: number): number {
@@ -39,14 +39,27 @@ export function groundRow(): number {
   return WORLD.groundRow - 1;
 }
 
+/**
+ * Rows in one story of a building: its rooms are one wall sprite (24 px)
+ * tall and stack straight on top of each other, with no deck showing
+ * between them. The upstairs floor is an unseen deck in the top row of the
+ * room below. (Tower floors are taller: TOWER.floorHeight, deck included.)
+ */
+export const HOUSE_STORY_ROWS = 3;
+
 /** The row workers stand on in a building's story (0 = ground floor, 1 = upstairs). */
 export function storyRow(story: number): number {
-  return groundRow() - story * TOWER.floorHeight;
+  return groundRow() - story * HOUSE_STORY_ROWS;
 }
 
-/** Which story of a building a standing row is on. */
+/** The row of the unseen deck a building's upstairs stands on. */
+export function houseDeckRow(): number {
+  return storyRow(1) + 1;
+}
+
+/** Which story of a building a row is in. The deck belongs to the room below it. */
 export function storyOfRow(y: number): number {
-  return Math.max(0, Math.round((groundRow() - y) / TOWER.floorHeight));
+  return Math.max(0, Math.floor((groundRow() - y) / HOUSE_STORY_ROWS));
 }
 
 export interface SiteInit {

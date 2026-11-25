@@ -143,7 +143,6 @@ export function fixtureArt(): WorldSprite[] {
  * (Babel Extras), so the boxes on the pages already drawn never move.
  */
 export function extrasArt(): WorldSprite[] {
-  const deck = terrainArt().find((s) => s.name === 'tower.deck')!;
   return [
     art('fixture.shelves', 'STORAGE SHELVES', 16, 16, (b) => {
       // an open frame with three shelves; goods are drawn on them by the game
@@ -159,7 +158,6 @@ export function extrasArt(): WorldSprite[] {
       }
       for (let i = 0; i < 24; i++) b.set(i, Math.min(31, 31 - Math.floor((i * 4) / 3) + 3), INK);
     }),
-    { name: 'building.deck', label: 'HOUSE DECK (UPSTAIRS FLOOR)', grid: deck.grid },
   ];
 }
 

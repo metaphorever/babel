@@ -55,14 +55,18 @@ const typing = (e: Event) => {
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA');
 };
 
+/** Put down whatever build tool is in hand. Returns false if there wasn't one. */
+function dropTool(): boolean {
+  if (build.placing) build.cancel();
+  else if (build.demolishing) build.stopDemolish();
+  else return false;
+  return true;
+}
+
 window.addEventListener('keydown', (e) => {
   if (typing(e) || build.modalOpen) return;
   const k = e.key.toLowerCase();
-  if (k === 'escape' && (build.placing || build.demolishing)) {
-    if (build.placing) build.cancel();
-    else build.stopDemolish();
-    return;
-  }
+  if (k === 'escape' && dropTool()) return;
   if (k === '[' || k === ']') {
     build.nudgeWidth(k === '[' ? -1 : 1);
     return;
@@ -99,18 +103,23 @@ window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener('blur', () => keys.clear());
 
 let hover: number | null = null;
-let drag: { x: number; y: number; camX: number; camY: number } | null = null;
+let drag: { x: number; y: number; camX: number; camY: number; button: number; moved: boolean } | null = null;
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('mousedown', (e) => {
   if (e.button === 1 || e.button === 2) {
     e.preventDefault();
-    drag = { x: e.clientX, y: e.clientY, camX: renderer.camX, camY: renderer.camY };
+    drag = { x: e.clientX, y: e.clientY, camX: renderer.camX, camY: renderer.camY, button: e.button, moved: false };
   }
 });
-window.addEventListener('mouseup', () => (drag = null));
+// a right-click that doesn't drag puts the tool down, like Escape; a right-drag still pans
+window.addEventListener('mouseup', (e) => {
+  if (drag && e.button === 2 && drag.button === 2 && !drag.moved && !build.modalOpen) dropTool();
+  drag = null;
+});
 canvas.addEventListener('mousemove', (e) => {
   if (drag) {
+    if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) > 4) drag.moved = true;
     const dpr = window.devicePixelRatio || 1;
     renderer.camX = drag.camX - ((e.clientX - drag.x) * dpr) / renderer.zoom;
     renderer.camY = drag.camY - ((e.clientY - drag.y) * dpr) / renderer.zoom;

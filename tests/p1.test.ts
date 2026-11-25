@@ -5,10 +5,9 @@ import { campJobs, footprint, groundUse, type PlaceRequest } from '../src/sim/bu
 import { pinNotice } from '../src/sim/carriers';
 import { ALL, makeOrder, orderText, parseOrder, type Place } from '../src/sim/lang';
 import { findPath } from '../src/sim/path';
-import { deckRow } from '../src/sim/tower';
 import { BUILD, MAP, PATRON, TIME } from '../src/sim/tuning';
 import { Tile, type FixtureKind, type SimState } from '../src/sim/types';
-import { groundRow, sitesOf, storyRow, tileAt } from '../src/sim/world';
+import { groundRow, houseDeckRow, sitesOf, storyRow, tileAt } from '../src/sim/world';
 
 function run(s: SimState, ticks: number) {
   for (let i = 0; i < ticks; i++) step(s);
@@ -214,8 +213,10 @@ describe('buildings and fixtures', () => {
   it('a two-story building gets a deck and a ladder, and its upstairs can be reached', () => {
     const s = createState(3);
     const x0 = withHouse(s, 6, 2);
-    expect(tileAt(s, x0 + 3, deckRow(1))).toBe(Tile.Deck);
-    expect(tileAt(s, x0, deckRow(1))).toBe(Tile.Ladder);
+    expect(tileAt(s, x0 + 3, houseDeckRow())).toBe(Tile.Deck);
+    expect(tileAt(s, x0, houseDeckRow())).toBe(Tile.Ladder);
+    // the rooms stack straight on top of each other: no gap between the stories
+    expect(houseDeckRow()).toBe(groundRow() - 2);
     expect(findPath(s, { x: x0 - 3, y: groundRow() }, { x: x0 + 4, y: storyRow(1) })).not.toBeNull();
     // fixtures can't block the ladder
     expect(validateCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 1 })).ok).toBe(false);

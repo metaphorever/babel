@@ -2,7 +2,7 @@ import { BUILD, DRIFT, ECONOMY, FIXTURE_LABEL, PATRON, TOWER, levelName, current
 import { fixtureWidth, footprint, houseCost, placeCost, worksFraction, type PlaceRequest } from '../sim/build';
 import { barMood } from '../sim/activities';
 import { deckRow } from '../sim/tower';
-import { buildingLabel, groundRow, siteTitle, storedTotal } from '../sim/world';
+import { buildingLabel, groundRow, siteTitle, storedTotal, storyOfRow } from '../sim/world';
 import { buildingHeight, TILE, type Renderer, type Thing } from '../render/renderer';
 import { clear, h } from './dom';
 import { flavor, type FlavorWord } from './flavor';
@@ -205,7 +205,10 @@ export class BuildUi {
         return { what: 'house', x0: tx - Math.floor(p.width / 2), width: p.width, stories: p.stories, name: 'Building' };
       case 'fixture': {
         // which story the mouse is in: each deck belongs to the story below it
-        const story = Math.max(0, Math.floor((deckRow(0) - 1 - Math.floor(wy / TILE)) / TOWER.floorHeight));
+        const row = Math.floor(wy / TILE);
+        const t = this.sim.state.tower;
+        const inTower = !!t && tx >= t.x0 && tx <= t.x1;
+        const story = inTower ? Math.max(0, Math.floor((deckRow(0) - 1 - row) / TOWER.floorHeight)) : storyOfRow(row);
         const w = fixtureWidth(p.fixture);
         return { what: 'fixture', fixture: p.fixture, x0: tx - Math.floor(w / 2) + (w % 2 === 0 ? 1 : 0), story };
       }
@@ -644,7 +647,7 @@ export class BuildUi {
   }
 }
 
-/** A ladder planned (or built) on the Tower Ground Level, up to Level 2. */
+/** A ladder planned (or built) on the Tower Ground Level, up onto its roof. */
 function ladderPlaced(s: SimState): boolean {
   return s.sites.some((x) => x.kind === 'ladder' && x.level === 0 && !x.demolish);
 }
@@ -686,7 +689,7 @@ function steps(s: SimState): Step[] {
   return [
     {
       title: 'The stipend',
-      text: `Your patron pays a stipend each dawn: ${stipend} gold while their patience is full. Patience wears thin over time, and the stipend shrinks with it. For the first ${PATRON.graceDays} days you have grace: patience won’t drop while the camp gets started. But the patron expects Tower Level 2 to be finished by then. Each finished level wins patience back and brings a bonus; building anything else helps a little too.`,
+      text: `Your patron pays a stipend each dawn: ${stipend} gold while their patience is full. Patience wears thin over time, and the stipend shrinks with it. For the first ${PATRON.graceDays} days you have grace: patience won’t drop while the camp gets started. But the patron expects the Tower Ground Level to be finished by then. Each finished level wins patience back and brings a bonus; building anything else helps a little too.`,
     },
     {
       title: 'Gathering',
@@ -763,15 +766,15 @@ function steps(s: SimState): Step[] {
       text: (s) => {
         const plans =
           blueprintsSoFar(s) < 2
-            ? 'You will need to draft and deliver plans for each new level of the tower before construction on it can begin. You can draft plans for more than one level at a time; they’re saved until they’re needed. Draft the plans for Tower Level 3 now. '
-            : 'The plans for Tower Level 3 are drafted. ';
+            ? 'You will need to draft and deliver plans for each new level of the tower before construction on it can begin. You can draft plans for more than one level at a time; they’re saved until they’re needed. Draft the plans for Tower Level 2 now. '
+            : 'The plans for Tower Level 2 are drafted. ';
         const rooms = 'Each new level of the tower is an empty room: your workers have to build everything in it, including the ladder up to it. ';
         const ladder =
           s.floors === 0
-            ? 'Once Tower Level 2 is finished, place a ladder on the Tower Ground Level, so workers can climb up to build Level 3 and carry its plans to the top.'
+            ? 'Once the Tower Ground Level is finished, place a ladder in it, so workers can climb onto its roof to build Level 2 and carry its plans to the top.'
             : ladderPlaced(s)
-              ? 'The ladder up to Tower Level 2 is planned; “build camp” work gets it built.'
-              : 'Right now there’s no way up to Tower Level 2. Place a ladder on the Tower Ground Level, and post “build camp” work to get it built.';
+              ? 'The ladder up from the Tower Ground Level is planned; “build camp” work gets it built.'
+              : 'Right now there’s no way up onto the Tower Ground Level’s roof. Place a ladder on the Tower Ground Level, and post “build camp” work to get it built.';
         return plans + rooms + ladder;
       },
       buttons: (s) => [

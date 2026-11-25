@@ -144,14 +144,24 @@ export function placeTokens(place: Place, lang: LangId = 'en'): Token[] {
 }
 
 /**
- * A tower level as the player reads it. The ground counts as the first
- * level: index 0 (the ground) is "Tower Ground Level", index n (on top of
- * the nth deck) is "Tower Level n+1". Inside the code, levels stay 0-based.
+ * A tower room as the player reads it, by the level workers stand on in it.
+ * The room on the ground (standing level 0) is "Tower Ground Level", the
+ * room on top of the nth deck is "Tower Level n+1". There is no level 0 or
+ * level 1 for the player. Inside the code, levels stay 0-based.
  * Short drops "Tower", for places where the tower goes without saying.
  */
 export function levelName(level: number, short = false): string {
   if (level === 0) return short ? 'Ground Level' : 'Tower Ground Level';
   return `${short ? '' : 'Tower '}Level ${level + 1}`;
+}
+
+/**
+ * A tower floor under construction (or finished), as the player reads it.
+ * Building floor k raises the walls of the room below its deck, so the
+ * first floor built is the Ground Level, the next is Level 2.
+ */
+export function floorName(floor: number, short = false): string {
+  return levelName(floor - 1, short);
 }
 
 export function placeName(place: Place): string {

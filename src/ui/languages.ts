@@ -1,4 +1,4 @@
-import { DRIFT, DRIFTABLE, LANGS, levelName, driftPool, wordIn, type Sim, type SimState } from '../sim';
+import { DRIFT, DRIFTABLE, LANGS, floorName, levelName, driftPool, wordIn, type Sim, type SimState } from '../sim';
 import { clear, h } from './dom';
 import type { WindowManager } from './windows';
 
@@ -41,7 +41,7 @@ export class LanguagesPanel {
           ? 'The common tongue'
           : open.includes(l.id)
             ? 'Drifting in now'
-            : `Drifts in once the tower reaches ${levelName(l.fromFloor, true)}`;
+            : `Drifts in once the tower reaches ${floorName(l.fromFloor, true)}`;
       this.body.append(
         h('div', { class: 'section-label' }, `${l.name} · ${status}`),
         h('div', { class: 'kv' }, h('span', { class: 'k' }, 'You can write'), h('span', { class: 'v' }, `${lex.length} of ${DRIFTABLE.length} words`)),
