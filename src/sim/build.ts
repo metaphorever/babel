@@ -1,6 +1,6 @@
 import { log } from './actions';
 import { newCarrier, pinNotice, scribeLoop } from './carriers';
-import { ALL, floorName, levelName, makeOrder, type Noun, type WorkVerb } from './lang';
+import { ALL, FIXTURE_WORD_KIND, floorName, levelName, makeOrder, type Noun, type Place, type WorkVerb } from './lang';
 import { giveCarrier } from './scrolls';
 import { BUILD, FIXTURE_LABEL, MAP, PATRON, TOWER, type FixtureSpec } from './tuning';
 import { ladderRows, standRow } from './tower';
@@ -161,8 +161,8 @@ export function footprint(s: SimState, req: PlaceRequest): Footprint {
       const ladder = b.stories === 2 && x === b.x0;
       fp.blocked[i] = taken || ladder;
     }
-    if (b.build) fp.error = `${b.name} isn't finished yet.`;
-    else if (b.demolish) fp.error = `${b.name} is being taken down.`;
+    // a building still being built can have its fixtures planned: they wait until it's up
+    if (b.demolish) fp.error = `${b.name} is being taken down.`;
     else if (fp.blocked.some(Boolean)) fp.error = 'Something is already there.';
     return fp;
   }
@@ -278,7 +278,7 @@ export function applyPlace(s: SimState, req: PlaceRequest): void {
       // something that costs nothing (a stockpile is just marked-out ground) is ready at once
       if (cost.stone + cost.wood > 0) site.build = newWorks(s, cost);
       s.sites.push(site);
-      const where = fp.building ? ` in ${fp.building.name}` : fp.towerLevel !== null ? ` on ${storyName(fp.towerLevel, true)}` : ' on open ground';
+      const where = fp.building ? ` in ${fp.building.name}${fp.building.build ? ', once it’s built' : ''}` : fp.towerLevel !== null ? ` on ${storyName(fp.towerLevel, true)}` : ' on open ground';
       log(s, `Planned: ${site.label}${where}.${req.fixture === 'ladder' ? ' Post "build camp" work to get it built.' : ''}`);
       break;
     }
@@ -340,6 +340,35 @@ export function campJobs(s: SimState): Job[] {
     else if (site.demolish && storedTotal(site) === 0) jobs.push({ kind: 'site', id: site.id, works: site.demolish, demolish: true, y: site.y, x0: site.x0, x1: site.x1, label: site.label });
   }
   return jobs.sort((a, b) => a.works.since - b.works.since || a.id - b.id);
+}
+
+/**
+ * The camp jobs an order's build target means (null = all of them):
+ * - a building by name: the building and every fixture planned in it;
+ * - a fixture by number ("ladder 1") or by the name it was given;
+ * - a level: everything planned on that tower level (0 = the base: every
+ *   building, and everything on the ground).
+ */
+export function campJobsFor(s: SimState, target: Place | null): Job[] {
+  const jobs = campJobs(s);
+  if (target === null) return jobs;
+  const siteOfJob = (j: Job) => (j.kind === 'site' ? s.sites.find((x) => x.id === j.id) ?? null : null);
+  if (target === 'tower') return jobs.filter((j) => (siteOfJob(j)?.level ?? 0) > 0);
+  if (typeof target === 'number') return jobs.filter((j) => (j.kind === 'building' ? 0 : siteOfJob(j)?.level ?? 0) === target);
+  if ('fixture' in target) {
+    const kind = FIXTURE_WORD_KIND[target.fixture];
+    return jobs.filter((j) => {
+      const site = siteOfJob(j);
+      return !!site && site.kind === kind && site.num === target.n;
+    });
+  }
+  const name = target.name.toLowerCase();
+  const b = s.buildings.find((x) => x.name.toLowerCase() === name);
+  if (b) return jobs.filter((j) => (j.kind === 'building' ? j.id === b.id : siteOfJob(j)?.buildingId === b.id));
+  return jobs.filter((j) => {
+    const site = siteOfJob(j);
+    return !!site && site.named && site.label.toLowerCase() === name;
+  });
 }
 
 export function findJob(s: SimState, kind: Job['kind'], id: number): Job | null {
@@ -508,7 +537,7 @@ export function applyDemolish(s: SimState, t: DemolishTarget): void {
       }
     }
     if (t.kind === 'building') {
-      // its planned fixtures go with it (there can't be any yet, but be safe)
+      // the fixtures planned in it are called off with it (none of them can have been started)
       s.sites = s.sites.filter((x) => x.buildingId !== t.id);
       s.buildings = s.buildings.filter((x) => x.id !== t.id);
     } else s.sites = s.sites.filter((x) => x.id !== t.id);

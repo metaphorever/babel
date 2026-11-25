@@ -6,6 +6,8 @@
 // in as the tower rises: French is one a casual player may half know, Greek
 // is a different script, so you can see at a glance that a word is foreign.
 
+import type { FixtureKind } from './types';
+
 export type LangId = 'en' | 'fr' | 'el';
 
 export interface LangInfo {
@@ -30,8 +32,12 @@ export type WorkVerb = 'MINE' | 'CHOP' | 'HARVEST' | 'COOK' | 'BREW' | 'HAUL' | 
 /** Verbs that control a scroll, move orders around, or teach. Scrolls only. */
 export type FlowVerb = 'WRITE' | 'DELIVER' | 'REPEAT' | 'CHECK' | 'TEACH' | 'LEARN';
 export type Verb = WorkVerb | FlowVerb;
-/** CAMP is everything built on the ground: buildings and the fixtures in them (everything but the tower). */
-export type Noun = 'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER' | 'BOARD' | 'TOWER' | 'CAMP';
+/**
+ * CAMP is everything built on the ground: buildings and the fixtures in them
+ * (everything but the tower). ANY is "anything": hauling whatever goods
+ * there are, each to where it's kept.
+ */
+export type Noun = 'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER' | 'ANY' | 'BOARD' | 'TOWER' | 'CAMP';
 /** Little words that introduce details: where from, where to. */
 export type Prep = 'FROM' | 'TO';
 /**
@@ -40,21 +46,38 @@ export type Prep = 'FROM' | 'TO';
  * noun too) means any level.
  */
 export type PlaceWord = 'BASE' | 'FLOOR';
-/** Fixtures that hold goods, by kind: the token carries the fixture's permanent number ("stockpile 3"). */
-export type FixtureWord = 'STOCKPILE' | 'SHELVES' | 'PANTRY' | 'BAR';
+/**
+ * Fixtures by kind: the token carries the fixture's permanent number
+ * ("stockpile 3", "bed 2"). The stores (stockpile, shelves, pantry, bar) are
+ * places goods can be hauled from and to; any fixture can be built by number.
+ */
+export type FixtureWord = 'STOCKPILE' | 'SHELVES' | 'PANTRY' | 'BAR' | 'BED' | 'OVEN' | 'BREWERY' | 'LADDER';
 export type StoreKind = 'stockpile' | 'shelves' | 'pantry' | 'bar';
 /** Which fixture kind each fixture word names. */
-export const FIXTURE_WORD_KIND: Record<FixtureWord, StoreKind> = { STOCKPILE: 'stockpile', SHELVES: 'shelves', PANTRY: 'pantry', BAR: 'bar' };
-export const FIXTURE_WORDS: readonly FixtureWord[] = ['STOCKPILE', 'SHELVES', 'PANTRY', 'BAR'];
+export const FIXTURE_WORD_KIND: Record<FixtureWord, FixtureKind> = {
+  STOCKPILE: 'stockpile', SHELVES: 'shelves', PANTRY: 'pantry', BAR: 'bar',
+  BED: 'bed', OVEN: 'oven', BREWERY: 'brewery', LADDER: 'ladder',
+};
+export const FIXTURE_WORDS: readonly FixtureWord[] = ['STOCKPILE', 'SHELVES', 'PANTRY', 'BAR', 'BED', 'OVEN', 'BREWERY', 'LADDER'];
+/** The word for each kind of fixture. */
+export const FIXTURE_WORD: Record<FixtureKind, FixtureWord> = {
+  stockpile: 'STOCKPILE', shelves: 'SHELVES', pantry: 'PANTRY', bar: 'BAR',
+  bed: 'BED', oven: 'OVEN', brewery: 'BREWERY', ladder: 'LADDER',
+};
+/** Does this fixture word name a store (somewhere goods are kept)? */
+export function isStoreWord(f: FixtureWord): boolean {
+  return f === 'STOCKPILE' || f === 'SHELVES' || f === 'PANTRY' || f === 'BAR';
+}
 /** The word for a kind of store. */
 export const STORE_WORD: Record<StoreKind, FixtureWord> = { stockpile: 'STOCKPILE', shelves: 'SHELVES', pantry: 'PANTRY', bar: 'BAR' };
-/** Where each good that can be hauled is kept: materials and grain in stockpiles and on shelves, bread in pantries, beer in bars. */
-export const STORES_FOR: Record<'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER', readonly StoreKind[]> = {
+/** Where each good that can be hauled is kept: materials and grain in stockpiles and on shelves, bread in pantries, beer in bars. Anything goes in any store that keeps it. */
+export const STORES_FOR: Record<'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER' | 'ANY', readonly StoreKind[]> = {
   STONE: ['stockpile', 'shelves'],
   WOOD: ['stockpile', 'shelves'],
   GRAIN: ['stockpile', 'shelves'],
   BREAD: ['pantry'],
   BEER: ['bar'],
+  ANY: ['stockpile', 'shelves', 'pantry', 'bar'],
 };
 /** Words workers think and say, so you can read what they want. */
 export type SayWord = 'WANT' | 'WATER' | 'SLEEP' | 'HOME' | 'GOLD' | 'WHAT';
@@ -83,8 +106,9 @@ export const NOUNS: readonly Noun[] = ['STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER'
 export const DRIFTABLE: readonly Exclude<TokenId, NameWord>[] = [
   'MINE', 'CHOP', 'HARVEST', 'COOK', 'BREW', 'HAUL', 'BUILD',
   'WRITE', 'DELIVER', 'REPEAT', 'CHECK', 'TEACH', 'LEARN',
-  'STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER', 'BOARD', 'TOWER', 'CAMP',
+  'STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER', 'ANY', 'BOARD', 'TOWER', 'CAMP',
   'FROM', 'TO', 'BASE', 'FLOOR', 'STOCKPILE', 'SHELVES', 'PANTRY', 'BAR',
+  'BED', 'OVEN', 'BREWERY', 'LADDER',
   'WANT', 'WATER', 'SLEEP', 'HOME', 'GOLD', 'WHAT',
 ];
 
@@ -92,22 +116,25 @@ const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
   en: {
     MINE: 'mine', CHOP: 'chop', HARVEST: 'harvest', COOK: 'cook', BREW: 'brew', HAUL: 'haul', BUILD: 'build',
     WRITE: 'write', DELIVER: 'deliver', REPEAT: 'repeat', CHECK: 'check', TEACH: 'teach', LEARN: 'learn from',
-    STONE: 'stone', WOOD: 'wood', GRAIN: 'grain', BREAD: 'bread', BEER: 'beer', BOARD: 'board', TOWER: 'tower', CAMP: 'camp',
+    STONE: 'stone', WOOD: 'wood', GRAIN: 'grain', BREAD: 'bread', BEER: 'beer', ANY: 'anything', BOARD: 'board', TOWER: 'tower', CAMP: 'camp',
     FROM: 'from', TO: 'to', BASE: 'base', FLOOR: 'level', STOCKPILE: 'stockpile', SHELVES: 'shelves', PANTRY: 'pantry', BAR: 'bar',
+    BED: 'bed', OVEN: 'oven', BREWERY: 'brewery', LADDER: 'ladder',
     WANT: 'want', WATER: 'water', SLEEP: 'sleep', HOME: 'home', GOLD: 'gold', WHAT: 'what?',
   },
   fr: {
     MINE: 'creuser', CHOP: 'couper', HARVEST: 'récolter', COOK: 'cuire', BREW: 'brasser', HAUL: 'porter', BUILD: 'bâtir',
     WRITE: 'écrire', DELIVER: 'livrer', REPEAT: 'répéter', CHECK: 'voir', TEACH: 'enseigner', LEARN: 'apprendre de',
-    STONE: 'pierre', WOOD: 'bois', GRAIN: 'blé', BREAD: 'pain', BEER: 'bière', BOARD: 'tableau', TOWER: 'tour', CAMP: 'camp',
+    STONE: 'pierre', WOOD: 'bois', GRAIN: 'blé', BREAD: 'pain', BEER: 'bière', ANY: 'tout', BOARD: 'tableau', TOWER: 'tour', CAMP: 'camp',
     FROM: 'de', TO: 'à', BASE: 'base', FLOOR: 'niveau', STOCKPILE: 'réserve', SHELVES: 'étagère', PANTRY: 'garde-manger', BAR: 'comptoir',
+    BED: 'lit', OVEN: 'four', BREWERY: 'brasserie', LADDER: 'échelle',
     WANT: 'veux', WATER: 'eau', SLEEP: 'dormir', HOME: 'maison', GOLD: 'or', WHAT: 'quoi ?',
   },
   el: {
     MINE: 'σκάψε', CHOP: 'κόψε', HARVEST: 'θέρισε', COOK: 'ψήσε', BREW: 'ζύμωσε', HAUL: 'κουβάλα', BUILD: 'χτίσε',
     WRITE: 'γράψε', DELIVER: 'παράδωσε', REPEAT: 'επανάλαβε', CHECK: 'δες', TEACH: 'δίδαξε', LEARN: 'μάθε από',
-    STONE: 'πέτρα', WOOD: 'ξύλο', GRAIN: 'σιτάρι', BREAD: 'ψωμί', BEER: 'μπίρα', BOARD: 'πίνακας', TOWER: 'πύργος', CAMP: 'καταυλισμός',
+    STONE: 'πέτρα', WOOD: 'ξύλο', GRAIN: 'σιτάρι', BREAD: 'ψωμί', BEER: 'μπίρα', ANY: 'οτιδήποτε', BOARD: 'πίνακας', TOWER: 'πύργος', CAMP: 'καταυλισμός',
     FROM: 'από', TO: 'σε', BASE: 'βάση', FLOOR: 'επίπεδο', STOCKPILE: 'σωρός', SHELVES: 'ράφια', PANTRY: 'κελάρι', BAR: 'ταβέρνα',
+    BED: 'κρεβάτι', OVEN: 'φούρνος', BREWERY: 'ζυθοποιείο', LADDER: 'σκάλα',
     WANT: 'θέλω', WATER: 'νερό', SLEEP: 'ύπνος', HOME: 'σπίτι', GOLD: 'χρυσός', WHAT: 'τι;',
   },
 };
@@ -186,29 +213,36 @@ function tokenPlace(tok: Token): Place | null {
     case 'BASE': return 0;
     case 'FLOOR': return tok.n ?? 0;
     case 'TOWER': return 'tower';
-    case 'STOCKPILE':
-    case 'SHELVES':
-    case 'PANTRY':
-    case 'BAR': return { fixture: tok.t, n: tok.n ?? 0 };
     case 'NAMED': return { name: tok.name ?? '' };
-    default: return null;
+    default: return (FIXTURE_WORDS as readonly string[]).includes(tok.t) ? { fixture: tok.t as FixtureWord, n: tok.n ?? 0 } : null;
   }
 }
 
-/** The parts of an order: verb, object, a worker named in it, and optional FROM / TO places. */
+/**
+ * The parts of an order: verb, object, a worker named in it, and optional
+ * FROM / TO places. A place right after the verb, instead of an object, is
+ * what to build: "build Kitchen", "build ladder 1", "build level 4".
+ */
 export interface ParsedOrder {
   verb: Verb;
   noun: Noun | null;
   who: number | null;
   from: Place | null;
   to: Place | null;
+  target: Place | null;
 }
 
 export function parseOrder(order: Order): ParsedOrder {
-  const out: ParsedOrder = { verb: order[0].t as Verb, noun: null, who: null, from: null, to: null };
+  const out: ParsedOrder = { verb: order[0].t as Verb, noun: null, who: null, from: null, to: null, target: null };
   let i = 1;
   if (order[i]?.t === 'WHO') out.who = order[i++].n ?? null;
-  else if (order[i] && !isPrep(order[i].t)) out.noun = order[i++].t as Noun;
+  else if (order[i] && !isPrep(order[i].t)) {
+    // TOWER is a place too, but after a verb it's the thing itself ("build tower")
+    const place = order[i].t === 'TOWER' ? null : tokenPlace(order[i]);
+    if (place !== null) out.target = place;
+    else out.noun = order[i].t as Noun;
+    i++;
+  }
   while (i < order.length) {
     const prep = order[i].t;
     const place = order[i + 1];
@@ -235,12 +269,15 @@ export interface OrderExtras {
   to?: Place | null;
   /** A worker named in the order (who to teach, who to learn from). */
   who?: { id: number; name: string } | null;
+  /** One planned build (or everything planned on a level), in place of an object. */
+  target?: Place | null;
 }
 
 export function makeOrder(verb: Verb, noun: Noun | null = null, extras: OrderExtras = {}, lang: LangId = 'en'): Order {
   const o: Order = [{ t: verb, lang }];
   if (extras.who) o.push({ t: 'WHO', lang, n: extras.who.id, name: extras.who.name });
-  if (noun) o.push({ t: noun, lang });
+  if (extras.target !== undefined && extras.target !== null) o.push(...placeTokens(extras.target, lang));
+  else if (noun) o.push({ t: noun, lang });
   if (extras.from !== undefined && extras.from !== null) o.push({ t: 'FROM', lang }, ...placeTokens(extras.from, lang));
   if (extras.to !== undefined && extras.to !== null) o.push({ t: 'TO', lang }, ...placeTokens(extras.to, lang));
   return o;
@@ -267,9 +304,14 @@ export const VALID_JOBS: Record<WorkVerb, readonly Noun[]> = {
   HARVEST: ['GRAIN'],
   COOK: ['BREAD'],
   BREW: ['BEER'],
-  HAUL: ['STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER'],
+  HAUL: ['ANY', 'STONE', 'WOOD', 'GRAIN', 'BREAD', 'BEER'],
   BUILD: ['TOWER', 'CAMP'],
 };
+
+/** Building can name one planned build instead of an object. */
+export function takesTarget(verb: Verb): boolean {
+  return verb === 'BUILD';
+}
 
 export function isValidJob(verb: Verb, noun: Noun): boolean {
   return isWorkVerb(verb) && VALID_JOBS[verb].includes(noun);
@@ -291,7 +333,8 @@ export const SCROLL_LINES: readonly LineOption[] = [
   { verb: 'REPEAT', noun: null },
 ];
 
-export function isValidLine(verb: Verb, noun: Noun | null): boolean {
+export function isValidLine(verb: Verb, noun: Noun | null, target: Place | null = null): boolean {
+  if (target !== null) return takesTarget(verb) && noun === null && target !== 'tower';
   return SCROLL_LINES.some((l) => l.verb === verb && l.noun === noun);
 }
 

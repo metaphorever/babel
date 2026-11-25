@@ -165,28 +165,37 @@ describe('buildings and fixtures', () => {
     expect(wood - after).toBe(4); // one wood per tile
   });
 
-  it('fixtures only go inside a finished building, and can’t overlap', () => {
+  it('fixtures go inside a building, even one still being planned, and can’t overlap', () => {
     const s = createState(3);
     stockUp(s);
     const x0 = freeSpot(s, 6, 100);
-    expect(validateCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 0 })).ok).toBe(false);
+    expect(validateCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 0 })).ok).toBe(false); // open ground
     applyCommand(s, place({ what: 'house', x0, width: 6, stories: 1, name: 'Dorm' }));
-    const early = validateCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 0 }));
-    expect(early.ok).toBe(false);
-    postBuildCamp(s);
-    const b = s.buildings.find((x) => x.name === 'Dorm')!;
-    expect(runUntil(s, () => b.build === null, 20 * 600)).toBe(true);
+    const dorm = s.buildings.find((x) => x.name === 'Dorm')!;
+    // planned before the building is up: the whole unit in one go
     expect(applyCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 0 })).ok).toBe(true);
     expect(validateCommand(s, place({ what: 'fixture', fixture: 'bed', x0: x0 + 1, story: 0 })).ok).toBe(false);
     expect(validateCommand(s, place({ what: 'fixture', fixture: 'bed', x0: x0 + 5, story: 0 })).ok).toBe(false); // sticks out
     expect(applyCommand(s, place({ what: 'fixture', fixture: 'pantry', x0: x0 + 2, story: 0 })).ok).toBe(true);
-    // "build camp, all of it" came down when the building was done; new plans need new work
-    expect(s.notices.some((n) => n.order[1].t === 'CAMP')).toBe(false);
+    // the fixtures wait for their building
+    expect(campJobs(s).map((j) => j.id)).toEqual([dorm.id]);
     postBuildCamp(s);
-    expect(runUntil(s, () => campJobs(s).length === 0, 20 * 600)).toBe(true);
-    const dorm = s.buildings.find((x) => x.name === 'Dorm')!;
-    const inside = s.sites.filter((x) => x.buildingId === dorm.id).map((x) => x.label);
-    expect(inside).toEqual(['Bed 7', 'Pantry 2']);
+    expect(runUntil(s, () => campJobs(s).length === 0, 20 * 900)).toBe(true);
+    const inside = s.sites.filter((x) => x.buildingId === dorm.id);
+    expect(inside.map((x) => x.label)).toEqual(['Bed 7', 'Pantry 2']);
+    expect(inside.every((x) => x.build === null)).toBe(true);
+  });
+
+  it('calling off a planned building calls off the fixtures planned in it', () => {
+    const s = createState(3);
+    const x0 = freeSpot(s, 6, 100);
+    applyCommand(s, place({ what: 'house', x0, width: 6, stories: 2, name: 'Loft' }));
+    const loft = s.buildings.find((x) => x.name === 'Loft')!;
+    expect(applyCommand(s, place({ what: 'fixture', fixture: 'bed', x0: x0 + 2, story: 1 })).ok).toBe(true);
+    expect(s.sites.some((x) => x.buildingId === loft.id)).toBe(true);
+    expect(applyCommand(s, { type: 'demolish', playerId: 0, target: { kind: 'building', id: loft.id } }).ok).toBe(true);
+    expect(s.buildings.includes(loft)).toBe(false);
+    expect(s.sites.some((x) => x.buildingId === loft.id)).toBe(false);
   });
 
   it('a stockpile goes on open ground and holds the same as one indoors', () => {
@@ -545,5 +554,82 @@ describe('session 4: hauling bread and beer', () => {
     expect(runUntil(s, () => !s.items.some((it) => it.type === 'beer') && !s.workers.some((w) => w.carrying === 'beer'), 20 * 900)).toBe(true);
     expect(s.sites.filter((x) => x.kind === 'stockpile').every((x) => x.store.beer === 0)).toBe(true);
     expect(bar.store.beer + s.takings / 5).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('session 5: haul anything, build one thing', () => {
+  const compose = (s: SimState, line: Record<string, unknown>) =>
+    validateCommand(s, { type: 'compose', playerId: 0, lines: [{ count: 1, noun: null, ...line } as never], wage: 0, dest: { kind: 'board', addressee: null } });
+
+  it('reads and writes the new words', () => {
+    expect(orderText(makeOrder('HAUL', 'ANY'))).toBe('haul anything');
+    expect(orderText(makeOrder('HAUL', 'ANY', { to: { fixture: 'STOCKPILE', n: 2 } }, 'fr'))).toBe('porter tout à réserve 2');
+    const kitchen = makeOrder('BUILD', null, { target: { name: 'Kitchen' } });
+    expect(orderText(kitchen)).toBe('build Kitchen');
+    expect(parseOrder(kitchen)).toMatchObject({ noun: null, target: { name: 'Kitchen' } });
+    expect(orderText(makeOrder('BUILD', null, { target: { fixture: 'LADDER', n: 1 } }, 'fr'))).toBe('bâtir échelle 1');
+    expect(parseOrder(makeOrder('BUILD', null, { target: 2 })).target).toBe(2);
+    expect(orderText(makeOrder('BUILD', null, { target: 2 }))).toBe('build level 3');
+    // "build tower" is still the tower itself, not a place
+    expect(parseOrder(makeOrder('BUILD', 'TOWER'))).toMatchObject({ noun: 'TOWER', target: null });
+  });
+
+  it('checks the new lines', () => {
+    const s = createState(3);
+    expect(compose(s, { verb: 'HAUL', noun: 'ANY' }).ok).toBe(true);
+    expect(compose(s, { verb: 'HAUL', noun: 'ANY', to: { fixture: 'STOCKPILE', n: 1 } }).ok).toBe(true);
+    expect(compose(s, { verb: 'HAUL', noun: 'ANY', to: { fixture: 'BED', n: 1 } }).ok).toBe(false);
+    expect(compose(s, { verb: 'HAUL', noun: 'STONE', from: { fixture: 'OVEN', n: 1 } }).ok).toBe(false);
+    expect(compose(s, { verb: 'BUILD', target: { fixture: 'BED', n: 3 } }).ok).toBe(true);
+    expect(compose(s, { verb: 'BUILD', target: { name: 'Kitchen' } }).ok).toBe(true);
+    expect(compose(s, { verb: 'MINE', target: { name: 'Kitchen' } }).ok).toBe(false);
+    expect(compose(s, { verb: 'BUILD', noun: 'CAMP', target: { name: 'Kitchen' } }).ok).toBe(false);
+  });
+
+  it('"haul anything" sweeps up every kind of loose good, each to where it’s kept', () => {
+    const s = createState(3);
+    s.notices = [];
+    s.reserved = 0;
+    s.items = [];
+    for (const p of s.sites.filter((x) => x.kind === 'stockpile' && !x.supplies)) p.capacity = null;
+    const bar = s.sites.find((x) => x.kind === 'bar')!;
+    bar.store.beer = 0;
+    const gy = groundRow();
+    const loose = ['stone', 'wood', 'grain', 'beer', 'stone', 'wood'] as const;
+    loose.forEach((type, i) => s.items.push({ id: s.nextId++, type, x: 12 + i * 3, y: gy, reservedBy: null }));
+    pinNotice(s, makeOrder('HAUL', 'ANY'), ALL, 1, null);
+    expect(runUntil(s, () => s.items.length === 0 && !s.workers.some((w) => w.carrying !== null && w.activity.kind === 'job'), 20 * 1200)).toBe(true);
+    expect(s.sites.filter((x) => x.kind === 'stockpile').every((x) => x.store.beer === 0)).toBe(true);
+    // the notice came down once there was nothing left to haul
+    expect(s.notices.length).toBe(0);
+  });
+
+  it('"build <name>" builds that building and what’s planned in it, and nothing else', () => {
+    const s = createState(3);
+    stockUp(s);
+    s.notices = [];
+    s.reserved = 0;
+    const xa = freeSpot(s, 5, 100);
+    applyCommand(s, place({ what: 'house', x0: xa, width: 5, stories: 1, name: 'Annex' }));
+    applyCommand(s, place({ what: 'fixture', fixture: 'bed', x0: xa + 1, story: 0 }));
+    const xb = freeSpot(s, 5, xa + 6);
+    applyCommand(s, place({ what: 'house', x0: xb, width: 5, stories: 1, name: 'Barn' }));
+    const annex = s.buildings.find((x) => x.name === 'Annex')!;
+    const barn = s.buildings.find((x) => x.name === 'Barn')!;
+    const bed = s.sites.find((x) => x.buildingId === annex.id)!;
+    pinNotice(s, makeOrder('BUILD', null, { target: { name: 'Annex' } }), ALL, 1, null);
+    expect(runUntil(s, () => annex.build === null && bed.build === null, 20 * 1200)).toBe(true);
+    expect(barn.build!.placed).toEqual({ stone: 0, wood: 0 });
+    expect(s.notices.length).toBe(0);
+  });
+
+  it('a build target nobody can read means building whatever is planned', async () => {
+    const { readOrder } = await import('../src/sim/drift');
+    const s = createState(3);
+    const w = s.workers[0];
+    w.vocab.en = (w.vocab.en ?? []).filter((t) => t !== 'LADDER');
+    const r = readOrder(s, w, makeOrder('BUILD', null, { target: { fixture: 'LADDER', n: 1 } }));
+    expect(r.guesses).toBe(1);
+    expect(orderText(r.order!)).toBe('build camp');
   });
 });

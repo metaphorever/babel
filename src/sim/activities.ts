@@ -1,5 +1,5 @@
 import { addMoodlet, dropCarried, log, moveTo, settle } from './actions';
-import { ALL, FOREVER, STORES_FOR, floorName, isSpecialCount, isWorkVerb, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
+import { ALL, FOREVER, STORES_FOR, floorName, isSpecialCount, isWorkVerb, makeOrder, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
 import { carrierText } from './carriers';
 import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed, unreadableLine } from './scrolls';
 import { addConfusion, knows, readOrder } from './drift';
@@ -10,7 +10,7 @@ import { beatenTo, sharedJob, together, tookNotice, wokeBeside, workedBeside } f
 import type { ActivityKind, BuildMaterial, Carrier, FixtureKind, Item, ItemType, Notice, SimState, Site, SiteKind, SkillId, Worker } from './types';
 import { depotFor, findSite, nearest, siteOf, siteRef, sitesOf, sourceFor, spotFor, standable, stockpiles, storesAt, usable } from './world';
 import { activeProject, buildSpot, placeMaterial } from './tower';
-import { accepts, campJobs, jobSpot, placeUnit, stillNeeded, undoUnit, type Job } from './build';
+import { accepts, campJobs, campJobsFor, jobSpot, placeUnit, stillNeeded, undoUnit, type Job } from './build';
 
 export type Result = 'running' | 'done' | 'failed';
 
@@ -257,6 +257,7 @@ export function eligibleNotices(s: SimState, w: Worker) {
 function allDone(s: SimState, n: Notice): boolean {
   if (s.workers.some((w) => w.memory?.noticeId === n.id)) return false;
   const o = parseOrder(n.order);
+  if (o.verb === 'HAUL' && o.noun === 'ANY') return !anythingToHaul(s, o.from, o.to, false);
   if (o.verb === 'HAUL' && o.from === null) return !s.items.some((it) => it.type === nounItem(o.noun as Noun));
   return nothingToHaul(s, n);
 }
@@ -264,9 +265,10 @@ function allDone(s: SimState, n: Notice): boolean {
 export function nothingToHaul(s: SimState, n: Notice): boolean {
   const o = parseOrder(n.order);
   // the tower and the camp are in plain sight: nothing planned, nothing to build
-  if (o.verb === 'BUILD') return o.noun === 'CAMP' ? campJobs(s).length === 0 : activeProject(s) === null;
+  if (o.verb === 'BUILD') return o.noun === 'TOWER' ? activeProject(s) === null : campJobsFor(s, o.target).length === 0;
   if (o.verb === 'COOK' || o.verb === 'BREW') return !canProcess(s, PROCESS[o.verb]);
   if (o.verb !== 'HAUL') return false;
+  if (o.noun === 'ANY') return !anythingToHaul(s, o.from, o.to, true);
   const type = nounItem(o.noun as Noun);
   if (o.from !== null) return !storesAt(s, o.from, type).some((x) => x.store[type] > 0);
   return !s.items.some((it) => it.type === type && it.reservedBy === null);
@@ -394,16 +396,68 @@ export function workOrder(s: SimState, w: Worker, order: Order): Result {
     if (reading.guesses > 0 && orderText(reading.order) !== orderText(order)) log(s, `${w.name} read «${orderText(order)}» as "${orderText(reading.order)}".`, w.id);
     a.read = reading.order;
   }
-  const { verb, noun, from, to } = parseOrder(a.read);
+  const { verb, noun, from, to, target } = parseOrder(a.read);
   const prod = PRODUCE[verb];
   if (prod) return produceJob(s, w, verb as WorkVerb, prod.site, prod.ticks, prod.doing, nounItem(noun as Noun));
   if (verb === 'HAUL') {
+    if (noun === 'ANY') {
+      // "haul anything": settle on one good for this trip, then it's an ordinary haul
+      const type = haulAnyType(s, w, from, to);
+      if (!type) return failWork(s, w, from === null ? 'Nothing lying around to haul.' : `Nothing at ${placeName(from)} to haul.`, true);
+      a.read = makeOrder('HAUL', type.toUpperCase() as Noun, { from, to });
+      return workOrder(s, w, order);
+    }
     if (from !== null) return haulBetween(s, w, nounItem(noun as Noun), from, to);
     return haulJob(s, w, nounItem(noun as Noun), to);
   }
   if (verb === 'COOK' || verb === 'BREW') return processJob(s, w, PROCESS[verb]);
-  if (verb === 'BUILD') return noun === 'CAMP' ? campJob(s, w) : buildJob(s, w);
+  if (verb === 'BUILD') return noun === 'TOWER' ? buildJob(s, w) : campJob(s, w, target);
   return failWork(s, w, "I don't know how to do that.");
+}
+
+const GOODS: readonly ItemType[] = ['stone', 'wood', 'grain', 'bread', 'beer'];
+
+/**
+ * Which good a "haul anything" trip moves. Whatever's already in hand comes
+ * first. From the ground, the nearest loose thing that has somewhere to go;
+ * from a place, the first good stored there that has somewhere to go.
+ */
+function haulAnyType(s: SimState, w: Worker, from: Place | null, to: Place | null): ItemType | null {
+  const held = w.carrying;
+  if (held && GOODS.includes(held) && depotFor(s, to, held, w)) return held;
+  if (from === null) {
+    const goesSomewhere = new Map<ItemType, boolean>();
+    const ok = (t: ItemType) => {
+      if (!goesSomewhere.has(t)) goesSomewhere.set(t, depotFor(s, to, t, w) !== null);
+      return goesSomewhere.get(t)!;
+    };
+    let best: Item | null = null;
+    let bestD = Infinity;
+    for (const it of s.items) {
+      if (it.reservedBy !== null || !GOODS.includes(it.type) || !ok(it.type)) continue;
+      const d = Math.abs(it.x - w.x) + Math.abs(it.y - w.y);
+      if (d < bestD) {
+        bestD = d;
+        best = it;
+      }
+    }
+    return best?.type ?? null;
+  }
+  for (const t of GOODS) {
+    const sources = storesAt(s, from, t);
+    if (sources.some((x) => x.store[t] > 0) && depotFor(s, to, t, w, sources)) return t;
+  }
+  return null;
+}
+
+/** Is there anything for "haul anything" to do? Loose goods (or goods stored at `from`) that have somewhere to go. */
+function anythingToHaul(s: SimState, from: Place | null, to: Place | null, unclaimedOnly: boolean): boolean {
+  for (const t of GOODS) {
+    const sources = from === null ? [] : storesAt(s, from, t);
+    const there = from === null ? s.items.some((it) => it.type === t && (!unclaimedOnly || it.reservedBy === null)) : sources.some((x) => x.store[t] > 0);
+    if (there && depotFor(s, to, t, { x: 0, y: 0 }, sources)) return true;
+  }
+  return false;
 }
 
 function finishWork(s: SimState, w: Worker, units: number): Result {
@@ -930,12 +984,12 @@ function wanted(s: SimState, j: Job, m: BuildMaterial): number {
  * activity.ref counts units done, activity.timer holds the source while
  * fetching.
  */
-function campJob(s: SimState, w: Worker): Result {
+function campJob(s: SimState, w: Worker, target: Place | null): Result {
   const a = w.activity;
   const current = () => (a.aim === null ? null : campJobs(s).find((j) => j.id === a.aim) ?? null);
   if (a.stage === 0) {
-    const jobs = campJobs(s);
-    if (jobs.length === 0) return failWork(s, w, 'Nothing to build.', true);
+    const jobs = campJobsFor(s, target);
+    if (jobs.length === 0) return failWork(s, w, target === null ? 'Nothing to build.' : `Nothing left to build at ${placeName(target)}.`, true);
     a.ref = a.ref ?? 0;
     // already carrying something one of them needs: take it there
     const held = w.carrying === 'stone' || w.carrying === 'wood' ? w.carrying : null;
@@ -1036,7 +1090,7 @@ function campJob(s: SimState, w: Worker): Result {
     }
     if (w.carrying) {
       // left over: keep it for the next job if anything wants it, else put it down here
-      const next = campJobs(s).find((x) => !x.demolish && stillNeeded(x, w.carrying as BuildMaterial) > 0);
+      const next = campJobsFor(s, w.activity.read ? parseOrder(w.activity.read).target : null).find((x) => !x.demolish && stillNeeded(x, w.carrying as BuildMaterial) > 0);
       if (next) {
         a.aim = next.id;
         a.stage = 2;

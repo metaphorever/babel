@@ -1,4 +1,4 @@
-import { BUILD, DRIFT, ECONOMY, FIXTURE_LABEL, PATRON, TOWER, levelName, currentStipend, type Building, type FixtureKind, type Sim, type SimState, type Site } from '../sim';
+import { ALL, BUILD, DRIFT, ECONOMY, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, levelName, currentStipend, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
 import { fixtureWidth, footprint, houseCost, placeCost, worksFraction, type PlaceRequest } from '../sim/build';
 import { barMood } from '../sim/activities';
 import { deckRow } from '../sim/tower';
@@ -150,7 +150,7 @@ export class BuildUi {
     }
     into.append(
       grid,
-      h('div', { class: 'hint' }, `Fixtures go inside a finished building or a tower room. A stockpile can also be marked out on open ground (it holds ${BUILD.capacity.stockpile} anywhere); storage shelves hold ${BUILD.capacity.shelves}, indoors only. Each tower level starts as an empty room: a ladder from the room below is the way up to it.`),
+      h('div', { class: 'hint' }, `Fixtures go inside a building or a tower room. You can plan them in a building that isn’t built yet: they go in once it’s up. A stockpile can also be marked out on open ground (it holds ${BUILD.capacity.stockpile} anywhere); storage shelves hold ${BUILD.capacity.shelves}, indoors only. Each tower level starts as an empty room: a ladder from the room below is the way up to it.`),
       h(
         'div',
         { class: 'row row-end' },
@@ -481,7 +481,8 @@ export class BuildUi {
         h(
           'div',
           { class: 'row row-end' },
-          b.kind === 'house' && !b.build ? h('button', { class: 'btn', onclick: () => this.wm.show('build') }, 'Add a fixture…') : null,
+          b.kind === 'house' && !b.demolish ? h('button', { class: 'btn', onclick: () => this.wm.show('build') }, 'Add a fixture…') : null,
+          b.kind === 'house' && (b.build || s.sites.some((x) => x.buildingId === b.id && x.build)) ? this.buildThisButton({ name: b.name }, b.name) : null,
           this.takeDownButton({ kind: 'building', building: b }),
         ),
       );
@@ -505,9 +506,19 @@ export class BuildUi {
       goods.length ? kv('Has', goods.join(', ')) : '',
       site.kind === 'bar' && !site.build ? this.priceRow(site) : '',
       site.broken ? h('div', { class: 'hint' }, 'Broken beyond repair. Take it down for the materials.') : '',
-      h('div', { class: 'row row-end' }, this.takeDownButton({ kind: 'site', site })),
+      h(
+        'div',
+        { class: 'row row-end' },
+        site.build && site.kind in FIXTURE_WORD ? this.buildThisButton(site.named ? { name: site.label } : { fixture: FIXTURE_WORD[site.kind as FixtureKind], n: site.num }, site.label.toLowerCase()) : null,
+        this.takeDownButton({ kind: 'site', site }),
+      ),
     );
     return siteTitle(s, site);
+  }
+
+  /** Open the composer with a notice to build just this (for a building: it and what's planned in it). */
+  private buildThisButton(target: Place, label: string): HTMLElement {
+    return h('button', { class: 'btn', onclick: () => this.scriptorium.openDraft([{ verb: 'BUILD', noun: null, target, from: null, to: null, count: ALL }]) }, `Write “build ${label}”…`);
   }
 
   /** A bar's beer price: cheap beer cheers more; dear beer brings more back to the treasury. */

@@ -732,6 +732,91 @@ A popup message when something needs the player's attention, with a little sound
   - **Only the extremes show,** as dashed italic words beside the traits: Warm-hearted, Slow to warm, Thin-skinned, Thick-skinned, Quick to forgive, Holds grudges. About half the workers get one.
   - **Measured (12 workers, 12 seeds, 30 days):** the colony-wide numbers don't move (temperament decides who, not how much). The warmest third end the month with about 2.8 friends each against 1.6 for the coolest; the touchiest third with 2.0 foes against 1.3 for the thickest-skinned. Forgiveness barely shows in a month (it only changes how fast grudges fade); it should matter more in long games. `npm run sim:month` now reports these, plus friends each, loners and workers with 3+ foes.
 
+### 16.7 Conditions and signals: the full toolkit
+
+*Scoped in session 5 (2026-11-24). The user wants the whole toolset laid out first, to see what it can do; the words will be unlocked gradually later. The balance: a full toolkit, without it turning into a programming game.*
+
+**The rule that keeps it a game (decided): state lives in the world.** There's no dot notation and there are no variables. A condition is a sentence about something a worker can see or hear: a store's contents, a flag, a bell, their own body. To store a number, you keep a pile of stone in a specially named store. Flags and bells are how information crosses distance without a courier.
+
+**What already exists:** every line's count is a counted loop (`mine stone ×20`), `REPEAT` is an endless loop, `CHECK BOARD` means "stop and get new orders", and the patron's charter is an if/then.
+
+**Branching**
+- `IF <condition>`: the next line only runs if the condition holds. `OTHERWISE` (decided over "else": more in period): the line after it runs only if it didn't.
+- One level, no nesting. Two `IF` lines in a row act as AND, so there are no AND or OR words.
+
+**Conditions**
+- **Amounts at a store:** `stockpile 3 has 20 stone` (at least 20), `has fewer than 20`, `has no stone`. Two comparisons only; any other comparison is a shifted number.
+- **Yes/no:** `IS` and `NOT`: `oven 1 is broken`, `not night`.
+- **The worker themselves:** `HUNGRY`, `TIRED`, `CARRYING`. Free to check, since it's about themselves.
+- **People:** `NO ONE` / `ANYONE`, as in the charter ("if no one is writing"). Used sparingly: checks on other people leak the player's omniscience into the workers.
+- **Flags and bells** (below).
+
+**Loops and waiting**
+- `REPEAT ×n` (the whole scroll n times).
+- `UNTIL <condition>`: "haul stone to Counter until it has 40". In a colony sim this is the loop people actually want.
+- `WAIT`, `WAIT UNTIL <condition>`, with time words `DAWN` and `NIGHT`.
+
+**Flags (decided): state you can see from far away.**
+- A flagpole is a fixture: on the ground, on a tower level, wherever. A worker raises or lowers its flag with an order (`raise flag 2`, `lower flag 2`), which means walking there. `IF flag 2 is up` is a condition anyone who can see the pole can check.
+- **Line of sight is the point.** Workers high in the tower can see flags on the ground, and the ground can see flags on the tower, so a flag is "wireless" for one bit. A tower crew raises "we're out of stone" on level 9, and a ground scroll that says "if flag 3 is up, haul stone to level 9" answers it, with no courier climbing either way.
+- **Colors are heraldic hatching (decided).** Flags stay 1-bit: each color is drawn in the hatching heralds use for engravings (the Petra Sancta system), with a small gloss of the pattern where it helps (the composer's color slot, the flag's window, a key in Help). The seven tinctures, and the pattern each would use (most are already in `patterns.ts`):
+
+  | Color | Heraldic name | Hatching | Pattern |
+  |---|---|---|---|
+  | White | Argent | plain | `white` |
+  | Yellow | Or | dots | `sparse` |
+  | Red | Gules | vertical lines | `vstripe` |
+  | Blue | Azure | horizontal lines | `hstripe` |
+  | Green | Vert | diagonal, top left to bottom right | `diag` |
+  | Purple | Purpure | diagonal, top right to bottom left | *new:* `antidiag` |
+  | Black | Sable | crossed horizontal and vertical lines | *new:* `grid` |
+
+  - *Claude's suggestions:*
+    - **The order words are plain colors** (red, blue...), which drift like other words. The heraldic name goes in the gloss as flavor ("Gules: red, drawn as vertical lines"), not in orders, so nobody has to learn heraldry to play.
+    - **A color is a local channel, like a bell's size.** "If the red flag is up" means the red flag *that worker can see*, so the same color can be reused in different parts of the map with different meanings, as long as their ranges don't overlap. Where they do overlap, a name settles it.
+    - **Hatching works for colorblind players** as a side effect: the colors are told apart by pattern, not hue.
+    - *Later, if more channels are needed:* two-color flags divided the heraldic way (per pale, per fess). Not before playtests ask for it.
+- *Claude's suggestion:* flags can't be seen at night, which leaves a gap for bells (or later, lanterns) to fill.
+
+**Sizes: range costs resources (decided).** Bells and flags come in small, medium and large. The bigger one reaches further but costs much more, so the player chooses between cheap signals that take care to lay out (relays, careful spacing) and an expensive one that just works.
+- **Bells** (the user's placeholder numbers, to be tuned): small, 1 iron, heard 10 tiles away; medium, 20 iron, 100 tiles; large, 500 iron, heard anywhere. Bells can also be bought from the trader (§16.2).
+- **Flags:** a bigger flag is seen from further away, but costs more, takes more room, and takes longer to raise and lower.
+- **Range is a radius around the fixture**, shown as a dotted circle while placing it. The player can also show the radius of one fixture (select it) or of all of them (a toggle, like N for names), to get the spacing right.
+- **Bell size is another channel.** The big bell carries colony-wide signals and small bells local ones, so the same three rings can mean different things depending on which bell rang.
+- *Claude's notes:*
+  - **This replaces the earlier "earshot limited by height" idea.** One rule (a radius), visible on the map, is better than a special case for height.
+  - **The map makes the medium bell nearly as good as the large one.** The map is 192 tiles wide and the tower 120 rows tall (30 levels × 4). A medium bell with 100 tiles of range at the tower's foot reaches level 25 and almost the whole map, so there'd be little reason to buy the large one. Ranges more like small 8 (a building, or two levels), medium 30 (a stretch of camp, about 7 levels), large everywhere would give each size its job. Settle the numbers in playtests.
+  - **Name the bells and flags.** Fixtures can already be named, and names never drift. So "until Great Bell rings 3" is a channel that can't be misread, while "until bell 4 rings 3" can drift like any other word. Orders always name which bell or flag they mean.
+  - **Small bells are a relay:** a scroll that says "wait until bell 1 rings, ring bell 2, repeat" carries a signal up the tower. That's the cheap, fiddly option, built from words that already exist.
+- **A bell wakes sleepers in range (decided).** They hear the signal, so nobody in range misses it, but being woken costs mood. The bigger the bell, the more people that is, so a big bell is something to ring sparingly, and every ring is a little story. *Claude's reading:* every bell wakes the sleepers in its own range, not only the large one; that's what makes "nobody in range misses it" hold for all sizes. Easy to narrow if playtests say otherwise.
+- **Iron (decided, later):** a mined resource, found rarely, worked by a blacksmith at a forge. Bells need it, unless they're bought from the trader.
+
+**Bells (decided): events everyone in earshot hears.**
+- A bell is a fixture, and ringing it is an order (`ring bell ×3`), so someone has to go and ring it. `UNTIL bell rings 3` / `IF bell rang 3` let a scroll listen for a pattern of rings.
+- **One ring order can stop ten loops at once:** every scroll written "haul … until the bell rings 3" ends when it rings. Only scrolls that listen for the bell are affected; a bell isn't a remote control.
+- *Claude's suggestions:*
+  - **A ring is an event; a flag is state.** A worker out of earshot misses the ring, and their loop keeps going. That's a feature: it makes where people are matter. (Sleepers don't miss it: see waking, below.)
+  - **Signals don't drift.** Once a worker has read and understood "until the bell rings 3", the rings themselves need no language. Flags and bells are the language-proof channel, but they only carry a number of rings or a single bit, and the order that says what they mean can still drift. That fits pillar 3 well: it's how a player works around drift without beating it.
+
+**Numbers are piles (decided).** A counter is a named store holding stone: `haul 1 stone to Counter` adds one, `haul 1 stone from Counter` takes one away, and `if Counter has 5 stone` reads it. It costs real stone that builders want, and you can see it. *Claude's note:* two such counters plus IF and loops is a Minsky register machine, which is Turing complete. That's the nerd ceiling, reached with stone and shelves.
+
+**Kept out (decided):** named variables, arithmetic, nesting, labels or GOTO, subroutines, and the full set of comparison and logic operators.
+
+**What happens when these words drift** (Claude's proposal, to decide before building):
+- An unreadable `IF`: the worker doesn't know the line has a condition, so they do it anyway.
+- An unreadable `NOT` is dropped, so they do the opposite.
+- An unreadable `OTHERWISE`: both branches run.
+- *Open:* are numerals universal, like names? Conditions put numbers inside sentences, so §14's question becomes real. Claude leans yes, so one drifted digit doesn't wreck an otherwise readable condition.
+
+**Still to decide**
+- **Checking a store means walking there?** Flags and bells already settle the principle (you check what you can see or hear). The proposal: a store can only be checked by going to it, or by standing at it.
+- The exact ranges and costs of each size of bell and flag; whether night hides flags; whether walls block a flag from view (simplest: they don't).
+- Whether any bell pattern has a built-in meaning (say, a long peal means "everyone come down").
+- Standing orders on boards, modeled on the charter: "if pantry 1 has fewer than 10 bread, post cook bread ×10". Probably the most useful single piece, and what gives upper boards their job.
+- The unlock order. A natural one: checks on yourself, then `IF`/`OTHERWISE`, then `UNTIL`/`WAIT`, then flags, then bells, then standing orders.
+
+**New words, roughly:** IF, OTHERWISE, NOT, HAS, FEWER, NO, IS, UNTIL, WAIT, RING, BELL, RAISE, LOWER, FLAG, NO ONE, plus states (HUNGRY, TIRED, BROKEN, CARRYING) and times (DAWN, NIGHT). About 20.
+
 ### 15.14 Purses: sending money home, and the bar's price (session 4, 2026-11-24)
 
 *The user: a worker with a full purse sends money home, which cheers them, dents the purse and makes them likelier to take work again. The bar's price can be set: cheap beer is an easy boost to morale; dear beer brings more coin back to the treasury.*
@@ -740,6 +825,16 @@ A popup message when something needs the player's attention, with a little sound
 - **Had their fill:** right after a drink (while its moodlet lasts), the bar appeals much less. Before this, a worker with a full purse would go straight back to the bar and never work.
 - **The bar's price:** each bar's window has a Beer price with − and + buttons, from free to 20 gold (usually 5). A cheaper beer cheers more (+1 mood per gold under the usual price, down to +3 at the dearest; free beer is +17) and tempts more (the bar's appeal counts how many beers the purse would buy). Dearer beer brings more of each worker's wages back to the treasury. Changing it is a command, logged.
 - **In the 30-day simulation:** workers drink about once a day, do about 9 jobs a day, and send home about 6 to 7 gold a day each. A colony given 400 gold a head on day one sends most of it home within days and keeps working.
+
+### 15.15 Haul anything, build one thing, plan a whole unit (session 5, 2026-11-24)
+
+*The user: haul orders can say "any" as well as a material, to sweep up whatever's lying around. Build orders can name one planned build. Fixtures can be planned in a building before it's finished, to lay out a whole unit in one go.*
+
+- **"Haul anything"** (`ANY`; French *tout*, Greek *οτιδήποτε*). Each trip settles on one good: whatever's already in hand, else the nearest loose thing that has somewhere to go (with FROM: the first good stored there that has somewhere to go). Each good goes where it's kept: stone, wood and grain to stockpiles and shelves, bread to a pantry, beer to a bar. With TO, only goods that place keeps are moved. As "all", it's finished when nothing loose has anywhere to go.
+- **"Build <something>"**: a place right after BUILD, instead of CAMP or TOWER, is what to build. "build Kitchen" builds that building and every fixture planned in it; "build ladder 1" / "build bed 3" one fixture by number (or by the name it was given); "build level 4" everything planned on that tower level. The composer lists what's planned under "One planned build", and the building and fixture windows have a "Write “build …”" button.
+- **Every fixture has a word now** so it can be named by number: bed (*lit*, *κρεβάτι*), oven (*four*, *φούρνος*), brewery (*brasserie*, *ζυθοποιείο*), ladder (*échelle*, *σκάλα*). Only the stores (stockpile, shelves, pantry, bar) are places goods can be hauled from or to.
+- **A build target nobody can read** is dropped: the worker builds whatever's planned, like "build camp". Building names never drift.
+- **Fixtures in unfinished buildings:** they can be planned as soon as the building is. They wait until the building is up (as fixture jobs always did), then "build camp" or "build <the building>" builds them. Calling off the building calls them off too.
 
 ## Glossary
 

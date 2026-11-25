@@ -1,6 +1,10 @@
 import { log } from './actions';
 import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCarrier, queueDesign } from './carriers';
-import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isValidLine, langName, makeOrder, placeKey, placeName, FIXTURE_WORDS, FIXTURE_WORD_KIND, STORES_FOR, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
+import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isStoreWord, isValidLine, langName, makeOrder, placeKey, placeName, FIXTURE_WORDS, FIXTURE_WORD_KIND, STORES_FOR, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
+
+function cap(t: string): string {
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
 import { BUILD, ECONOMY, SCRIBE, TOWER } from './tuning';
 import type { Dest, SimState } from './types';
 import { applyDemolish, applyPlace, applyRename, applyRenameFixture, validateDemolish, validatePlace, validateRename, validateRenameFixture, type DemolishTarget, type PlaceRequest } from './build';
@@ -21,6 +25,8 @@ export interface ComposeLine {
   /** Where from and where to (hauling only). */
   from?: Place | null;
   to?: Place | null;
+  /** One planned build to work on, in place of the object (BUILD only): a building, a fixture, or a tower level. */
+  target?: Place | null;
   /** Units to finish before moving to the next line (the notice count, for a notice). */
   count: number;
 }
@@ -68,7 +74,7 @@ function countless(verb: Verb): boolean {
 function buildCarrier(s: SimState, cmd: Extract<Command, { type: 'compose' }>, dryRun = false) {
   const lines = cmd.lines.map((l) => {
     const who = l.who !== undefined && l.who !== null ? { id: l.who, name: s.workers.find((w) => w.id === l.who)?.name ?? '?' } : null;
-    return { order: makeOrder(l.verb, l.noun, { from: l.from, to: l.to, who }, cmd.lang ?? 'en'), count: countless(l.verb) ? 1 : l.count };
+    return { order: makeOrder(l.verb, l.noun, { from: l.from, to: l.to, who, target: l.target }, cmd.lang ?? 'en'), count: countless(l.verb) ? 1 : l.count };
   });
   if (dryRun) {
     // a throwaway carrier for checking words; don't use up an id
@@ -95,7 +101,10 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       if (cmd.lines.length < 1) return { ok: false, error: 'Write at least one line.' };
       if (cmd.lines.length > SCRIBE.maxLines) return { ok: false, error: `A scroll holds at most ${SCRIBE.maxLines} lines.` };
       for (const l of cmd.lines) {
-        if (!isValidLine(l.verb, l.noun)) return { ok: false, error: 'One of the lines makes no sense.' };
+        const target = l.target ?? null;
+        if (!isValidLine(l.verb, l.noun, target)) return { ok: false, error: 'One of the lines makes no sense.' };
+        const badTarget = target === null ? null : placeError(target);
+        if (badTarget) return { ok: false, error: badTarget };
         if (l.count === ALL && !allowsAll(l.verb)) return { ok: false, error: `"All" doesn't work for ${l.verb.toLowerCase()}: it never runs out.` };
         if (l.count === FOREVER && !allowsForever(l.verb)) return { ok: false, error: `"Forever" doesn't work for ${l.verb.toLowerCase()}.` };
         if (!countless(l.verb) && !isSpecialCount(l.count) && (!Number.isInteger(l.count) || l.count < 1 || l.count > 999)) return { ok: false, error: 'Counts must be 1 to 999, all, or forever.' };
@@ -103,8 +112,10 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
         if (places.length > 0 && !takesPlaces(l.verb)) return { ok: false, error: `"${l.verb.toLowerCase()}" doesn't take a from or to.` };
         const bad = places.map(placeError).find((e) => e !== null);
         if (bad) return { ok: false, error: bad };
-        // a store by number has to be the kind that keeps this good
-        const wrong = places.find((p) => typeof p === 'object' && 'fixture' in p && l.noun && l.noun in STORES_FOR && !STORES_FOR[l.noun as keyof typeof STORES_FOR].includes(FIXTURE_WORD_KIND[p.fixture]));
+        // a fixture by number has to be a store, and the kind that keeps this good
+        const notStore = places.find((p) => typeof p === 'object' && 'fixture' in p && !isStoreWord(p.fixture));
+        if (notStore) return { ok: false, error: `${cap(placeName(notStore))} doesn't keep goods.` };
+        const wrong = places.find((p) => typeof p === 'object' && 'fixture' in p && l.noun && l.noun in STORES_FOR && !(STORES_FOR[l.noun as keyof typeof STORES_FOR] as readonly string[]).includes(FIXTURE_WORD_KIND[p.fixture]));
         if (wrong && l.noun) return { ok: false, error: `${placeName(wrong)} doesn't keep ${l.noun.toLowerCase()}.` };
         if (l.from !== undefined && l.from !== null && placeKey(l.from) === placeKey(l.to ?? null)) return { ok: false, error: 'From and to are the same place.' };
       }

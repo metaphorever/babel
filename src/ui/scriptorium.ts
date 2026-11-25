@@ -23,6 +23,9 @@ import {
   placeTokens,
   STORE_WORD,
   STORES_FOR,
+  FIXTURE_WORD,
+  takesTarget,
+  type FixtureKind,
   type Place,
   type Site,
   type LangId,
@@ -62,7 +65,16 @@ export interface DraftLine {
   to: Place | null;
   /** Teaching / learning: which worker. */
   who?: number | null;
+  /** Building: one planned build (a building, a fixture, or a tower level) instead of the whole camp. */
+  target?: Place | null;
   count: number;
+}
+
+interface TargetOption {
+  key: string;
+  target: Place;
+  text: string;
+  words: TokenId[];
 }
 
 interface PlaceOption {
@@ -330,7 +342,7 @@ export class ScriptoriumPanel {
     const s = this.s;
     const stores = this.storesFor(noun);
     const opts: PlaceOption[] = [
-      { key: '', place: null, text: dir === 'from' ? 'lying around' : `to the nearest ${noun && noun in STORES_FOR ? STORES_FOR[noun as keyof typeof STORES_FOR][0] : 'store'}`, words: [] },
+      { key: '', place: null, text: dir === 'from' ? 'lying around' : noun === 'ANY' ? 'to wherever each thing is kept' : `to the nearest ${noun && noun in STORES_FOR ? STORES_FOR[noun as keyof typeof STORES_FOR][0] : 'store'}`, words: [] },
       { key: placeKey(0), place: 0, text: `${dir} the base (any)`, words: ['BASE'] },
     ];
     // floors only where something up there keeps this good
@@ -360,12 +372,65 @@ export class ScriptoriumPanel {
     return sel;
   }
 
-  /** Stores that exist, so the place menus can be redrawn when one is added, renamed or taken away. */
+  /**
+   * What a build line can name instead of the whole camp: each building with
+   * work still planned (it and its fixtures), each planned fixture, and each
+   * tower level with fixtures planned on it.
+   */
+  private buildTargets(): TargetOption[] {
+    const s = this.s;
+    const opts: TargetOption[] = [];
+    const planned = s.sites.filter((x) => x.build && x.kind in FIXTURE_WORD);
+    for (const b of s.buildings) {
+      if (b.kind !== 'house') continue;
+      const inside = planned.filter((x) => x.buildingId === b.id).length;
+      if (!b.build && inside === 0) continue;
+      const what = b.build ? (inside ? `${b.name}, and the ${inside} ${inside === 1 ? 'fixture' : 'fixtures'} planned in it` : b.name) : `what’s planned in ${b.name}`;
+      opts.push({ key: placeKey({ name: b.name }), target: { name: b.name }, text: what, words: [] });
+    }
+    const levels = [...new Set(planned.filter((x) => x.level > 0).map((x) => x.level))].sort((a, b) => a - b);
+    for (const k of levels) opts.push({ key: placeKey(k), target: k, text: `everything planned on ${levelName(k)}`, words: ['FLOOR'] });
+    for (const x of planned) {
+      const fw = FIXTURE_WORD[x.kind as FixtureKind];
+      const target: Place = x.named ? { name: x.label } : { fixture: fw, n: x.num };
+      opts.push({ key: placeKey(target), target, text: siteTitle(s, x), words: x.named ? [] : [fw] });
+    }
+    return opts;
+  }
+
+  /** Stores that exist and builds that are planned, so the menus can be redrawn when one is added, renamed or taken away. */
   private storesSig(): string {
-    return this.s.sites
+    const stores = this.s.sites
       .filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves' || x.kind === 'pantry' || x.kind === 'bar') && x.num > 0)
       .map((x) => `${x.id}:${x.label}:${x.build ? 0 : 1}`)
       .join('|');
+    return `${stores}#${this.buildTargets().map((o) => o.key + o.text).join('|')}`;
+  }
+
+  /** The "what" slot of a build line: the whole camp, the tower, or one planned build. */
+  private buildSelect(i: number, line: DraftLine): HTMLSelectElement {
+    const sel = h('select', { 'aria-label': `Line ${i + 1} what` });
+    for (const n of ['CAMP', 'TOWER'] as const) sel.append(h('option', { value: `N:${n}`, disabled: !this.canWrite(n) && n !== line.noun }, this.label(n === 'CAMP' ? 'camp (everything planned)' : 'tower', n)));
+    const targets = this.buildTargets();
+    const current = line.target ?? null;
+    if (current !== null && !targets.some((o) => o.key === placeKey(current))) targets.push({ key: placeKey(current), target: current, text: `${placeName(current)} (nothing planned there now)`, words: [] });
+    if (targets.length) {
+      const group = h('optgroup', { label: 'One planned build' });
+      for (const o of targets) group.append(h('option', { value: `P:${o.key}`, disabled: o.words.some((t) => !this.canWrite(t)) && o.key !== placeKey(current) }, o.text));
+      sel.append(group);
+    }
+    sel.value = current !== null ? `P:${placeKey(current)}` : `N:${line.noun ?? 'CAMP'}`;
+    sel.addEventListener('change', () => {
+      if (sel.value.startsWith('N:')) {
+        line.noun = sel.value.slice(2) as Noun;
+        line.target = null;
+      } else {
+        line.noun = null;
+        line.target = targets.find((o) => `P:${o.key}` === sel.value)?.target ?? null;
+      }
+      this.updateSummary();
+    });
+    return sel;
   }
 
   private usePreset(lines: DraftLine[]): void {
@@ -384,13 +449,16 @@ export class ScriptoriumPanel {
         line.noun = nounsFor(line.verb)[0] ?? null;
         line.from = null;
         line.to = null;
+        line.target = null;
         this.renderLines();
       });
       const nouns = nounsFor(line.verb);
       let nounEl: HTMLElement = h('span', { class: 'slot-empty' });
-      if (nouns.length > 1) {
+      if (takesTarget(line.verb)) {
+        nounEl = this.buildSelect(i, line);
+      } else if (nouns.length > 1) {
         const nounSel = h('select', { 'aria-label': `Line ${i + 1} what` });
-        for (const n of nouns) nounSel.append(h('option', { value: n, disabled: !this.canWrite(n) && n !== line.noun }, this.label(n.toLowerCase(), n)));
+        for (const n of nouns) nounSel.append(h('option', { value: n, disabled: !this.canWrite(n) && n !== line.noun }, this.label(wordIn(n, 'en'), n)));
         nounSel.value = line.noun ?? nouns[0];
         nounSel.addEventListener('change', () => {
           line.noun = nounSel.value as Noun;
@@ -516,7 +584,8 @@ export class ScriptoriumPanel {
     const lineWords = this.lines.map((l) => {
       const words = [wordIn(l.verb, this.lang)];
       if (takesWho(l.verb)) words.push(nameOf(l.who));
-      if (l.noun && l.verb !== 'CHECK') words.push(wordIn(l.noun, this.lang));
+      if (takesTarget(l.verb) && l.target) words.push(...placeTokens(l.target, this.lang).map(word));
+      else if (l.noun && l.verb !== 'CHECK') words.push(wordIn(l.noun, this.lang));
       if (l.verb === 'CHECK') words.push(wordIn('BOARD', this.lang));
       if (takesPlaces(l.verb) && l.from !== null) words.push(wordIn('FROM', this.lang), ...placeTokens(l.from, this.lang).map(word));
       if (takesPlaces(l.verb) && l.to !== null) words.push(wordIn('TO', this.lang), ...placeTokens(l.to, this.lang).map(word));
@@ -535,6 +604,7 @@ export class ScriptoriumPanel {
         who: takesWho(l.verb) ? l.who ?? null : null,
         from: takesPlaces(l.verb) ? l.from : null,
         to: takesPlaces(l.verb) ? l.to : null,
+        target: takesTarget(l.verb) ? l.target ?? null : null,
         count: l.count,
       })),
       lang: this.lang,

@@ -460,7 +460,7 @@ export class Ui {
         h('li', {}, h('b', {}, 'B'), ' the Build window · ', h('b', {}, 'Esc'), ' stop placing · ', h('b', {}, '[ ]'), ' building width'),
         h('li', {}, h('b', {}, 'Space'), ' pause · ', h('b', {}, '1 2 3'), ' speed · ', h('b', {}, 'N'), ' show all names'),
       ),
-      h('p', { class: 'hint' }, `To build anything on the ground: place it from the Build window, then post “build camp” work. Fixtures (beds, ovens, pantries, the bar...) go inside finished buildings. To build the tower: draw a blueprint (Tower window or Scriptorium), then post “build tower” work. Languages drift from ${levelName(DRIFT.lineFloor)} up (see the Languages window). Keep the patron pleased by finishing levels, and keep your workers fed or they’ll quit. Not in yet: mailboxes, upper job boards, COPY.`),
+      h('p', { class: 'hint' }, `To build anything on the ground: place it from the Build window, then post “build camp” work. Fixtures (beds, ovens, pantries, the bar...) go inside buildings, and can be planned before the building is up. To build the tower: draw a blueprint (Tower window or Scriptorium), then post “build tower” work. Languages drift from ${levelName(DRIFT.lineFloor)} up (see the Languages window). Keep the patron pleased by finishing levels, and keep your workers fed or they’ll quit. Not in yet: mailboxes, upper job boards, COPY.`),
     );
   }
 

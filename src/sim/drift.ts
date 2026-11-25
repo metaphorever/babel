@@ -127,8 +127,15 @@ export function readOrder(s: SimState, w: Worker, order: Order): Reading {
       else to = null;
     }
   }
+  // what to build: a planned build they can't make out means building whatever's planned
+  let target = parsed.target;
+  if (target !== null && order[1] && !knows(w, order[1])) {
+    guesses++;
+    target = null;
+    noun = 'CAMP';
+  }
   const who = parsed.who !== null ? { id: parsed.who, name: order.find((t) => t.t === 'WHO')?.name ?? '?' } : null;
-  return { order: makeOrder(parsed.verb as Verb, noun, { from, to, who }), guesses };
+  return { order: makeOrder(parsed.verb as Verb, noun, { from, to, who, target }), guesses };
 }
 
 /** Reading something unreadable, or guessing at words, is confusing. */

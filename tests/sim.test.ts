@@ -454,7 +454,7 @@ describe('the tower', () => {
     expect(levelName(0)).toBe('Tower Ground Level');
     expect(levelName(1)).toBe('Tower Level 2');
     expect(levelName(3, true)).toBe('Level 4');
-    expect(parseOrder(o)).toEqual({ verb: 'HAUL', noun: 'STONE', who: null, from: 0, to: 3 });
+    expect(parseOrder(o)).toEqual({ verb: 'HAUL', noun: 'STONE', who: null, from: 0, to: 3, target: null });
   });
 
   it('only hauling takes places', () => {
