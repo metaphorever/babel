@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addWorker, createState } from '../src/sim/sim';
-import { childrenOf, feelOf, pairLabel, parentsOf, partnersOf, related, relationsOf, socialArrival, together, updateSocial } from '../src/sim/social';
+import { beatenTo, childrenOf, farewell, feelOf, gossip, lessonWord, pairLabel, parentsOf, partnersOf, related, relationsOf, socialArrival, together, tookNotice, updateSocial, wokeBeside } from '../src/sim/social';
 import { SOCIAL, TIME } from '../src/sim/tuning';
 import type { SimState, Worker } from '../src/sim/types';
 
@@ -162,5 +162,120 @@ describe('relationships', () => {
     set(a, d, 0.9, 0.4);
     expect(relationsOf(s, a).map((r) => r.text)).toContain(`Adores ${d.name}`);
     expect(s.tick).toBeLessThan(TIME.dayTicks);
+  });
+});
+
+describe('social life', () => {
+  /** Run with a tuning number swapped, then put it back. */
+  function withTuning<T extends object, K extends keyof T>(obj: T, key: K, value: T[K], run: () => void) {
+    const was = obj[key];
+    obj[key] = value;
+    try {
+      run();
+    } finally {
+      obj[key] = was;
+    }
+  }
+  const atBar = (w: Worker, x: number, y: number) => {
+    w.activity = { ...w.activity, kind: 'bar', stage: 1 };
+    w.x = x;
+    w.y = y;
+  };
+
+  it('a complaint makes the listener take a side: whoever they like better', () => {
+    const s = createState(7);
+    const [speaker, subject, listener] = s.workers;
+    speaker.lately = [{ about: subject.id, tone: -1, what: `${subject.name} snoring all night`, tick: s.tick }];
+    // the listener likes the subject more: they think less of the speaker
+    set(listener, subject, 0.7);
+    set(listener, speaker, 0.45);
+    gossip(s, speaker, listener);
+    expect(feelOf(listener, speaker)).toBeCloseTo(0.45 - SOCIAL.gossip.side, 6);
+    expect(listener.lately[0].what).toBe(`${speaker.name} badmouthing ${subject.name}`);
+    // now they like the speaker more: they sour on the subject, and warm to the speaker
+    set(listener, subject, 0.4);
+    set(listener, speaker, 0.6);
+    listener.lately = [];
+    gossip(s, speaker, listener);
+    expect(feelOf(listener, subject)).toBeCloseTo(0.4 - SOCIAL.gossip.pile, 6);
+    expect(feelOf(listener, speaker)).toBeCloseTo(0.6 + SOCIAL.gossip.bond, 6);
+    expect(listener.lately[0]).toMatchObject({ about: subject.id, heardFrom: speaker.id, tone: -1 });
+    // what they only heard, they don't pass on
+    const next = s.workers[3];
+    const before = feelOf(next, subject);
+    gossip(s, listener, next);
+    expect(feelOf(next, subject)).toBe(before);
+  });
+
+  it('nobody gossips to someone about themselves', () => {
+    const s = createState(7);
+    const [speaker, subject] = s.workers;
+    speaker.lately = [{ about: subject.id, tone: -1, what: 'x', tick: s.tick }];
+    const before = feelOf(subject, speaker);
+    gossip(s, speaker, subject);
+    expect(feelOf(subject, speaker)).toBe(before);
+  });
+
+  it('a snorer beside you all night: your taste decides', () => {
+    const s = createState(7);
+    const [w, o] = s.workers;
+    o.habits = ['snores'];
+    o.activity = { ...o.activity, kind: 'sleep', stage: 1 };
+    o.x = w.x + 1;
+    o.y = w.y;
+    set(w, o, 0.5);
+    w.tastes.snores = -1;
+    wokeBeside(s, w);
+    expect(feelOf(w, o)).toBeCloseTo(0.5 - SOCIAL.habits.dose, 6);
+    expect(w.lately[0].what).toBe(`${o.name} snoring all night`);
+  });
+
+  it('enemies drinking side by side may come to blows; a friend breaks it up', () => {
+    const s = createState(7);
+    const [a, b, c] = s.workers;
+    for (const w of [a, b, c]) for (const o of s.workers) if (w !== o) w.feel[o.id] = 0.4;
+    set(a, b, 0.05);
+    set(c, a, 0.6, 0.4);
+    atBar(a, 50, 20);
+    atBar(b, 51, 20);
+    atBar(c, 52, 20);
+    withTuning(SOCIAL.scuffle, 'chance', 1, () => withTuning(SOCIAL.gossip, 'chance', 0, () => together(s, a, 'bar', 0)));
+    expect(s.events.some((e) => e.text === `${a.name} and ${b.name} came to blows at the bar; ${c.name} broke it up.`)).toBe(true);
+    expect(a.moodlets.some((m) => m.kind === 'scuffle')).toBe(true);
+    expect(feelOf(a, c)).toBeCloseTo(0.4 + SOCIAL.scuffle.thanks, 6);
+  });
+
+  it('beaten to a job: you know whom to blame', () => {
+    const s = createState(7);
+    const [w, o] = s.workers;
+    set(w, o, 0.5);
+    tookNotice(s, o, 999);
+    beatenTo(s, w, 999);
+    expect(feelOf(w, o)).toBeCloseTo(0.5 - SOCIAL.job.beatMe, 6);
+    expect(w.lately[0].what).toBe(`${o.name} beating them to a job`);
+  });
+
+  it('lessons warm teacher and student to each other', () => {
+    const s = createState(7);
+    const [t, st] = s.workers;
+    set(t, st, 0.4);
+    lessonWord(s, t, st);
+    expect(feelOf(t, st)).toBeCloseTo(0.4 + SOCIAL.lessonWord, 6);
+    expect(feelOf(st, t)).toBeCloseTo(0.4 + SOCIAL.lessonWord, 6);
+  });
+
+  it('when someone quits, a spouse may go too; friends are sad, enemies glad', () => {
+    const s = createState(7);
+    const [w, spouse, friend, foe] = s.workers;
+    s.social.ties = [{ kind: 'spouse', a: w.id, b: spouse.id, strained: null }];
+    set(spouse, w, 0.8);
+    set(friend, w, 0.75);
+    set(foe, w, 0.05);
+    w.leaving = true;
+    let following: Worker[] = [];
+    withTuning(SOCIAL.leaving, 'follow', 10, () => (following = farewell(s, w)));
+    expect(following).toEqual([spouse]);
+    expect(friend.moodlets.find((m) => m.kind === 'farewell')?.value).toBe(SOCIAL.leaving.missed);
+    expect(foe.moodlets.find((m) => m.kind === 'farewell')?.value).toBe(SOCIAL.leaving.glad);
   });
 });

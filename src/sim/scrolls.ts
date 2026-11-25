@@ -8,6 +8,7 @@ import { LESSON, MOOD, SCRIBE } from './tuning';
 import { startFloorFromBlueprint, topSpot } from './tower';
 import type { Carrier, SimState, Worker } from './types';
 import { findSite, spotFor } from './world';
+import { lessonWord } from './social';
 
 // A worker holding a card or scroll carries it out line by line; the
 // current line is their current job. Needs can still pull them away, but the
@@ -348,6 +349,7 @@ function lessonLine(s: SimState, w: Worker, c: Carrier, verb: 'TEACH' | 'LEARN')
   if (a.timer < LESSON.perWord) return 'running';
   a.timer -= LESSON.perWord;
   a.ref = done + 1;
+  lessonWord(s, verb === 'TEACH' ? w : student, verb === 'TEACH' ? student : w);
   if (verb === 'TEACH') {
     student.vocab[pair.lang] = [...(student.vocab[pair.lang] ?? []), pair.t];
     log(s, `${w.name} taught ${student.name} «${word({ t: pair.t, lang: pair.lang })}».`, w.id);

@@ -17,7 +17,7 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
   - **Every push to `main` deploys:** `.github/workflows/pages.yml` runs the tests, builds, and publishes to GitHub Pages.
   - **Commit author:** "Clover <metaphorever@gmail.com>". The user chose to publish that as is.
 - **GitHub CLI:** on this machine it's at `C:\Program Files\GitHub CLI\gh.exe` and is logged in as `metaphorever`. Shells started before it was installed may need the full path.
-- **Tests:** keep them passing (`npm test`, 105 now). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
+- **Tests:** keep them passing (`npm test`, 112 now). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
 - **Playtest feedback:** the user playtests on the live site and sends batches of notes. Fix bugs, record design decisions in DESIGN.md, and keep "provisional" notes up to date.
 
 ## Code rules that matter
@@ -70,7 +70,7 @@ Built and tested: the random map, the opening text and founding, placement mode 
 - **Addressing is built** (DESIGN.md §15.11): permanent fixture numbers, fixture renaming, and hauls TO/FROM the nearest store, the base, the tower, a floor, or one store by number or name. A haul with no TO now goes to the nearest store, not the base.
 - **The scriptorium** stacks its queue between its columns again. **Babel Extras**, a new MacPaint page, has blank storage shelves, placeholder stairs and a house deck. Two-story houses now draw their own deck.
 - **Roadmap recorded** (DESIGN.md §16): stairs, the trader, pilgrimages, an About/credits window ([CREDITS.md](CREDITS.md) has the text).
-- **Relationships are built** (DESIGN.md §15.13): feelings, pair labels, couples (lovers, spouses, secret affairs, divorce), families (parents by birth and by marriage, siblings, estrangement), checked each dawn, listed in the worker window. Only drinking and eating together move feelings so far. **Next:** the user picks from the social-life list (DESIGN.md §16.6). The user's raw notes are in [IDEAS_BRAINDUMP.md](../IDEAS_BRAINDUMP.md).
+- **Relationships are built** (DESIGN.md §15.13): feelings, pair labels, couples (lovers, spouses, secret affairs, divorce), families (parents by birth and by marriage, siblings, estrangement), checked each dawn, listed in the worker window. Social life is built too (DESIGN.md §16.6): habits, scuffles, beaten to a job or helped with it, jealousy over purses, lessons, company moodlets, spouses following a quitter home, and **gossip** with side-taking. The worker window shows habits and a **Lately** list. The user's raw notes are in [IDEAS_BRAINDUMP.md](../IDEAS_BRAINDUMP.md).
 - **The night sky** (the user's Milky Way picture) dithers in as night deepens. **The tower's wall, deck and ladder, the building tops and roofs, and the stockpile** are redrawn (the updated sheet screenshots).
 - **Portraits:** the user's Photoshop layer format is validated (see SPRITES.md), but the art isn't final, so it isn't in the game. The worker window has a blank 64x64 frame for it. Plan: roll relationships first, then build portraits from them, so bio children inherit parts from their parents.
 
@@ -82,7 +82,7 @@ Built and tested: the random map, the opening text and founding, placement mode 
    - **The supplies** (20 stone, 30 wood, 24 bread): enough to found the camp and get to floor 1 inside the grace period?
    - **Build-camp workflow:** placing, then writing "build camp" work. Does it feel like the game, or like a chore?
 2. **More art:** clouds built from parts (reference: `art-src/shots/cloud-reference.png`), the Babel Extras page, and the tower's deck and wall (with the portrait sprint). Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art to catch anything missed.
-3. **Social life** (DESIGN.md §16.6): the user picks which interactions come first.
+3. **Social life, round two** (DESIGN.md §16.6, "Not built yet"), and tuning from playtests. Watch the log: too many label changes, or too few? A prebuilt colony left alone with no orders quits around day 3 (before and after the social changes alike): it's an unattended game starving, but worth a look when balancing.
 4. **The portrait card,** once the user's art settles: read the PSD (`tools/_psd.ts` is a working reader, kept out of the repo for now), parts picked from the look seed, bio children inheriting from their parents.
 5. **P0 leftovers:** mailboxes and upper job boards (then the first board can be demolished), the COPY order, and night changing behavior (workers preferring to sleep at night).
 6. **The roadmap** (DESIGN.md §16): the About window is the quickest win; alerts (§16.5); stairs; the trader and pilgrimages.

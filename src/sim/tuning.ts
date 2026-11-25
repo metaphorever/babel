@@ -398,4 +398,37 @@ export const SOCIAL = {
     /** "Beside": within this many tiles. */
     near: 4,
   },
+  /** Habits: little things workers do, and what everyone else thinks of them. */
+  habits: {
+    /** Chance of having none, one or two. */
+    count: [0.45, 0.4, 0.15],
+    /** What people tend to think of each (-1..1); each worker's taste is rolled around it. */
+    lean: { whistles: 0, sings: 0.1, stories: 0.3, snores: -0.5 } as Record<string, number>,
+    spread: 0.6,
+    /** A taste this strong either way is remembered (and gossiped about). */
+    strong: 0.4,
+    /** One dose (a night of snoring, a song at the bar, a job finished whistling) moves feeling by taste times this. */
+    dose: 0.006,
+  },
+  /** Enemies drinking side by side may come to blows. */
+  scuffle: { chance: 0.3, mood: -8, moodTicks: 3000, sour: 0.04, thanks: 0.03 },
+  /** Work: beaten to a job, or helped with one. Industrious workers resent lazy helpers. Help is common, so only some of it sticks in memory. */
+  job: { beatMe: 0.03, help: 0.006, lazyHelp: -0.006, remember: 0.15 },
+  /** Purses: greedy workers resent those this much richer; frugal ones are impressed. */
+  wealth: { gap: 15, jealous: 0.008, admire: 0.006 },
+  /** Each word taught warms teacher and student to each other. */
+  lessonWord: 0.008,
+  /** A friend (or an enemy) beside you over a drink or a meal. */
+  company: { friend: 3, enemy: -3, ticks: 2400 },
+  /** When a worker quits: a spouse may go too; those close are sad, those who hated them glad. */
+  leaving: { follow: 0.5, missed: -8, glad: 3, ticks: 4800 },
+  /** How many recent moments a worker keeps in mind. */
+  remember: 4,
+  /**
+   * Gossip: finishing a drink or a meal beside someone, a worker may tell
+   * them their latest moment. A complaint makes the listener take a side,
+   * by whom they like better; praise warms them to its subject, unless they
+   * can't stand that person.
+   */
+  gossip: { chance: 0.3, maxAge: TIME.dayTicks * 2, side: 0.03, pile: 0.015, bond: 0.01 },
 };

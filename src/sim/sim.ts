@@ -15,7 +15,7 @@ import { AI, ARRIVALS, ECONOMY, PATRON, POPULATION, SKILLS, TIME, type Difficult
 import type { FixtureKind, SimState, StartMode, Worker } from './types';
 import { fixedMap, generateMap, groundRow, sitesOf } from './world';
 import { applyPlace, campJobs, finishNow, type PlaceRequest } from './build';
-import { generateSocial, newSocial, rollMonogamy, updateSocial } from './social';
+import { generateSocial, newSocial, rollHabits, rollMonogamy, updateSocial } from './social';
 
 /**
  * A new game. 'opening' is the real start (P1): a fresh random map with
@@ -25,7 +25,7 @@ import { generateSocial, newSocial, rollMonogamy, updateSocial } from './social'
  */
 export function createState(seed: number, difficulty: Difficulty = 'normal', start: StartMode = 'prebuilt'): SimState {
   const s: SimState = {
-    version: 9,
+    version: 10,
     start,
     seed,
     tick: 0,
@@ -190,6 +190,8 @@ export function addWorker(s: SimState): Worker {
     look: nextU32(s.rng),
     feel: {},
     monogamy: rollMonogamy(s),
+    ...rollHabits(s),
+    lately: [],
   };
   w.skills[w.knack] = SKILLS.knackStartXp;
   startActivity(w, 'idle');

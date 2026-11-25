@@ -4,6 +4,7 @@ import { carrierText } from './carriers';
 import { QUIT, TICKS_PER_SECOND } from './tuning';
 import type { SimState, Worker } from './types';
 import { siteOf } from './world';
+import { farewell } from './social';
 
 // Workers work to live. Keep someone miserable for long enough and they
 // give notice; if things get better before it runs out, they stay. If not,
@@ -48,6 +49,7 @@ export function startLeaving(s: SimState, w: Worker): void {
   startActivity(w, 'idle');
   w.thought = 'Going home.';
   log(s, `${w.name} has quit and is walking home.`, w.id);
+  for (const f of farewell(s, w)) startLeaving(s, f);
 }
 
 /** A leaving worker walks to the road home and is gone. Returns true once they've left. */

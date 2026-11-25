@@ -6,7 +6,7 @@ import { addConfusion, knows, readOrder } from './drift';
 import { rand, randInt } from './rng';
 import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_OF_VERB, skillLevel } from './skills';
 import { BUILD, ECONOMY, MOOD, NEEDS, SCRIBE, SKILLS, SOCIAL, TOWER, WORK } from './tuning';
-import { together } from './social';
+import { beatenTo, sharedJob, together, tookNotice, wokeBeside, workedBeside } from './social';
 import type { ActivityKind, BuildMaterial, Carrier, FixtureKind, Item, ItemType, Notice, SimState, Site, SiteKind, SkillId, Worker } from './types';
 import { depotFor, findSite, nearest, siteOf, siteRef, sitesOf, sourceFor, spotFor, standable, stockpiles, storesAt, usable } from './world';
 import { activeProject, buildSpot, placeMaterial } from './tower';
@@ -167,6 +167,7 @@ function sleep(s: SimState, w: Worker): Result {
   const inBed = (a.ref ?? -1) >= 0;
   w.fatigue = Math.max(0, w.fatigue - (inBed ? NEEDS.sleepRecoverBed : NEEDS.sleepRecoverGround));
   if (w.fatigue > NEEDS.wakeBelow) return 'running';
+  wokeBeside(s, w);
   if (inBed) addMoodlet(s, w, 'slept', 'Slept in a bed', MOOD.sleptInBed.value, MOOD.sleptInBed.ticks);
   else addMoodlet(s, w, 'slept', 'Slept on the ground', MOOD.sleptOnGround.value, MOOD.sleptOnGround.ticks);
   return 'done';
@@ -388,6 +389,7 @@ export function workOrder(s: SimState, w: Worker, order: Order): Result {
 }
 
 function finishWork(s: SimState, w: Worker, units: number): Result {
+  if (units > 0) workedBeside(s, w);
   return w.activity.kind === 'scroll' ? scrollLineDone(s, w, units) : completeJob(s, w, units);
 }
 
@@ -1061,6 +1063,7 @@ function completeJob(s: SimState, w: Worker, units: number): Result {
   w.memory = null;
   w.jobsDone++;
   const notice = s.notices.find((n) => n.id === mem.noticeId);
+  if (notice && units > 0) sharedJob(s, w, mem.noticeId);
   if (notice && isSpecialCount(notice.remaining)) {
     // "all" and "forever" notices pay from the treasury as they go
     const pay = units * notice.wage;
@@ -1074,6 +1077,7 @@ function completeJob(s: SimState, w: Worker, units: number): Result {
     w.thought = `Done: ${units} ${mem.order[1]?.t.toLowerCase() ?? ''}.`;
     // "all" is finished once there's nothing left to do
     if (notice.remaining === ALL && units > 0 && allDone(s, notice)) {
+      tookNotice(s, w, notice.id);
       s.notices = s.notices.filter((n) => n.id !== notice.id);
       log(s, `Notice finished: ${orderText(notice.order)} (all done).`);
     }
@@ -1088,6 +1092,7 @@ function completeJob(s: SimState, w: Worker, units: number): Result {
     const what = `${counted} ${mem.order[1].t.toLowerCase()}`;
     w.thought = pay > 0 ? `Done! ${what}, +${pay} gold.` : `Done: ${what}.`;
     if (notice.remaining === 0) {
+      tookNotice(s, w, notice.id);
       s.notices = s.notices.filter((n) => n.id !== notice.id);
       log(s, `Notice finished: ${orderText(notice.order)}.`);
     }
@@ -1095,6 +1100,7 @@ function completeJob(s: SimState, w: Worker, units: number): Result {
     const penalty = Math.min(MOOD.missedJobCap, MOOD.missedJobBase + mem.wage * MOOD.missedJobPerWage);
     addMoodlet(s, w, 'missed', 'Did a job for nothing', -penalty, MOOD.missedJobTicks);
     w.thought = 'Somebody beat me to it! No pay?!';
+    beatenTo(s, w, mem.noticeId);
     log(s, `${w.name} finished "${orderText(mem.order)}" but it was already done. No pay.`, w.id);
   }
   return 'done';

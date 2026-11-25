@@ -1,7 +1,7 @@
-import { log } from './actions';
+import { addMoodlet, log } from './actions';
 import { rand, seedRng } from './rng';
 import { SOCIAL, TIME } from './tuning';
-import type { PairLabel, SimState, SocialState, Tie, Worker } from './types';
+import type { HabitId, PairLabel, SimState, SocialState, Tie, Worker } from './types';
 
 // Relationships. Every worker feels something about every other worker:
 // a number from 0 to 1, rolled when they're created and nudged by what
@@ -20,11 +20,35 @@ import type { PairLabel, SimState, SocialState, Tie, Worker } from './types';
 // never shifts the rest of the sim's rolls.
 
 export function newSocial(seed: number): SocialState {
-  return { rng: seedRng((seed ^ 0x50c1a15e) >>> 0), ties: [], labels: {}, estranged: [], nextDawn: TIME.dayTicks };
+  return { rng: seedRng((seed ^ 0x50c1a15e) >>> 0), ties: [], labels: {}, estranged: [], nextDawn: TIME.dayTicks, takers: [] };
 }
 
 export function rollMonogamy(s: SimState): number {
   return rand(s.social.rng) ** SOCIAL.monogamySkew;
+}
+
+export const HABITS: HabitId[] = ['whistles', 'sings', 'stories', 'snores'];
+export const HABIT_LABEL: Record<HabitId, string> = {
+  whistles: 'Whistles at work',
+  sings: 'Sings over a drink',
+  stories: 'Tells stories over a drink',
+  snores: 'Snores',
+};
+
+/** A worker's habits (none to two), and their taste for each habit in others. */
+export function rollHabits(s: SimState): { habits: HabitId[]; tastes: Record<HabitId, number> } {
+  const r = s.social.rng;
+  const [none, one] = SOCIAL.habits.count;
+  const roll = rand(r);
+  const n = roll < none ? 0 : roll < none + one ? 1 : 2;
+  const habits: HabitId[] = [];
+  while (habits.length < n) {
+    const h = HABITS[Math.floor(rand(r) * HABITS.length)];
+    if (!habits.includes(h)) habits.push(h);
+  }
+  const tastes = {} as Record<HabitId, number>;
+  for (const h of HABITS) tastes[h] = Math.max(-1, Math.min(1, SOCIAL.habits.lean[h] + (rand(r) * 2 - 1) * SOCIAL.habits.spread));
+  return { habits, tastes };
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -314,13 +338,200 @@ export function socialArrival(s: SimState, w: Worker): void {
 
 // ------------------------------------------------------------- what happens
 
-/** Finishing a meal or a drink: you warm a little to everyone doing the same beside you. */
+/** Keep a moment in mind. The same moment again just freshens it. */
+function remember(s: SimState, w: Worker, about: Worker, tone: 1 | -1, what: string, heardFrom?: number): void {
+  const same = w.lately.findIndex((m) => m.about === about.id && m.what === what && m.heardFrom === heardFrom);
+  if (same >= 0) w.lately.splice(same, 1);
+  w.lately.unshift({ about: about.id, tone, what, tick: s.tick, ...(heardFrom !== undefined ? { heardFrom } : {}) });
+  w.lately.length = Math.min(w.lately.length, SOCIAL.remember);
+}
+
+/** Workers beside this one (same row, a few tiles away), optionally only those doing something. */
+function beside(s: SimState, w: Worker, kind?: string): Worker[] {
+  return s.workers.filter(
+    (o) => o !== w && !o.leaving && o.y === w.y && Math.abs(o.x - w.x) <= SOCIAL.event.near && (kind === undefined || (o.activity.kind === kind && o.activity.stage === 1)),
+  );
+}
+
+const HABIT_WHAT: Record<HabitId, (name: string) => string> = {
+  whistles: (n) => `${n}'s whistling at work`,
+  sings: (n) => `${n}'s singing at the bar`,
+  stories: (n) => `${n}'s stories at the bar`,
+  snores: (n) => `${n} snoring all night`,
+};
+
+/** w gets a dose of o's habit: their taste decides which way it moves them. */
+function habitDose(s: SimState, w: Worker, o: Worker, h: HabitId): void {
+  const taste = w.tastes[h] ?? 0;
+  nudge(w, o, taste * SOCIAL.habits.dose);
+  if (Math.abs(taste) >= SOCIAL.habits.strong) remember(s, w, o, taste > 0 ? 1 : -1, HABIT_WHAT[h](o.name));
+}
+
+/**
+ * Finishing a meal or a drink: you warm a little to everyone doing the
+ * same beside you, hear their songs and stories, size up their purses,
+ * enjoy (or put up with) the company, maybe come to blows with an enemy,
+ * and maybe tell someone the latest.
+ */
 export function together(s: SimState, w: Worker, kind: 'eat' | 'bar', by: number): void {
-  for (const o of s.workers) {
-    if (o === w || o.leaving || o.activity.kind !== kind || o.activity.stage !== 1) continue;
-    if (o.y !== w.y || Math.abs(o.x - w.x) > SOCIAL.event.near) continue;
+  const company = beside(s, w, kind);
+  if (company.length === 0) return;
+  let friend: Worker | null = null;
+  let enemy: Worker | null = null;
+  for (const o of company) {
     nudge(w, o, by);
+    if (kind === 'bar') for (const h of o.habits) if (h === 'sings' || h === 'stories') habitDose(s, w, o, h);
+    purses(s, w, o);
+    const label = labelOf(w, o);
+    if (label === 'friends' || label === 'good friends' || label === 'best friends') friend ??= o;
+    if (label === 'enemies' || feelOf(w, o) < SOCIAL.hates) enemy ??= o;
   }
+  const c = SOCIAL.company;
+  if (friend) addMoodlet(s, w, 'company', `Good company: ${friend.name}`, c.friend, c.ticks);
+  else if (enemy) addMoodlet(s, w, 'company', `Had to put up with ${enemy.name}`, c.enemy, c.ticks);
+  if (kind === 'bar' && enemy && canScuffle(w, enemy) && rand(s.social.rng) < SOCIAL.scuffle.chance) scuffle(s, w, enemy, company);
+  if (rand(s.social.rng) < SOCIAL.gossip.chance) gossip(s, w, company[Math.floor(rand(s.social.rng) * company.length)]);
+}
+
+/** Greedy workers resent a much fuller purse; frugal ones admire it. */
+function purses(s: SimState, w: Worker, o: Worker): void {
+  if (o.purse < w.purse + SOCIAL.wealth.gap) return;
+  if (w.traits.includes('greedy')) {
+    nudge(w, o, -SOCIAL.wealth.jealous);
+    remember(s, w, o, -1, `${o.name}'s fat purse`);
+  } else if (w.traits.includes('frugal')) {
+    nudge(w, o, SOCIAL.wealth.admire);
+    remember(s, w, o, 1, `how much ${o.name} has saved`);
+  }
+}
+
+/** Enemies, or one who hates the other: bad blood both ways. */
+function canScuffle(a: Worker, b: Worker): boolean {
+  return Math.max(feelOf(a, b), feelOf(b, a)) < SOCIAL.dislikes && Math.min(feelOf(a, b), feelOf(b, a)) < SOCIAL.hates;
+}
+
+/** A scuffle at the bar. A friend of either nearby may break it up. */
+function scuffle(s: SimState, a: Worker, b: Worker, around: Worker[]): void {
+  const k = SOCIAL.scuffle;
+  for (const [x, y] of [[a, b], [b, a]] as const) {
+    nudge(x, y, -k.sour);
+    addMoodlet(s, x, 'scuffle', `Came to blows with ${y.name}`, k.mood, k.moodTicks);
+    remember(s, x, y, -1, `the scuffle with ${y.name}`);
+  }
+  const peacemaker = around.find((p) => p !== b && (feelOf(p, a) >= SOCIAL.likes || feelOf(p, b) >= SOCIAL.likes));
+  if (!peacemaker) {
+    log(s, `${a.name} and ${b.name} came to blows at the bar.`, a.id);
+    return;
+  }
+  // the one they stood with is grateful
+  const helped = feelOf(peacemaker, a) >= feelOf(peacemaker, b) ? a : b;
+  nudge(helped, peacemaker, k.thanks);
+  remember(s, helped, peacemaker, 1, `${peacemaker.name} breaking up the scuffle`);
+  log(s, `${a.name} and ${b.name} came to blows at the bar; ${peacemaker.name} broke it up.`, a.id);
+}
+
+/**
+ * Gossip: the speaker tells the listener their latest moment (not one about
+ * the listener, and not one they only heard). A complaint makes the listener
+ * take a side, by whom they like better: siding with the subject sours them
+ * on the speaker; siding with the speaker sours them on the subject and
+ * warms them to the speaker. Praise warms the listener to its subject,
+ * unless they can't stand that person, in which case it's the speaker they
+ * think less of.
+ */
+export function gossip(s: SimState, speaker: Worker, listener: Worker): void {
+  const g = SOCIAL.gossip;
+  const m = speaker.lately.find((x) => x.about !== listener.id && x.heardFrom === undefined && s.tick - x.tick <= g.maxAge);
+  if (!m) return;
+  const subject = s.workers.find((o) => o.id === m.about && !o.leaving);
+  if (!subject) return;
+  if (m.tone < 0) {
+    speaker.thought = `Complaining to ${listener.name} about ${m.what}.`;
+    if (feelOf(listener, subject) > feelOf(listener, speaker)) {
+      nudge(listener, speaker, -g.side);
+      remember(s, listener, speaker, -1, `${speaker.name} badmouthing ${subject.name}`);
+    } else {
+      nudge(listener, subject, -g.pile);
+      nudge(listener, speaker, g.bond);
+      remember(s, listener, subject, -1, m.what, speaker.id);
+    }
+  } else {
+    speaker.thought = `Telling ${listener.name} about ${m.what}.`;
+    if (feelOf(listener, subject) < SOCIAL.dislikes) nudge(listener, speaker, -g.side / 2);
+    else {
+      nudge(listener, subject, g.pile / 2);
+      remember(s, listener, subject, 1, m.what, speaker.id);
+    }
+  }
+}
+
+/** A worker woke up: the snorers who slept beside them made an impression. */
+export function wokeBeside(s: SimState, w: Worker): void {
+  for (const o of beside(s, w, 'sleep')) if (o.habits.includes('snores')) habitDose(s, w, o, 'snores');
+}
+
+/** A worker finished some work: anyone beside them heard the whistling. */
+export function workedBeside(s: SimState, w: Worker): void {
+  if (!w.habits.includes('whistles')) return;
+  for (const o of beside(s, w)) habitDose(s, o, w, 'whistles');
+}
+
+/** A worker finished their share of a notice: whoever's on the same notice helped (or, if lazy, didn't). */
+export function sharedJob(s: SimState, w: Worker, noticeId: number): void {
+  for (const o of s.workers) {
+    if (o === w || o.leaving || o.memory?.noticeId !== noticeId || o.activity.kind !== 'job') continue;
+    if (w.traits.includes('industrious') && o.traits.includes('lazy')) {
+      nudge(w, o, SOCIAL.job.lazyHelp);
+      if (rand(s.social.rng) < SOCIAL.job.remember * 2) remember(s, w, o, -1, `${o.name} slacking on the job`);
+    } else {
+      nudge(w, o, SOCIAL.job.help);
+      if (rand(s.social.rng) < SOCIAL.job.remember) remember(s, w, o, 1, `${o.name}'s help with the work`);
+    }
+  }
+}
+
+/** Someone finished the last of a notice: remember who, for whoever turns up too late. */
+export function tookNotice(s: SimState, w: Worker, noticeId: number): void {
+  s.social.takers.push({ notice: noticeId, by: w.id });
+  if (s.social.takers.length > 30) s.social.takers.shift();
+}
+
+/** A worker finished a job that someone else had already emptied. */
+export function beatenTo(s: SimState, w: Worker, noticeId: number): void {
+  const t = s.social.takers.find((x) => x.notice === noticeId);
+  const by = t && s.workers.find((o) => o.id === t.by && o !== w);
+  if (!by) return;
+  nudge(w, by, -SOCIAL.job.beatMe);
+  remember(s, w, by, -1, `${by.name} beating them to a job`);
+}
+
+/** A word taught: teacher and student warm to each other. */
+export function lessonWord(s: SimState, teacher: Worker, student: Worker): void {
+  nudge(teacher, student, SOCIAL.lessonWord);
+  nudge(student, teacher, SOCIAL.lessonWord);
+  remember(s, student, teacher, 1, `the lessons with ${teacher.name}`);
+}
+
+/**
+ * A worker is leaving for good. Those close to them are sad, those who
+ * hated them glad, and a spouse may go with them. Returns who's following.
+ */
+export function farewell(s: SimState, w: Worker): Worker[] {
+  const k = SOCIAL.leaving;
+  const spouses = spousesOf(s, w.id);
+  const following: Worker[] = [];
+  for (const o of s.workers) {
+    if (o === w || o.leaving) continue;
+    if (spouses.includes(o.id) && rand(s.social.rng) < k.follow * feelOf(o, w) * 2) {
+      following.push(o);
+      log(s, `${o.name} won't stay without ${w.name}: they're leaving together.`, o.id);
+      continue;
+    }
+    const f = feelOf(o, w);
+    if (f >= SOCIAL.fond || spouses.includes(o.id)) addMoodlet(s, o, 'farewell', `${w.name} left`, k.missed, k.ticks);
+    else if (f < SOCIAL.hates) addMoodlet(s, o, 'farewell', `Glad ${w.name} is gone`, k.glad, k.ticks);
+  }
+  return following;
 }
 
 // ------------------------------------------------------------- each dawn

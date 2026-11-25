@@ -30,7 +30,7 @@ import {
   type SimState,
   type Worker,
 } from '../sim';
-import { relationsOf } from '../sim/social';
+import { HABIT_LABEL, relationsOf } from '../sim/social';
 import { bar, clear, h } from './dom';
 import { ScriptoriumPanel } from './scriptorium';
 import { TowerPanel } from './tower';
@@ -249,6 +249,7 @@ export class Ui {
     win.title.textContent = w.name;
     const traits = h('div', { class: 'traits' });
     for (const t of w.traits) traits.append(h('span', { class: 'trait', title: TRAITS[t].blurb }, TRAITS[t].label));
+    for (const hb of w.habits) traits.append(h('span', { class: 'trait habit', title: 'A habit. Others have opinions about it.' }, HABIT_LABEL[hb]));
     const kv = (k: string, v: Node | string) => h('div', { class: 'kv' }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v));
     const need = (label: string, v: number) => h('div', { class: 'need' }, h('span', { class: 'k' }, label), bar(v, true), h('span', { class: 'num' }, Math.round(v)));
     const moodlets = h('ul', { class: 'moodlets' });
@@ -292,6 +293,12 @@ export class Ui {
           : h('li', {}, r.text.slice(0, at), h('button', { class: 'name-link', onclick: () => this.select(r.otherId) }, other!.name), r.text.slice(at + other!.name.length)),
       );
     }
+    // what's happened between them and others lately (what they'd gossip about)
+    const lately = h('ul', { class: 'relations lately' });
+    for (const m of w.lately) {
+      const from = m.heardFrom !== undefined ? this.s.workers.find((o) => o.id === m.heardFrom) : undefined;
+      lately.append(h('li', { class: m.tone > 0 ? 'good' : 'bad' }, `${m.tone > 0 ? '+' : '−'} ${cap(m.what)}${from ? ` (heard from ${from.name})` : ''}`));
+    }
     win.body.append(
       h(
         'div',
@@ -323,6 +330,8 @@ export class Ui {
       w.moodlets.length ? moodlets : h('div', { class: 'hint' }, 'Nothing much on their mind.'),
       h('div', { class: 'section-label' }, 'Relationships'),
       relations.childElementCount ? relations : h('div', { class: 'hint' }, 'Nobody they feel strongly about, yet.'),
+      w.lately.length ? h('div', { class: 'section-label' }, 'Lately') : '',
+      w.lately.length ? lately : '',
       h('div', { class: 'section-label' }, 'Skills'),
       skills,
       h('details', { class: 'debug', open: this.debugOpen, ontoggle: (e) => (this.debugOpen = (e.target as HTMLDetailsElement).open) }, h('summary', {}, 'What they’re weighing (debug)'), scores, h('div', { class: 'hint' }, `Drift exposure ${Math.round(w.exposure)} / 100 (hidden from players)`)),

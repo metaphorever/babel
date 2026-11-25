@@ -316,6 +316,27 @@ export interface Worker {
   feel: Record<number, number>;
   /** 0..1: how strongly they hold to one partner. Low means open to more than one, and fine with a partner who is. */
   monogamy: number;
+  /** Little things they do that others have opinions on. */
+  habits: HabitId[];
+  /** What they think of each habit in others, -1 (can't stand it) to 1 (loves it). */
+  tastes: Record<HabitId, number>;
+  /** Their latest social moments, newest first: what they'd gossip about. */
+  lately: SocialMemory[];
+}
+
+export type HabitId = 'whistles' | 'sings' | 'stories' | 'snores';
+
+/** Something that happened between two workers, as one of them remembers it. */
+export interface SocialMemory {
+  /** Who it was about. */
+  about: number;
+  /** How it sat with them: 1 good, -1 bad. */
+  tone: 1 | -1;
+  /** A phrase that reads after "about": "Rejun snoring all night". */
+  what: string;
+  tick: number;
+  /** Heard secondhand, from this worker (and not passed on again). */
+  heardFrom?: number;
 }
 
 /**
@@ -346,6 +367,8 @@ export interface SocialState {
   estranged: string[];
   /** When statuses are next checked (each dawn). */
   nextDawn: number;
+  /** Who finished recent notices, so a worker beaten to one knows whom to blame. */
+  takers: { notice: number; by: number }[];
 }
 
 export interface GameEvent {
@@ -358,7 +381,7 @@ export interface GameEvent {
 export type StartMode = 'opening' | 'prebuilt';
 
 export interface SimState {
-  version: 9;
+  version: 10;
   start: StartMode;
   seed: number;
   tick: number;

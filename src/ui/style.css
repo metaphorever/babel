@@ -390,6 +390,14 @@ label {
   font-size: 11px;
 }
 
+.trait.habit {
+  border-style: dotted;
+}
+
+.lately .bad {
+  font-weight: bold;
+}
+
 .name-link {
   border: 0;
   background: none;
