@@ -3,7 +3,7 @@ import { activeProject, deckRow, projectFraction } from '../sim/tower';
 import { worksFraction } from '../sim/build';
 import { buildingLabel, groundRow } from '../sim/world';
 import { INK, PAPER, Patterns, type PatternName } from './patterns';
-import { itemSprite, propSprite, thoughtSprite, workerSprite, worldSprite } from './sprites';
+import { itemSprite, nightSky, propSprite, thoughtSprite, workerSprite, worldSprite } from './sprites';
 
 /** Height in pixels of one story's walls (the deck above it makes up the rest of a floor). */
 const STORY_PX = 24;
@@ -509,8 +509,28 @@ export class Renderer {
       // a soft edge at the horizon and along the tower column
       this.rect(cx, horizon - 2, bw, 2, 'sparse');
     }
-    // stars, fixed in the sky
-    if (d > 0.6) {
+    // the night sky picture, dithered in as night deepens; its bottom edge sits on the horizon
+    const night = nightSky(Math.floor((d - 0.6) / 0.1) + 1);
+    if (night && skyBottom > cy) {
+      const pic = night.picture;
+      const top = horizon - pic.height;
+      if (top > cy) {
+        // plain black above the picture
+        this.g.fillStyle = this.g.createPattern(night.black, 'repeat')!;
+        this.g.fillRect(cx, cy, bw, Math.min(top, skyBottom) - cy);
+      }
+      const y0 = Math.max(cy, top);
+      if (skyBottom > y0) {
+        for (let x = Math.floor(cx / pic.width) * pic.width; x < cx + bw; x += pic.width) {
+          const sx = Math.max(0, cx - x);
+          const w = Math.min(pic.width - sx, cx + bw - (x + sx));
+          if (w > 0) this.g.drawImage(pic, sx, y0 - top, w, skyBottom - y0, x + sx, y0, w, skyBottom - y0);
+        }
+      }
+      if (towerTop < skyBottom) this.rect(towerL, Math.max(cy, towerTop), towerR - towerL, skyBottom - Math.max(cy, towerTop), 'white');
+    }
+    // stars, fixed in the sky (until the night sky picture is in)
+    if (d > 0.6 && !night) {
       this.g.fillStyle = PAPER;
       for (let i = 0; i < 260; i++) {
         const x = (i * 7919) % (s.width * TILE);

@@ -1,4 +1,4 @@
-import { setArt, setWorldArt } from './sprites';
+import { setArt, setNightSky, setWorldArt } from './sprites';
 import {
   CELL,
   GLYPH_NAMES,
@@ -29,6 +29,8 @@ interface Manifest {
   version: number;
   sheets: Record<'body' | 'head' | 'beard' | 'hat' | 'items' | 'props' | 'glyphs', SheetInfo>;
   atlases?: { world?: { file: string; sprites: Record<string, [number, number, number, number]> } };
+  /** The night sky picture, as wide as the map. */
+  nightSky?: string;
 }
 
 async function loadPixels(url: string): Promise<ImageData> {
@@ -148,6 +150,17 @@ export async function loadArt(): Promise<void> {
       setWorldArt(world);
     } catch (e) {
       console.warn(`Babel art: couldn't load ${atlas.file}; keeping the built-in world art.`, e);
+    }
+  }
+  if (manifest.nightSky) {
+    try {
+      const img = new Image();
+      img.src = `art/${manifest.nightSky}${bust}`;
+      await img.decode();
+      setNightSky(img);
+      loaded.push(manifest.nightSky);
+    } catch (e) {
+      console.warn(`Babel art: couldn't load ${manifest.nightSky}; keeping the built-in stars.`, e);
     }
   }
   console.info(`Babel art: loaded ${loaded.join(', ')}.`);

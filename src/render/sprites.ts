@@ -92,6 +92,63 @@ export function thoughtSprite(ch: string): HTMLCanvasElement {
 
 const WORLD_ART = new Map([...allWorldArt(), ...extraWorldArt()].map((a) => [a.name, a.grid]));
 
+/**
+ * The night sky, faded in through an ordered dither: stage k of
+ * NIGHT_STAGES shows the picture on the pixels whose 4x4 Bayer threshold is
+ * under k/NIGHT_STAGES, and nothing elsewhere (so the dusk pattern shows
+ * through). Null until the picture loads; then the built-in stars step aside.
+ */
+export const NIGHT_STAGES = 4;
+const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+let nightStages: HTMLCanvasElement[] | null = null;
+let nightBlack: HTMLCanvasElement[] = [];
+
+function dithered(w: number, h: number, stage: number, src: (x: number, y: number) => boolean): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d')!;
+  const out = g.createImageData(w, h);
+  const cut = (stage / NIGHT_STAGES) * 16;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (BAYER4[(y & 3) * 4 + (x & 3)] >= cut) continue;
+      const i = (y * w + x) * 4;
+      const ink = src(x, y);
+      out.data[i] = out.data[i + 1] = out.data[i + 2] = ink ? 0 : 255;
+      out.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(out, 0, 0);
+  return c;
+}
+
+export function setNightSky(img: HTMLImageElement): void {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  g.drawImage(img, 0, 0);
+  const px = g.getImageData(0, 0, c.width, c.height).data;
+  const ink = (x: number, y: number) => {
+    const i = (y * c.width + x) * 4;
+    return px[i + 3] < 128 || px[i] + px[i + 1] + px[i + 2] < 384;
+  };
+  nightStages = [];
+  nightBlack = [];
+  for (let k = 1; k <= NIGHT_STAGES; k++) {
+    nightStages.push(dithered(c.width, c.height, k, ink));
+    nightBlack.push(dithered(4, 4, k, () => true)); // the plain black above the picture
+  }
+}
+
+/** The night sky at a stage (1..NIGHT_STAGES), and a 4x4 tile of its black, or null if there's no picture. */
+export function nightSky(stage: number): { picture: HTMLCanvasElement; black: HTMLCanvasElement } | null {
+  if (!nightStages || stage < 1) return null;
+  const k = Math.min(NIGHT_STAGES, stage) - 1;
+  return { picture: nightStages[k], black: nightBlack[k] };
+}
+
 /** Swap in world art loaded from public/art/world.png. */
 export function setWorldArt(next: Record<string, Grid>): void {
   for (const [name, grid] of Object.entries(next)) WORLD_ART.set(name, grid);

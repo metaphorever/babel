@@ -321,5 +321,6 @@
         ]
       }
     }
-  }
+  },
+  "nightSky": "night-sky.png"
 }
