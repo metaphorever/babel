@@ -59,9 +59,21 @@ export function feelOf(a: Worker, b: Worker): number {
   return a.feel[b.id] ?? 0.4;
 }
 
-/** Nudge how a feels about b. */
-export function nudge(a: Worker, b: Worker, by: number): void {
-  a.feel[b.id] = clamp01(feelOf(a, b) + by);
+/**
+ * For tuning tools (npm run sim:month): told about every change to a
+ * feeling and what caused it, and about shared time the daily cap held
+ * back. Never set in the game, and it changes nothing in the sim.
+ */
+export const feelingWatch: {
+  moved: ((from: number, to: number, why: string, by: number) => void) | null;
+  capped: ((why: string, amount: number) => void) | null;
+} = { moved: null, capped: null };
+
+/** Nudge how a feels about b; why is what caused it (for the tuning tools). */
+export function nudge(a: Worker, b: Worker, by: number, why = 'other'): void {
+  const before = feelOf(a, b);
+  a.feel[b.id] = clamp01(before + by);
+  if (feelingWatch.moved && a.feel[b.id] !== before) feelingWatch.moved(a.id, b.id, why, a.feel[b.id] - before);
 }
 
 /** Move how a first felt about b too: for things that change a relationship for good. */
@@ -70,13 +82,15 @@ function nudgeBase(a: Worker, b: Worker, by: number): void {
 }
 
 /** Shared time (drinks, meals, songs, snoring, help): capped per pair per day, either way. */
-function timeNudge(s: SimState, a: Worker, b: Worker, by: number): void {
+function timeNudge(s: SimState, a: Worker, b: Worker, by: number, why: string): void {
   const key = `${a.id}>${b.id}`;
   const used = s.social.today[key] ?? 0;
-  const room = SOCIAL.event.dailyCap - used;
-  if (room <= 0 || by === 0) return;
+  const room = Math.max(0, SOCIAL.event.dailyCap - used);
+  if (by === 0) return;
   const amount = Math.min(Math.abs(by), room);
-  nudge(a, b, Math.sign(by) * amount);
+  if (feelingWatch.capped && amount < Math.abs(by)) feelingWatch.capped(why, Math.abs(by) - amount);
+  if (amount === 0) return;
+  nudge(a, b, Math.sign(by) * amount, why);
   s.social.today[key] = used + amount;
 }
 
@@ -236,7 +250,7 @@ function becomeLovers(s: SimState, a: Worker, b: Worker, quiet: boolean): void {
   const secret = !aboveBoard(s, a, b);
   s.social.ties.push({ kind: 'lover', a: a.id, b: b.id, secret, strained: null });
   for (const [x, y] of [[a, b], [b, a]] as const) {
-    nudge(x, y, SOCIAL.gen.loverWarmth);
+    nudge(x, y, SOCIAL.gen.loverWarmth, 'became lovers');
     nudgeBase(x, y, SOCIAL.gen.loverWarmth);
   }
   if (!quiet) log(s, secret ? `${a.name} and ${b.name} are secretly seeing each other.` : `${a.name} and ${b.name} have become lovers.`, a.id);
@@ -381,7 +395,7 @@ const HABIT_WHAT: Record<HabitId, (name: string) => string> = {
 /** w gets a dose of o's habit: their taste decides which way it moves them. */
 function habitDose(s: SimState, w: Worker, o: Worker, h: HabitId): void {
   const taste = w.tastes[h] ?? 0;
-  timeNudge(s, w, o, taste * SOCIAL.habits.dose);
+  timeNudge(s, w, o, taste * SOCIAL.habits.dose, `habit: ${h}`);
   if (Math.abs(taste) >= SOCIAL.habits.strong) remember(s, w, o, taste > 0 ? 1 : -1, HABIT_WHAT[h](o.name));
 }
 
@@ -397,7 +411,7 @@ export function together(s: SimState, w: Worker, kind: 'eat' | 'bar', by: number
   let friend: Worker | null = null;
   let enemy: Worker | null = null;
   for (const o of company) {
-    timeNudge(s, w, o, by);
+    timeNudge(s, w, o, by, kind === 'bar' ? 'drinking together' : 'eating together');
     if (kind === 'bar') for (const h of o.habits) if (h === 'sings' || h === 'stories') habitDose(s, w, o, h);
     purses(s, w, o);
     const label = labelOf(w, o);
@@ -415,10 +429,10 @@ export function together(s: SimState, w: Worker, kind: 'eat' | 'bar', by: number
 function purses(s: SimState, w: Worker, o: Worker): void {
   if (o.purse < w.purse + SOCIAL.wealth.gap) return;
   if (w.traits.includes('greedy')) {
-    nudge(w, o, -SOCIAL.wealth.jealous);
+    nudge(w, o, -SOCIAL.wealth.jealous, 'jealousy');
     remember(s, w, o, -1, `${o.name}'s fat purse`);
   } else if (w.traits.includes('frugal')) {
-    nudge(w, o, SOCIAL.wealth.admire);
+    nudge(w, o, SOCIAL.wealth.admire, 'admiration');
     remember(s, w, o, 1, `how much ${o.name} has saved`);
   }
 }
@@ -434,7 +448,7 @@ function scuffle(s: SimState, a: Worker, b: Worker, around: Worker[]): void {
   const k = SOCIAL.scuffle;
   s.social.today[`fight:${pairKey(a.id, b.id)}`] = 1;
   for (const [x, y] of [[a, b], [b, a]] as const) {
-    nudge(x, y, -k.sour);
+    nudge(x, y, -k.sour, 'scuffle');
     addMoodlet(s, x, 'scuffle', `Came to blows with ${y.name}`, k.mood, k.moodTicks);
     remember(s, x, y, -1, `the scuffle with ${y.name}`);
   }
@@ -445,7 +459,7 @@ function scuffle(s: SimState, a: Worker, b: Worker, around: Worker[]): void {
   }
   // the one they stood with is grateful
   const helped = feelOf(peacemaker, a) >= feelOf(peacemaker, b) ? a : b;
-  nudge(helped, peacemaker, k.thanks);
+  nudge(helped, peacemaker, k.thanks, 'peacemaker');
   remember(s, helped, peacemaker, 1, `${peacemaker.name} breaking up the scuffle`);
   log(s, `${a.name} and ${b.name} came to blows at the bar; ${peacemaker.name} broke it up.`, a.id);
 }
@@ -468,18 +482,18 @@ export function gossip(s: SimState, speaker: Worker, listener: Worker): void {
   if (m.tone < 0) {
     speaker.thought = `Complaining to ${listener.name} about ${m.what}.`;
     if (feelOf(listener, subject) > feelOf(listener, speaker)) {
-      nudge(listener, speaker, -g.side);
+      nudge(listener, speaker, -g.side, 'gossip: sided against teller');
       remember(s, listener, speaker, -1, `${speaker.name} badmouthing ${subject.name}`);
     } else {
-      nudge(listener, subject, -g.pile);
-      nudge(listener, speaker, g.bond);
+      nudge(listener, subject, -g.pile, 'gossip: soured on subject');
+      nudge(listener, speaker, g.bond, 'gossip: bonded with teller');
       remember(s, listener, subject, -1, m.what, speaker.id);
     }
   } else {
     speaker.thought = `Telling ${listener.name} about ${m.what}.`;
-    if (feelOf(listener, subject) < SOCIAL.dislikes) nudge(listener, speaker, -g.side / 2);
+    if (feelOf(listener, subject) < SOCIAL.dislikes) nudge(listener, speaker, -g.side / 2, 'gossip: sided against teller');
     else {
-      nudge(listener, subject, g.pile / 2);
+      nudge(listener, subject, g.pile / 2, 'gossip: warmed to subject');
       remember(s, listener, subject, 1, m.what, speaker.id);
     }
   }
@@ -501,10 +515,10 @@ export function sharedJob(s: SimState, w: Worker, noticeId: number): void {
   for (const o of s.workers) {
     if (o === w || o.leaving || o.memory?.noticeId !== noticeId || o.activity.kind !== 'job') continue;
     if (w.traits.includes('industrious') && o.traits.includes('lazy')) {
-      timeNudge(s, w, o, SOCIAL.job.lazyHelp);
+      timeNudge(s, w, o, SOCIAL.job.lazyHelp, 'slacker');
       if (rand(s.social.rng) < SOCIAL.job.remember * 2) remember(s, w, o, -1, `${o.name} slacking on the job`);
     } else {
-      timeNudge(s, w, o, SOCIAL.job.help);
+      timeNudge(s, w, o, SOCIAL.job.help, 'help with work');
       if (rand(s.social.rng) < SOCIAL.job.remember) remember(s, w, o, 1, `${o.name}'s help with the work`);
     }
   }
@@ -521,14 +535,14 @@ export function beatenTo(s: SimState, w: Worker, noticeId: number): void {
   const t = s.social.takers.find((x) => x.notice === noticeId);
   const by = t && s.workers.find((o) => o.id === t.by && o !== w);
   if (!by) return;
-  nudge(w, by, -SOCIAL.job.beatMe);
+  nudge(w, by, -SOCIAL.job.beatMe, 'beaten to a job');
   remember(s, w, by, -1, `${by.name} beating them to a job`);
 }
 
 /** A word taught: teacher and student warm to each other. */
 export function lessonWord(s: SimState, teacher: Worker, student: Worker): void {
-  nudge(teacher, student, SOCIAL.lessonWord);
-  nudge(student, teacher, SOCIAL.lessonWord);
+  nudge(teacher, student, SOCIAL.lessonWord, 'lessons');
+  nudge(student, teacher, SOCIAL.lessonWord, 'lessons');
   remember(s, student, teacher, 1, `the lessons with ${teacher.name}`);
 }
 
@@ -597,7 +611,7 @@ function dawn(s: SimState): void {
     for (const b of ws) {
       if (a === b) continue;
       const base = a.feelBase[b.id];
-      if (base !== undefined) a.feel[b.id] = clamp01(feelOf(a, b) + (base - feelOf(a, b)) * SOCIAL.drift);
+      if (base !== undefined) nudge(a, b, (base - feelOf(a, b)) * SOCIAL.drift, 'drift back');
     }
   }
 
@@ -632,8 +646,8 @@ function dawn(s: SimState): void {
         .map(here)
         .find((p) => p && p.monogamy >= SOCIAL.openBelow && rand(r) < SOCIAL.dawn.discover);
       if (!wronged) continue;
-      nudge(wronged, cheat, -SOCIAL.dawn.betrayed);
-      nudge(wronged, other, -SOCIAL.dawn.rival);
+      nudge(wronged, cheat, -SOCIAL.dawn.betrayed, 'betrayal');
+      nudge(wronged, other, -SOCIAL.dawn.rival, 'betrayal');
       // some of it never quite heals
       nudgeBase(wronged, cheat, -SOCIAL.dawn.betrayed / 2);
       nudgeBase(wronged, other, -SOCIAL.dawn.rival / 2);

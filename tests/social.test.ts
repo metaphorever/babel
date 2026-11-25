@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addWorker, createState } from '../src/sim/sim';
 import { applyCommand } from '../src/sim/commands';
-import { beatenTo, childrenOf, farewell, feelOf, gossip, lessonWord, pairLabel, parentsOf, partnersOf, related, relationsOf, socialArrival, together, tookNotice, updateSocial, wokeBeside } from '../src/sim/social';
+import { beatenTo, childrenOf, farewell, feelingWatch, feelOf, gossip, lessonWord, pairLabel, parentsOf, partnersOf, related, relationsOf, socialArrival, together, tookNotice, updateSocial, wokeBeside } from '../src/sim/social';
 import { ECONOMY, REMIT, SOCIAL, TIME } from '../src/sim/tuning';
 import { updatePatron } from '../src/sim/patron';
 import { barMood, runActivity } from '../src/sim/activities';
@@ -344,5 +344,19 @@ describe('purses and the bar', () => {
     expect(w.activity.stage).toBe(1);
     expect(w.purse).toBe(1);
     expect(s.gold - gold).toBeGreaterThanOrEqual(2);
+  });
+
+  it('the tuning tools can watch what moves feelings, and why', () => {
+    const s = createState(7);
+    const [t, st] = s.workers;
+    set(t, st, 0.4);
+    const seen: string[] = [];
+    feelingWatch.moved = (from, to, why) => seen.push(`${from}>${to}:${why}`);
+    try {
+      lessonWord(s, t, st);
+    } finally {
+      feelingWatch.moved = null;
+    }
+    expect(seen).toEqual([`${t.id}>${st.id}:lessons`, `${st.id}>${t.id}:lessons`]);
   });
 });
