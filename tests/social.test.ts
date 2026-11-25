@@ -359,4 +359,27 @@ describe('purses and the bar', () => {
     }
     expect(seen).toEqual([`${t.id}>${st.id}:lessons`, `${st.id}>${t.id}:lessons`]);
   });
+
+  it('the last straw: a rumor of badmouthing finds its way back, and ends a friendship', () => {
+    const s = createState(7);
+    const [rejun, enbet, haftra] = s.workers;
+    for (const w of [rejun, enbet, haftra]) for (const o of s.workers) if (w !== o) set(w, o, 0.4);
+    // Rejun and Enbet are friends; Rejun snored, and Enbet minded
+    set(rejun, enbet, 0.65);
+    enbet.lately = [{ about: rejun.id, tone: -1, what: `${rejun.name} snoring all night`, tick: s.tick }];
+    // Enbet complains to Haftra, who likes Rejun better and takes their side
+    set(haftra, rejun, 0.7);
+    set(haftra, enbet, 0.45, 0.4);
+    gossip(s, enbet, haftra);
+    expect(haftra.lately[0]).toMatchObject({ about: enbet.id, target: rejun.id });
+    // later, Haftra sits beside Rejun and tells them, even with other news to share
+    haftra.lately.push({ about: enbet.id, tone: 1, what: 'something else', tick: s.tick });
+    gossip(s, haftra, rejun);
+    expect(feelOf(rejun, enbet)).toBeCloseTo(0.65 - SOCIAL.gossip.lastStraw, 6);
+    expect(rejun.feelBase[enbet.id]).toBeCloseTo(0.65 - SOCIAL.gossip.lastStrawBase, 6);
+    expect(feelOf(rejun, haftra)).toBeCloseTo(0.7 + SOCIAL.gossip.toldMe, 6);
+    expect(s.events.some((e) => e.text === `${rejun.name} heard from ${haftra.name} that ${enbet.name} has been badmouthing them, and they were friends.`)).toBe(true);
+    // told once: Haftra has nothing more to pass on about it
+    expect(haftra.lately.some((m) => m.target === rejun.id)).toBe(false);
+  });
 });

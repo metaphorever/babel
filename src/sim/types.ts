@@ -341,6 +341,8 @@ export interface SocialMemory {
   tick: number;
   /** Heard secondhand, from this worker (and not passed on again). */
   heardFrom?: number;
+  /** Badmouthing: who was badmouthed. If the rememberer gets to tell them, it can be the last straw. */
+  target?: number;
 }
 
 /**

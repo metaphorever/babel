@@ -138,7 +138,11 @@ function runColony(seed: number, r: Result) {
       for (const w of s.workers) if (w.activity.kind === 'bar' && w.activity.stage === 1 && w.activity.timer === 1) drinks++;
       const from = last ? s.events.indexOf(last) + 1 : 0;
       for (const e of s.events.slice(from)) {
-        const kind = /leaving together/.test(e.text)
+        const kind = /badmouthing them, and they were friends/.test(e.text)
+          ? 'last straws between friends'
+          : /badmouthing them/.test(e.text)
+          ? 'last straws'
+          : /leaving together/.test(e.text)
           ? 'spouses who followed'
           : /came to blows/.test(e.text)
           ? 'scuffles'
@@ -245,10 +249,10 @@ row('average mood', (r) => (r.meanMood / N).toFixed(1));
 row('label changes a day', (r) => (r.changes / N / DAYS).toFixed(1));
 row('  of which flipped back', (r) => pct(r.flipBacks / Math.max(1, r.changes)));
 
-header('Drama over the month');
+header(`Drama over ${DAYS} days`);
 for (const d of ['labels warmed', 'labels cooled', 'friendships formed', 'friendships ended', 'falling outs (once friends, now foes)', 'new enemies']) row(d, (r) => ((r.drama[d] ?? 0) / N).toFixed(1));
 
-header('Events over the month');
+header(`Events over ${DAYS} days`);
 const evs = [...new Set(results.flatMap((x) => Object.keys(x.r.events)))].sort();
 for (const e of evs) row(e, (r) => ((r.events[e] ?? 0) / N).toFixed(1));
 for (const e of ['drinks a day', 'jobs a day', 'gold sent home a day', 'couples at the end']) row(e, (r) => ((r.econ[e] ?? 0) / N).toFixed(1));

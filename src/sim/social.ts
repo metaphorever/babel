@@ -371,11 +371,15 @@ export function socialArrival(s: SimState, w: Worker): void {
 // ------------------------------------------------------------- what happens
 
 /** Keep a moment in mind. The same moment again just freshens it. */
-function remember(s: SimState, w: Worker, about: Worker, tone: 1 | -1, what: string, heardFrom?: number): void {
+function remember(s: SimState, w: Worker, about: Worker, tone: 1 | -1, what: string, heardFrom?: number, target?: number): void {
   const same = w.lately.findIndex((m) => m.about === about.id && m.what === what && m.heardFrom === heardFrom);
   if (same >= 0) w.lately.splice(same, 1);
-  w.lately.unshift({ about: about.id, tone, what, tick: s.tick, ...(heardFrom !== undefined ? { heardFrom } : {}) });
-  w.lately.length = Math.min(w.lately.length, SOCIAL.remember);
+  w.lately.unshift({ about: about.id, tone, what, tick: s.tick, ...(heardFrom !== undefined ? { heardFrom } : {}), ...(target !== undefined ? { target } : {}) });
+  // over the limit, forget the oldest everyday moment first: a rumor about someone is the last to go
+  while (w.lately.length > SOCIAL.remember) {
+    const drop = w.lately.map((m) => m.target === undefined).lastIndexOf(true);
+    w.lately.splice(drop >= 0 ? drop : w.lately.length - 1, 1);
+  }
 }
 
 /** Workers beside this one (same row, a few tiles away), optionally only those doing something. */
@@ -472,18 +476,32 @@ function scuffle(s: SimState, a: Worker, b: Worker, around: Worker[]): void {
  * warms them to the speaker. Praise warms the listener to its subject,
  * unless they can't stand that person, in which case it's the speaker they
  * think less of.
+ *
+ * The last straw: a listener who sided against the teller remembers the
+ * badmouthing. If they later get to tell the one who was badmouthed (it's
+ * the story they'd pick, sitting beside them), that worker turns hard on
+ * the badmouther, for good in part. A small slight between friends can end
+ * the friendship, if the rumor finds its way back.
  */
 export function gossip(s: SimState, speaker: Worker, listener: Worker): void {
   const g = SOCIAL.gossip;
-  const m = speaker.lately.find((x) => x.about !== listener.id && x.heardFrom === undefined && s.tick - x.tick <= g.maxAge);
+  const age = (x: { tick: number }) => s.tick - x.tick;
+  const rumor = speaker.lately.find((x) => x.target === listener.id && age(x) <= g.rumorDays * TIME.dayTicks);
+  const fresh = speaker.lately.filter((x) => x.about !== listener.id && x.heardFrom === undefined && age(x) <= g.maxAge);
+  const m = rumor ?? fresh[0];
   if (!m) return;
   const subject = s.workers.find((o) => o.id === m.about && !o.leaving);
   if (!subject) return;
+  if (m.target === listener.id) {
+    lastStraw(s, speaker, listener, subject);
+    speaker.lately = speaker.lately.filter((x) => x !== m); // told: nothing more to pass on
+    return;
+  }
   if (m.tone < 0) {
     speaker.thought = `Complaining to ${listener.name} about ${m.what}.`;
     if (feelOf(listener, subject) > feelOf(listener, speaker)) {
       nudge(listener, speaker, -g.side, 'gossip: sided against teller');
-      remember(s, listener, speaker, -1, `${speaker.name} badmouthing ${subject.name}`);
+      remember(s, listener, speaker, -1, `${speaker.name} badmouthing ${subject.name}`, undefined, subject.id);
     } else {
       nudge(listener, subject, -g.pile, 'gossip: soured on subject');
       nudge(listener, speaker, g.bond, 'gossip: bonded with teller');
@@ -499,15 +517,29 @@ export function gossip(s: SimState, speaker: Worker, listener: Worker): void {
   }
 }
 
+/** "Did you know what they've been saying about you?" */
+function lastStraw(s: SimState, teller: Worker, victim: Worker, badmouther: Worker): void {
+  const g = SOCIAL.gossip;
+  const wereFriends = labelOf(victim, badmouther);
+  nudge(victim, badmouther, -g.lastStraw, 'gossip: the last straw');
+  nudgeBase(victim, badmouther, -g.lastStrawBase);
+  nudge(victim, teller, g.toldMe, 'gossip: thanks for telling me');
+  remember(s, victim, badmouther, -1, `${badmouther.name} badmouthing them behind their back`, teller.id);
+  teller.thought = `Telling ${victim.name} what ${badmouther.name} said about them.`;
+  const friends = wereFriends === 'friends' || wereFriends === 'good friends' || wereFriends === 'best friends';
+  log(s, `${victim.name} heard from ${teller.name} that ${badmouther.name} has been badmouthing them${friends ? ', and they were friends' : ''}.`, victim.id);
+}
+
 /** A worker woke up: the snorers who slept beside them made an impression. */
 export function wokeBeside(s: SimState, w: Worker): void {
   for (const o of beside(s, w, 'sleep')) if (o.habits.includes('snores')) habitDose(s, w, o, 'snores');
 }
 
-/** A worker finished some work: anyone beside them heard the whistling. */
+/** A worker finished some work: anyone beside them heard the whistling, and they may pass on the latest. */
 export function workedBeside(s: SimState, w: Worker): void {
-  if (!w.habits.includes('whistles')) return;
-  for (const o of beside(s, w)) habitDose(s, o, w, 'whistles');
+  const near = beside(s, w);
+  if (w.habits.includes('whistles')) for (const o of near) habitDose(s, o, w, 'whistles');
+  if (near.length && SOCIAL.gossip.atWork > 0 && rand(s.social.rng) < SOCIAL.gossip.atWork) gossip(s, w, near[Math.floor(rand(s.social.rng) * near.length)]);
 }
 
 /** A worker finished their share of a notice: whoever's on the same notice helped (or, if lazy, didn't). */

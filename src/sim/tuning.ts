@@ -343,10 +343,12 @@ export const POPULATION = {
  * better unless it gets in the way of work; start big, tune down later"):
  * common things (help with work, whistling) are weak, and what happens
  * once a day or less (a drink together, gossip, a scuffle, a grudge) is
- * strong. Measured with npm run sim:month (12 workers, 30 days): about 1.5
- * label changes a day, warming and cooling about evenly, 9 friendships
- * formed and 6 ended, 2 new enemies, 3 new couples a month, few flip-backs,
- * and no change to work done or mood. See DESIGN.md 15.13.
+ * strong. Gossip can carry a rumor of badmouthing back to its target (the
+ * last straw). Measured with npm run sim:month (12 workers, 30 days):
+ * about 2.3 label changes a day, warming and cooling evenly, 13
+ * friendships formed and 8 ended, about 2 falling-outs and 5 last straws a
+ * month, 15% of changes flipping back, and no change to work done or mood;
+ * still stable at 60 days. See DESIGN.md 15.13.
  *
  * The feelings name themselves; pairs get a label from both sides; family
  * and couples are ties rolled on top.
@@ -464,7 +466,25 @@ export const SOCIAL = {
    * by whom they like better; praise warms them to its subject, unless they
    * can't stand that person.
    */
-  gossip: { chance: 0.7, maxAge: TIME.dayTicks * 2, side: 0.2, pile: 0.12, bond: 0.06 },
+  gossip: {
+    chance: 0.7,
+    maxAge: TIME.dayTicks * 2,
+    side: 0.2,
+    pile: 0.12,
+    bond: 0.06,
+    /**
+     * The last straw: someone who heard a worker badmouthed tells the one
+     * badmouthed. They turn on the badmouther this hard (and part of it,
+     * lastStrawBase, never fades), and warm a little to whoever told them.
+     */
+    lastStraw: 0.45,
+    lastStrawBase: 0.2,
+    toldMe: 0.05,
+    /** Juicy news keeps: a badmouthing is the last thing forgotten, and can be passed to its target for this long. */
+    rumorDays: 7,
+    /** People talk at work too: finishing a job beside someone, the chance of telling them the latest. */
+    atWork: 0.1,
+  },
 };
 
 /**
