@@ -596,6 +596,23 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
   - **Tuning kept its behavior,** so the copy shifted by one: drift starts at Tower Level 4 (`DRIFT.lineFloor` = 3), French drifts in once the tower reaches Level 4, Greek at Level 6. The patron's goal reads "Tower Level 30", though `TOWER.maxFloors` (30 decks) lets the tower reach Level 31. Retune if those numbers should land on rounder levels.
   - A pulley lift that "only goes on floor 2 or higher" is `minStory: 1`: Tower Level 2 or higher, or upstairs in a two-story building.
 
+### 15.13 Relationships (session 4, 2026-11-24)
+
+*The user's notes are in [IDEAS_BRAINDUMP.md](../IDEAS_BRAINDUMP.md) (2026-11-24, with clarifications). This is what's built from them; the code is `src/sim/social.ts`, the numbers are `SOCIAL` in tuning.ts.*
+
+- **Feelings.** Every worker feels something about every other: a hidden number, 0 to 1. The words: **hates** under 10%, **dislikes** under 30%, nothing from 30% to 50% (the neutral gap), **likes** from 50%, **is fond of** from 70%, **adores** from 85%.
+- **Pair labels** go by the weaker side: **friends** (both like), **good friends** (both fond), **best friends** (both adore), **enemies** (both hate). The one exception is **frenemies**, the mixed pair: one likes, the other dislikes.
+- **Rolling feelings:** a bell curve (average 38%), partly shared between the two, so feelings tend to run both ways. Cheerful workers are a little easier to like, grumpy ones a little harder. With 8 workers that's about 4 friendships, 1 good one, 1 pair of frenemies, and enemies in about every other colony.
+- **Couples:** lovers and spouses. At world generation, three rounds of romance, each changing the odds for the next: warmer pairs are likelier; every partner someone already has makes another less likely, and so does being monogamous. Becoming lovers warms both sides. Lovers may marry; a pair who only like each other rarely marries without being lovers (about a tenth of marriages).
+- **Monogamy** is a hidden disposition, 0 to 1, leaning most people monogamous. Under 40%, a worker is open to more than one partner. A new romance is **above board** if every partner either of them already has is open; otherwise it's a **secret affair** (and a marriage can only happen above board). Each dawn, a monogamous partner may find out: it costs a lot with the one who cheated, and more with the other lover, and the log says so.
+- **Families.** Bio parents are only rolled when a worker is created: at world generation (a couple may have a grown child among the workers, or a worker may be the child of one parent alone), or when a newcomer arrives (who may be the grown child of a couple already here: "Ninbin is Tibbi and Hembo's grown child, come to join them"). At most two bio parents, but that's internal: the bio lists parents the same way. **Marriage adds parents, never removes them:** a new spouse becomes a parent of their spouse's children, and a divorce doesn't undo it. **Siblings** are anyone sharing a parent.
+- **No incest,** step-relations included: no couple may be family within two generations (parents and children, grandparents, siblings, cousins, aunts, uncles, nieces, nephews), by birth or by marriage. A parent tie that would make an existing couple family isn't added.
+- **Each dawn:** couples whose feelings fall under 10% (either side) get a day's grace, then divorce or split up; secrets may come out; new romances and marriages may happen; labels are re-read and changes logged ("Ebbin and Flim have become best friends", "Tibbi and Hembo have married"); parents and children under 10% become **estranged** (and can make up). Relationships rolled at creation aren't logged.
+- **What moves feelings so far:** finishing a drink beside someone (+0.5%) or a meal (+0.25%). Nothing pulls them down yet: see §16.6.
+- **Their own dice.** The social web rolls from its own random stream (`s.social.rng`), so adding it didn't change a single roll anywhere else in the sim.
+- **The worker window** lists them: family and couples first, then friends and foes (closest first), then one-sided feelings (warmest first). Each name is a link to that worker. A blank 64x64 frame holds the portrait's place.
+- **To tune in playtests:** about a new couple a week among 20 workers; a few workers in more than one romance after a month. The user expects these numbers to move.
+
 ## 16. Roadmap: ideas the user has decided on, not built yet
 
 *Recorded 2026-11-24 (session 4). Claude's suggestions are marked as such.*
@@ -645,6 +662,35 @@ A popup message when something needs the player's attention, with a little sound
   - **Somewhere to turn them back on:** a Warnings window (or a section in a Settings window) listing every type with a checkbox, since "turn off all" is easy to click and hard to undo otherwise.
   - **Pausing:** the game already pauses while a dialog is open, so an alert pauses it too. That's probably right for the serious ones; if it gets annoying, minor ones could become a line in the log instead.
   - **The sound** comes with the procedural sound effects on the "later" list: a short System 7 style beep would fit.
+
+### 16.6 Social life: what moves feelings
+
+*The user: drinking together could build bonds; habits (whistling at work, singing or telling stories over a drink) that others nearby have opinions on; bad blood over a taken job, or gratitude for help; jealousy of others' coin, or being impressed by it. "Let's look at all of the things we can already measure or add in cheaply and see how they can be turned into story/character interactions."*
+
+**What the sim already measures**, and what each could become:
+
+| Measured now | Interaction |
+|---|---|
+| Who's at the bar together (built: +0.5%) | Bonds over drinks. Enemies at the same bar: a chance of a **scuffle** (both lose mood, dislike each other more, it's logged; a friend nearby may break it up). |
+| Who eats together (built: +0.25%) | Small bonds; later, tables make it the social hub. |
+| **Traits:** cheerful, grumpy (already pull feelings), industrious, lazy, greedy, glutton, sleepyhead, spendthrift, frugal, strong | Industrious workers resent lazy ones seen idling; spendthrifts **buy a round** for friends (warmth, and gold moves); gluttons annoy whoever finds the pantry empty; frugal workers think spendthrifts are fools. |
+| **Purse** (the gold each worker holds) | **Jealousy:** greedy workers dislike those much richer, when they're near each other. **Admiration:** frugal ones are impressed. |
+| **Jobs:** who reads which notice, who's working the same notice, jobs done | **"Took my job":** a worker heading for a notice that someone else empties first sours on them. **"Thanks for the help":** two on the same notice at once warm to each other (unless one is lazy). |
+| **Skills** and knacks | Impressed by the best builder; rivalry between two of a skill. |
+| **Lessons** (TEACH and LEARN) | Teacher and student warm to each other: language lessons double as friendship. |
+| **Languages:** vocab, drift tongue | **"Only you understand me":** two drifted into the same tongue bond fast. Workers who've lost the common words drift apart. |
+| **Height:** working high in the tower | Shared danger bonds (more so with acts of god at height, later). |
+| **Sleeping:** in a bed or on the ground, in which building | Bunkmates; sleeping rough together. |
+| **Quitting:** notice, leaving | A spouse or best friend leaving hits mood hard, and a spouse may **follow them home**. An enemy leaving cheers a few people up. |
+| **Arrivals** | A family reunion moodlet when a grown child arrives. |
+| **Mood** | Friends nearby give a small moodlet, enemies a small minus. Newlyweds, divorce, betrayal: moodlets. |
+
+**Cheap to add:**
+- **Habits:** 0 to 2 per worker, rolled at creation: whistles while working, sings over a drink, tells stories over a drink, snores, hums, swears at the stones, laughs loudly. Each worker has a lasting **taste** for each habit (loves it, can't stand it, doesn't care), rolled once. Being near the habit at the right moment (work, the bar, sleep) nudges how they feel about whoever has it. The worker window would list a worker's habits.
+- **Boastful** and **generous** traits, and a **gossip** trait that makes secrets more likely to come out.
+- **A slow drift back toward neutral,** so years of shared meals don't make everyone friends: feelings would fade a little each dawn unless something keeps them up.
+
+**Claude's suggestion for the first pass:** scuffles at the bar, "took my job" and "thanks for the help", jealousy and admiration over purses, habits (whistling, singing, stories, snoring), lessons bonding, friends and enemies nearby as moodlets, and a spouse who may follow a quitter home. Those use what's already measured, and each one makes a log line worth reading.
 
 ## Glossary
 

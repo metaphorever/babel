@@ -15,6 +15,7 @@ import { AI, ARRIVALS, ECONOMY, PATRON, POPULATION, SKILLS, TIME, type Difficult
 import type { FixtureKind, SimState, StartMode, Worker } from './types';
 import { fixedMap, generateMap, groundRow, sitesOf } from './world';
 import { applyPlace, campJobs, finishNow, type PlaceRequest } from './build';
+import { generateSocial, newSocial, rollMonogamy, updateSocial } from './social';
 
 /**
  * A new game. 'opening' is the real start (P1): a fresh random map with
@@ -24,7 +25,7 @@ import { applyPlace, campJobs, finishNow, type PlaceRequest } from './build';
  */
 export function createState(seed: number, difficulty: Difficulty = 'normal', start: StartMode = 'prebuilt'): SimState {
   const s: SimState = {
-    version: 8,
+    version: 9,
     start,
     seed,
     tick: 0,
@@ -57,10 +58,12 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
     takings: 0,
     reserved: 0,
     events: [],
+    social: newSocial(seed),
   };
   if (start === 'opening') {
     generateMap(s);
     for (let i = 0; i < POPULATION.start; i++) addWorker(s);
+    generateSocial(s);
     // the first worker has a gift for letters: they'll be your first scribe
     const scribe = s.workers[0];
     scribe.knack = 'writing';
@@ -72,6 +75,7 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
   }
   prebuild(s);
   for (let i = 0; i < POPULATION.start; i++) addWorker(s);
+  generateSocial(s);
 
   // The patron left a few notices up so the ground is busy from the start.
   const starter: [WorkVerb, Noun, number, number][] = [
@@ -184,6 +188,8 @@ export function addWorker(s: SimState): Worker {
     noticeUntil: null,
     leaving: false,
     look: nextU32(s.rng),
+    feel: {},
+    monogamy: rollMonogamy(s),
   };
   w.skills[w.knack] = SKILLS.knackStartXp;
   startActivity(w, 'idle');
@@ -203,6 +209,7 @@ export function step(s: SimState, cmds: readonly Command[] = []): CommandResult[
   const results = cmds.map((c) => applyCommand(s, c));
   checkCharter(s);
   updatePatron(s);
+  updateSocial(s);
   const departed: Worker[] = [];
   for (const w of s.workers) if (updateWorker(s, w)) departed.push(w);
   removeDeparted(s, departed);

@@ -312,6 +312,40 @@ export interface Worker {
   leaving: boolean;
   /** Look seed for the procedural sprite later. */
   look: number;
+  /** How this worker feels about each other worker, by id: 0..1 (see SOCIAL in tuning). Hidden; the labels show. */
+  feel: Record<number, number>;
+  /** 0..1: how strongly they hold to one partner. Low means open to more than one, and fine with a partner who is. */
+  monogamy: number;
+}
+
+/**
+ * A lasting tie between two workers. For a parent tie, a is the parent and
+ * b the child. Friendships aren't ties: they're read off the feelings.
+ */
+export interface Tie {
+  kind: 'spouse' | 'lover' | 'parent';
+  a: number;
+  b: number;
+  /** Parent ties: by birth (rolled only when the child is created) or by marriage. */
+  bio?: boolean;
+  /** Lover ties: kept from a partner who wouldn't approve, until found out. */
+  secret?: boolean;
+  /** Spouse and lover ties: the dawn one of them fell below the line. One day's grace, then it ends. */
+  strained?: number | null;
+}
+
+export type PairLabel = '' | 'enemies' | 'frenemies' | 'friends' | 'good friends' | 'best friends';
+
+export interface SocialState {
+  /** The social web's own dice, so relationships never shift the rest of the sim's rolls. */
+  rng: RngState;
+  ties: Tie[];
+  /** Each pair's label as of the last check, keyed "lo:hi" by worker id, so changes can be logged. */
+  labels: Record<string, PairLabel>;
+  /** Parent-child pairs estranged as of the last dawn ("parent:child"). */
+  estranged: string[];
+  /** When statuses are next checked (each dawn). */
+  nextDawn: number;
 }
 
 export interface GameEvent {
@@ -324,7 +358,7 @@ export interface GameEvent {
 export type StartMode = 'opening' | 'prebuilt';
 
 export interface SimState {
-  version: 8;
+  version: 9;
   start: StartMode;
   seed: number;
   tick: number;
@@ -375,4 +409,6 @@ export interface SimState {
   reserved: number;
 
   events: GameEvent[];
+  /** Who feels what about whom: families, couples, friends and enemies. */
+  social: SocialState;
 }

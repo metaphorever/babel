@@ -7,6 +7,7 @@ import { ARRIVALS, PATRON, POPULATION, TIME } from './tuning';
 import { dayOf } from './time';
 import { siteOf } from './world';
 import type { Carrier, SimState } from './types';
+import { socialArrival } from './social';
 
 // The patron's charter is a standing order nailed to the board:
 //
@@ -114,6 +115,7 @@ export function updatePatron(s: SimState): void {
     const staying = s.workers.filter((w) => !w.leaving).length;
     if (s.patience >= PATRON.recruitAbove && staying < target) {
       const w = addWorker(s);
+      socialArrival(s, w);
       const road = siteOf(s, 'home');
       w.x = road.x0;
       w.y = road.y;

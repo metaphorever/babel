@@ -5,7 +5,8 @@ import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed,
 import { addConfusion, knows, readOrder } from './drift';
 import { rand, randInt } from './rng';
 import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_OF_VERB, skillLevel } from './skills';
-import { BUILD, ECONOMY, MOOD, NEEDS, SCRIBE, SKILLS, TOWER, WORK } from './tuning';
+import { BUILD, ECONOMY, MOOD, NEEDS, SCRIBE, SKILLS, SOCIAL, TOWER, WORK } from './tuning';
+import { together } from './social';
 import type { ActivityKind, BuildMaterial, Carrier, FixtureKind, Item, ItemType, Notice, SimState, Site, SiteKind, SkillId, Worker } from './types';
 import { depotFor, findSite, nearest, siteOf, siteRef, sitesOf, sourceFor, spotFor, standable, stockpiles, storesAt, usable } from './world';
 import { activeProject, buildSpot, placeMaterial } from './tower';
@@ -119,6 +120,7 @@ function eat(s: SimState, w: Worker): Result {
   if (--a.timer > 0) return 'running';
   w.hunger = Math.max(0, w.hunger - NEEDS.eatAmount);
   addMoodlet(s, w, 'ate', 'Ate bread', MOOD.ateBread.value, MOOD.ateBread.ticks);
+  together(s, w, 'eat', SOCIAL.event.ateTogether);
   return 'done';
 }
 
@@ -207,6 +209,7 @@ function bar(s: SimState, w: Worker): Result {
   if (--a.timer > 0) return 'running';
   w.thirst = Math.max(0, w.thirst - ECONOMY.beerQuench);
   addMoodlet(s, w, 'bar', 'A good time at the bar', MOOD.bar.value, MOOD.bar.ticks);
+  together(s, w, 'bar', SOCIAL.event.drankTogether);
   return 'done';
 }
 

@@ -327,3 +327,75 @@ export const POPULATION = {
   start: 8,
   cap: 30,
 };
+
+/**
+ * Relationships. Every worker feels something about every other, 0..1,
+ * rolled when they're created and moved by what happens (drinking and
+ * eating together, so far). The feelings name themselves; pairs get a label
+ * from both sides; family and couples are ties rolled on top.
+ */
+export const SOCIAL = {
+  /** Feeling lines, as fractions of 0..1. 0.3 to 0.5 is a neutral gap with no word. */
+  hates: 0.1,
+  dislikes: 0.3,
+  likes: 0.5,
+  fond: 0.7,
+  adores: 0.85,
+  /**
+   * Rolling feelings: a bell curve around feelMean, feelSpread wide (one
+   * standard deviation, before sharing). Each pair shares part of the
+   * roll, so feelings tend to run both ways. With 8 workers (28 pairs)
+   * this gives about 4 friendships, 1 good one, half a pair of enemies and
+   * 1 odd pair of frenemies; romance warms a couple more.
+   */
+  feelMean: 0.38,
+  feelSpread: 0.26,
+  shared: 0.55,
+  /** Cheerful people are easier to like, grumpy ones harder: added to what others feel about them. */
+  traitPull: { cheerful: 0.06, grumpy: -0.06 } as Record<string, number>,
+  /** Monogamy is rolled as rand^this: under 1 leans most people monogamous. */
+  monogamySkew: 0.5,
+  /** Below this, a worker is open to more than one partner (and fine with a partner who is). */
+  openBelow: 0.4,
+  /** At world generation: rounds of romance, each changing the odds for the next. */
+  gen: {
+    rounds: 3,
+    /** Chance per round that a pair at the "likes" line becomes lovers, rising to 4x at "adores". */
+    lover: 0.07,
+    /** Chance per round that lovers marry. */
+    marryLovers: 0.3,
+    /** Chance per round that a pair who like each other but aren't lovers marry anyway (a tenth of marriages or so). */
+    marryFriends: 0.004,
+    /** Becoming lovers warms both sides by this much. */
+    loverWarmth: 0.1,
+    /** Each partner they already have multiplies the odds of another by this... */
+    morePartners: 0.25,
+    /** ...and so does being monogamous (scaled: 1 - monogamy, at least this). */
+    monogamousFloor: 0.08,
+    /** Chance that a couple has a grown child among the workers (rolled again for a second, at half). */
+    childOfCouple: 0.45,
+    /** Chance that a worker is the grown child of one other worker alone. */
+    childOfOne: 0.05,
+  },
+  /** Each dawn, for every pair. */
+  dawn: {
+    lover: 0.01,
+    marryLovers: 0.02,
+    marryFriends: 0.001,
+    /** Chance that a monogamous partner finds out about a secret lover. */
+    discover: 0.12,
+    /** Finding out: how much it costs with the one who cheated, and with the other lover. */
+    betrayed: 0.35,
+    rival: 0.4,
+  },
+  /** A newcomer may be the grown child of a couple already here, or of one worker. */
+  arrival: { childOfCouple: 0.15, childOfOne: 0.04 },
+  /** Feeling nudges from things that happen. */
+  event: {
+    /** Each person you finish a drink beside, how much warmer you feel about them. */
+    drankTogether: 0.005,
+    ateTogether: 0.0025,
+    /** "Beside": within this many tiles. */
+    near: 4,
+  },
+};

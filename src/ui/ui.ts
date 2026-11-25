@@ -30,6 +30,7 @@ import {
   type SimState,
   type Worker,
 } from '../sim';
+import { relationsOf } from '../sim/social';
 import { bar, clear, h } from './dom';
 import { ScriptoriumPanel } from './scriptorium';
 import { TowerPanel } from './tower';
@@ -280,9 +281,25 @@ export class Ui {
       const meta = `${c.wage}g per unit${c.loops ? ` · looped ${c.loops}×` : ''}${i > 0 ? ' · next up' : ''}${c.waitUntil > this.s.tick ? ' · taking a breather' : ''}`;
       inHand.append(h('div', { class: 'held-carrier' }, h('div', { class: 'held-kind' }, cap(c.kind), h('span', { class: 'hint' }, ` ${meta}`)), lines));
     });
+    // their relationships, each name a link to that worker
+    const relations = h('ul', { class: 'relations' });
+    for (const r of relationsOf(this.s, w)) {
+      const other = this.s.workers.find((o) => o.id === r.otherId);
+      const at = other ? r.text.lastIndexOf(other.name) : -1;
+      relations.append(
+        at < 0
+          ? h('li', {}, r.text)
+          : h('li', {}, r.text.slice(0, at), h('button', { class: 'name-link', onclick: () => this.select(r.otherId) }, other!.name), r.text.slice(at + other!.name.length)),
+      );
+    }
     win.body.append(
-      traits,
-      h('div', { class: 'thought', title: 'What you can see them doing. Body language needs no translation.' }, w.thought || '...'),
+      h(
+        'div',
+        { class: 'bio-head' },
+        // the portrait goes here once the portrait art settles
+        h('div', { class: 'portrait', 'aria-hidden': 'true' }),
+        h('div', { class: 'bio-side' }, traits, h('div', { class: 'thought', title: 'What you can see them doing. Body language needs no translation.' }, w.thought || '...')),
+      ),
       this.saying(w),
       kv('Doing', DOING[w.activity.kind]),
       kv('Current job', currentJob(w)),
@@ -304,6 +321,8 @@ export class Ui {
       need('Confusion', w.confusion),
       h('div', { class: 'need' }, h('span', { class: 'k' }, 'Mood'), bar(w.mood), h('span', { class: 'num' }, Math.round(w.mood))),
       w.moodlets.length ? moodlets : h('div', { class: 'hint' }, 'Nothing much on their mind.'),
+      h('div', { class: 'section-label' }, 'Relationships'),
+      relations.childElementCount ? relations : h('div', { class: 'hint' }, 'Nobody they feel strongly about, yet.'),
       h('div', { class: 'section-label' }, 'Skills'),
       skills,
       h('details', { class: 'debug', open: this.debugOpen, ontoggle: (e) => (this.debugOpen = (e.target as HTMLDetailsElement).open) }, h('summary', {}, 'What they’re weighing (debug)'), scores, h('div', { class: 'hint' }, `Drift exposure ${Math.round(w.exposure)} / 100 (hidden from players)`)),
