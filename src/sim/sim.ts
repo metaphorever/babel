@@ -25,7 +25,7 @@ import { generateSocial, newSocial, rollHabits, rollMonogamy, updateSocial } fro
  */
 export function createState(seed: number, difficulty: Difficulty = 'normal', start: StartMode = 'prebuilt'): SimState {
   const s: SimState = {
-    version: 10,
+    version: 11,
     start,
     seed,
     tick: 0,
@@ -59,6 +59,7 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
     reserved: 0,
     events: [],
     social: newSocial(seed),
+    sentHome: 0,
   };
   if (start === 'opening') {
     generateMap(s);
@@ -189,6 +190,7 @@ export function addWorker(s: SimState): Worker {
     leaving: false,
     look: nextU32(s.rng),
     feel: {},
+    feelBase: {},
     monogamy: rollMonogamy(s),
     ...rollHabits(s),
     lately: [],

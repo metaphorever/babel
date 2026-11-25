@@ -1,7 +1,7 @@
-import { dropCarried, log, moveTo, releaseReservations } from './actions';
+import { addMoodlet, dropCarried, log, moveTo, releaseReservations } from './actions';
 import { startActivity } from './activities';
 import { carrierText } from './carriers';
-import { QUIT, TICKS_PER_SECOND } from './tuning';
+import { QUIT, REMIT, TICKS_PER_SECOND } from './tuning';
 import type { SimState, Worker } from './types';
 import { siteOf } from './world';
 import { farewell } from './social';
@@ -31,6 +31,27 @@ export function updateMorale(s: SimState, w: Worker): void {
     return;
   }
   if (s.tick >= w.noticeUntil) startLeaving(s, w);
+}
+
+/**
+ * Dawn: workers with a full purse send a good share of it home to their
+ * families. One log line for everyone who sent something.
+ */
+export function sendMoneyHome(s: SimState): void {
+  const sent: string[] = [];
+  for (const w of s.workers) {
+    if (w.leaving) continue;
+    const kind = w.traits.includes('frugal') ? 'frugal' : w.traits.includes('spendthrift') ? 'spendthrift' : 'usual';
+    if (w.purse < REMIT.fullAt[kind]) continue;
+    const gold = Math.floor(w.purse * REMIT.share[kind]);
+    if (gold <= 0) continue;
+    w.purse -= gold;
+    s.sentHome += gold;
+    const m = REMIT.mood;
+    addMoodlet(s, w, 'remit', `Sent ${gold} gold home`, Math.round(Math.min(m.max, m.base + gold * m.perGold)), REMIT.moodTicks);
+    sent.push(`${w.name} ${gold}`);
+  }
+  if (sent.length) log(s, `Sent home to their families at dawn: ${sent.join(', ')} gold.`);
 }
 
 /** Put everything down and head for the road home. */

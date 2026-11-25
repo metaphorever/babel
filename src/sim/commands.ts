@@ -1,7 +1,7 @@
 import { log } from './actions';
 import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCarrier, queueDesign } from './carriers';
 import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isValidLine, langName, makeOrder, placeKey, placeName, FIXTURE_WORDS, FIXTURE_WORD_KIND, STORES_FOR, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
-import { BUILD, SCRIBE, TOWER } from './tuning';
+import { BUILD, ECONOMY, SCRIBE, TOWER } from './tuning';
 import type { Dest, SimState } from './types';
 import { applyDemolish, applyPlace, applyRename, applyRenameFixture, validateDemolish, validatePlace, validateRename, validateRenameFixture, type DemolishTarget, type PlaceRequest } from './build';
 
@@ -46,7 +46,8 @@ export type Command =
   /** Rename one of your buildings (its label shows the name). */
   | { type: 'rename'; playerId: number; buildingId: number; name: string }
   /** Rename a fixture (blank goes back to its number). */
-  | { type: 'renameFixture'; playerId: number; siteId: number; name: string };
+  | { type: 'renameFixture'; playerId: number; siteId: number; name: string }
+  | { type: 'setBeerPrice'; playerId: number; siteId: number; price: number };
 
 export interface StampedCommand {
   tick: number;
@@ -157,6 +158,12 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       const error = validateRenameFixture(s, cmd.siteId, cmd.name);
       return error ? { ok: false, error } : { ok: true };
     }
+    case 'setBeerPrice': {
+      const bar = s.sites.find((x) => x.id === cmd.siteId);
+      if (!bar || bar.kind !== 'bar') return { ok: false, error: 'That isn’t a bar.' };
+      if (!Number.isInteger(cmd.price) || cmd.price < 0 || cmd.price > ECONOMY.beerPriceMax) return { ok: false, error: `A beer costs from 0 to ${ECONOMY.beerPriceMax} gold.` };
+      return { ok: true };
+    }
   }
 }
 
@@ -206,6 +213,12 @@ export function applyCommand(s: SimState, cmd: Command): CommandResult {
     case 'renameFixture':
       applyRenameFixture(s, cmd.siteId, cmd.name);
       break;
+    case 'setBeerPrice': {
+      const bar = s.sites.find((x) => x.id === cmd.siteId)!;
+      bar.price = cmd.price;
+      log(s, `${bar.label}: a beer now costs ${cmd.price === 0 ? 'nothing' : `${cmd.price} gold`}.`);
+      break;
+    }
   }
   return { ok: true };
 }

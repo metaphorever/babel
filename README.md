@@ -86,5 +86,6 @@ In the browser console, `babel.sim.state` holds the live game state, for poking 
 - [x] Hauling bread to pantries and beer to bars
 - [x] Relationships: feelings, friends and enemies, couples, families, checked each dawn
 - [x] Social life: habits, scuffles, jealousy, help, gossip with side-taking
+- [x] Sending money home; setting the bar's beer price
 - [x] The night sky
 - [ ] The user's art in place of the built-in drawings

@@ -703,7 +703,21 @@ A popup message when something needs the player's attention, with a little sound
 - **Gossip** (the user's idea): finishing a drink or a meal beside someone, a worker may (30%) tell them their latest moment (not one about the listener, nothing older than two days, nothing they only heard). **A complaint makes the listener take a side, by whom they like better:** siding with the subject sours them on the speaker ("Enbet badmouthing Rejun"); siding with the speaker sours them on the subject and warms them to the speaker. **Praise** warms the listener to its subject, unless they can't stand that person, in which case it's the speaker they think less of. What a listener hears is remembered as "(heard from Enbet)" and isn't passed on again, so a story travels one step. So a good moment between two workers can turn a third against someone, through the web of differing opinions.
 - **Affairs** come out by chance (the user: dice are enough). Marriages are public; lovers less so.
 
-**Not built yet:** "only you understand me" (a shared drifted tongue), spendthrifts buying rounds, gluttons and empty pantries, rivalry by skill, shared danger at height, bunkmates, a family reunion moodlet, boastful/generous/gossip traits, and the slow drift back toward neutral.
+**Not built yet:** "only you understand me" (a shared drifted tongue), spendthrifts buying rounds, gluttons and empty pantries, rivalry by skill, shared danger at height, bunkmates, a family reunion moodlet, boastful/generous/gossip traits.
+
+**Keeping the web from saturating (session 4).** A 30-day simulation (`npm run sim:month`) showed that warm moments far outnumber sour ones: with realistic wages, friendships climbed steadily all month with no sign of leveling off; with full purses, workers drank 40 times a day and nearly every pair was best friends within a week. Two fixes, both the user's call:
+- **A daily cap on shared time:** drinks, meals, habits and help can move one worker's feeling about another by at most 2% a day, either way. One-off events (scuffles, gossip, lessons, grudges) aren't capped. A pair comes to blows at most once a day.
+- **Drift back toward the original feeling** (not toward neutral, the user's preference): each dawn every feeling moves 5% of the way back to how that worker first felt about the other, so events fade over about two weeks unless something keeps them up, and each pair keeps its natural chemistry. Becoming lovers moves the starting point itself; a betrayal moves it half as far as the blow.
+- **After the fix:** the average feeling rises from 0.41 to about 0.48 over a month and is leveling off; friends of any kind go from about 17% of pairs to about 27%; frenemies hold at about 6%; enemies thin from 2% to 1%. Watch whether enemies get too rare in long games.
+
+### 15.14 Purses: sending money home, and the bar's price (session 4, 2026-11-24)
+
+*The user: a worker with a full purse sends money home, which cheers them, dents the purse and makes them likelier to take work again. The bar's price can be set: cheap beer is an easy boost to morale; dear beer brings more coin back to the treasury.*
+
+- **Remittances:** at dawn, a worker whose purse holds 40 gold or more sends 60% of it home (frugal: from 25, sending 80%; spendthrift: from 80, sending 40%). The gold leaves the colony for good (`s.sentHome` counts it). They get a moodlet, "Sent 30 gold home", worth 4 plus a little per gold (up to 12) for a day. One log line at dawn lists everyone who sent money.
+- **Had their fill:** right after a drink (while its moodlet lasts), the bar appeals much less. Before this, a worker with a full purse would go straight back to the bar and never work.
+- **The bar's price:** each bar's window has a Beer price with − and + buttons, from free to 20 gold (usually 5). A cheaper beer cheers more (+1 mood per gold under the usual price, down to +3 at the dearest; free beer is +17) and tempts more (the bar's appeal counts how many beers the purse would buy). Dearer beer brings more of each worker's wages back to the treasury. Changing it is a command, logged.
+- **In the 30-day simulation:** workers drink about once a day, do about 9 jobs a day, and send home about 6 to 7 gold a day each. A colony given 400 gold a head on day one sends most of it home within days and keeps working.
 
 ## Glossary
 

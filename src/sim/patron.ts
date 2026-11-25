@@ -8,6 +8,7 @@ import { dayOf } from './time';
 import { siteOf } from './world';
 import type { Carrier, SimState } from './types';
 import { socialArrival } from './social';
+import { sendMoneyHome } from './morale';
 
 // The patron's charter is a standing order nailed to the board:
 //
@@ -107,6 +108,7 @@ export function updatePatron(s: SimState): void {
       s.income += pay;
     }
     log(s, `Day ${dayOf(s.tick)} dawns.${pay > 0 ? ` The patron pays ${pay} gold.` : ' The patron pays nothing.'}`);
+    sendMoneyHome(s);
   }
 
   if (s.tick >= s.nextArrival) {

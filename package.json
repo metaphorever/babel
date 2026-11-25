@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "art:export": "vite-node tools/art-export.ts",
     "art:import": "vite-node tools/art-import.ts",
-    "art:reference": "vite-node tools/reference-art.ts"
+    "art:reference": "vite-node tools/reference-art.ts",
+    "sim:month": "vite-node tools/month.ts"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

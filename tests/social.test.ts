@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { addWorker, createState } from '../src/sim/sim';
+import { applyCommand } from '../src/sim/commands';
 import { beatenTo, childrenOf, farewell, feelOf, gossip, lessonWord, pairLabel, parentsOf, partnersOf, related, relationsOf, socialArrival, together, tookNotice, updateSocial, wokeBeside } from '../src/sim/social';
-import { SOCIAL, TIME } from '../src/sim/tuning';
+import { ECONOMY, REMIT, SOCIAL, TIME } from '../src/sim/tuning';
+import { updatePatron } from '../src/sim/patron';
+import { barMood, runActivity } from '../src/sim/activities';
 import type { SimState, Worker } from '../src/sim/types';
 
 /** Run the social web's dawn check once, a day after the last. */
@@ -11,8 +14,8 @@ function nextDawn(s: SimState) {
 }
 
 const set = (a: Worker, b: Worker, ab: number, ba = ab) => {
-  a.feel[b.id] = ab;
-  b.feel[a.id] = ba;
+  a.feel[b.id] = a.feelBase[b.id] = ab;
+  b.feel[a.id] = b.feelBase[a.id] = ba;
 };
 
 describe('relationships', () => {
@@ -277,5 +280,69 @@ describe('social life', () => {
     expect(following).toEqual([spouse]);
     expect(friend.moodlets.find((m) => m.kind === 'farewell')?.value).toBe(SOCIAL.leaving.missed);
     expect(foe.moodlets.find((m) => m.kind === 'farewell')?.value).toBe(SOCIAL.leaving.glad);
+  });
+
+  it('shared time is capped per pair per day; the next dawn it counts afresh', () => {
+    const s = createState(7);
+    const [a, b] = s.workers;
+    set(a, b, 0.4);
+    atBar(b, a.x + 1, a.y);
+    withTuning(SOCIAL.gossip, 'chance', 0, () => {
+      for (let i = 0; i < 20; i++) together(s, a, 'bar', SOCIAL.event.drankTogether);
+    });
+    expect(feelOf(a, b)).toBeCloseTo(0.4 + SOCIAL.event.dailyCap, 6);
+    nextDawn(s);
+    expect(s.social.today).toEqual({});
+  });
+
+  it('feelings drift back toward how they first felt, a share each dawn', () => {
+    const s = createState(7);
+    const [a, b] = s.workers;
+    a.feelBase[b.id] = 0.4;
+    a.feel[b.id] = 0.8;
+    nextDawn(s);
+    expect(feelOf(a, b)).toBeCloseTo(0.8 - 0.4 * SOCIAL.drift, 6);
+  });
+});
+
+describe('purses and the bar', () => {
+  it('a full purse goes home at dawn: frugal workers send sooner and more', () => {
+    const s = createState(7);
+    const [a, b, c] = s.workers;
+    a.traits = [];
+    b.traits = ['frugal'];
+    c.traits = [];
+    for (const w of s.workers) w.purse = 0;
+    a.purse = 50;
+    b.purse = 30;
+    c.purse = 20; // not full yet
+    s.tick = s.nextStipend;
+    updatePatron(s);
+    expect(a.purse).toBe(50 - Math.floor(50 * REMIT.share.usual));
+    expect(b.purse).toBe(30 - Math.floor(30 * REMIT.share.frugal));
+    expect(c.purse).toBe(20);
+    expect(s.sentHome).toBe(Math.floor(50 * REMIT.share.usual) + Math.floor(30 * REMIT.share.frugal));
+    expect(a.moodlets.some((m) => m.kind === 'remit')).toBe(true);
+  });
+
+  it('a bar’s beer price can be set; cheap beer cheers more', () => {
+    const s = createState(7);
+    const bar = s.sites.find((x) => x.kind === 'bar')!;
+    expect(applyCommand(s, { type: 'setBeerPrice', playerId: 0, siteId: bar.id, price: 2 }).ok).toBe(true);
+    expect(bar.price).toBe(2);
+    expect(applyCommand(s, { type: 'setBeerPrice', playerId: 0, siteId: bar.id, price: -1 }).ok).toBe(false);
+    expect(applyCommand(s, { type: 'setBeerPrice', playerId: 0, siteId: bar.id, price: ECONOMY.beerPriceMax + 1 }).ok).toBe(false);
+    expect(barMood(2)).toBeGreaterThan(barMood(ECONOMY.beerPrice));
+    expect(barMood(ECONOMY.beerPriceMax)).toBe(ECONOMY.barMoodMin);
+    // a worker with 3 gold can now afford a beer, and pays the bar's price
+    const w = s.workers[1];
+    w.purse = 3;
+    w.activity = { kind: 'bar', stage: 0, timer: 0, target: null, read: null, ref: null, aim: null };
+    const gold = s.gold;
+    for (let i = 0; i < 4000 && w.activity.stage === 0; i++) runActivity(s, w);
+    expect(w.activity.kind).toBe('bar');
+    expect(w.activity.stage).toBe(1);
+    expect(w.purse).toBe(1);
+    expect(s.gold - gold).toBeGreaterThanOrEqual(2);
   });
 });

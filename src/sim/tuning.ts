@@ -257,8 +257,13 @@ export const ARRIVALS = {
 
 export const ECONOMY = {
   startingGold: 400,
-  /** A worker pays this for a beer at the bar. The bar is the colony's, so it goes back to the treasury. */
+  /** What a beer costs unless the player sets a bar's price. The bar is the colony's, so it goes back to the treasury. */
   beerPrice: 5,
+  /** The price the player can set at a bar, from free up to this. */
+  beerPriceMax: 20,
+  /** Each gold under the usual price makes a beer this much more cheering (and each gold over, less), down to barMoodMin. */
+  barMoodPerGold: 1,
+  barMoodMin: 3,
   barTicks: 120,
   /** A beer also takes the edge off thirst. */
   beerQuench: 30,
@@ -277,6 +282,8 @@ export const AI = {
   barPerGold: 1.2,
   barCap: 55,
   barMoodWeight: 0.35,
+  /** Right after a drink (while its moodlet lasts), the bar appeals this much less: they've had their fill for now. */
+  barAfterDrink: 0.35,
   wanderBase: 8,
   noise: 4, // random jitter on each candidate so equal workers differ
   /** Before the scriptorium is placed, workers mill around and only sleep if they're this tired. */
@@ -397,7 +404,22 @@ export const SOCIAL = {
     ateTogether: 0.0025,
     /** "Beside": within this many tiles. */
     near: 4,
+    /**
+     * Shared time has diminishing returns: drinks, meals, songs, snoring
+     * and help can move one worker's feeling about another by at most this
+     * much a day, either way. One-off events (scuffles, gossip, lessons,
+     * grudges) aren't capped. A pair can only come to blows once a day.
+     */
+    dailyCap: 0.02,
   },
+  /**
+   * Each dawn, every feeling drifts this share of the way back toward how
+   * that worker first felt about the other (their natural chemistry), so
+   * what's happened fades unless something keeps it up. 0.05 a day: about
+   * two weeks to fade halfway. Becoming lovers moves the starting point
+   * itself, and a betrayal moves it half as far as the blow.
+   */
+  drift: 0.05,
   /** Habits: little things workers do, and what everyone else thinks of them. */
   habits: {
     /** Chance of having none, one or two. */
@@ -431,4 +453,20 @@ export const SOCIAL = {
    * can't stand that person.
    */
   gossip: { chance: 0.3, maxAge: TIME.dayTicks * 2, side: 0.03, pile: 0.015, bond: 0.01 },
+};
+
+/**
+ * Remittances: at dawn, a worker with a full purse sends a good share of it
+ * home to their family. It cheers them, takes the gold out of the colony
+ * (it doesn't come back to the treasury), and leaves them reason to work.
+ * Frugal workers send sooner and more; spendthrifts later and less.
+ */
+export const REMIT = {
+  /** A purse this full gets sent home: the usual, frugal, spendthrift. */
+  fullAt: { usual: 40, frugal: 25, spendthrift: 80 },
+  /** The share of the purse that goes. */
+  share: { usual: 0.6, frugal: 0.8, spendthrift: 0.4 },
+  /** The moodlet: this much plus this much per gold sent, up to a cap, for a day. */
+  mood: { base: 4, perGold: 0.15, max: 12 },
+  moodTicks: TIME.dayTicks,
 };

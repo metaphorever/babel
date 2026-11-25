@@ -1,5 +1,6 @@
-import { BUILD, DRIFT, FIXTURE_LABEL, PATRON, TOWER, levelName, currentStipend, type Building, type FixtureKind, type Sim, type SimState, type Site } from '../sim';
+import { BUILD, DRIFT, ECONOMY, FIXTURE_LABEL, PATRON, TOWER, levelName, currentStipend, type Building, type FixtureKind, type Sim, type SimState, type Site } from '../sim';
 import { fixtureWidth, footprint, houseCost, placeCost, worksFraction, type PlaceRequest } from '../sim/build';
+import { barMood } from '../sim/activities';
 import { deckRow } from '../sim/tower';
 import { buildingLabel, groundRow, siteTitle, storedTotal } from '../sim/world';
 import { buildingHeight, TILE, type Renderer, type Thing } from '../render/renderer';
@@ -499,10 +500,34 @@ export class BuildUi {
       kv('State', statusOf(site)),
       site.capacity !== null && !site.supplies ? kv('Holds', `${storedTotal(site)} of ${site.capacity}`) : '',
       goods.length ? kv('Has', goods.join(', ')) : '',
+      site.kind === 'bar' && !site.build ? this.priceRow(site) : '',
       site.broken ? h('div', { class: 'hint' }, 'Broken beyond repair. Take it down for the materials.') : '',
       h('div', { class: 'row row-end' }, this.takeDownButton({ kind: 'site', site })),
     );
     return siteTitle(s, site);
+  }
+
+  /** A bar's beer price: cheap beer cheers more; dear beer brings more back to the treasury. */
+  private priceRow(site: Site): HTMLElement {
+    const price = site.price ?? ECONOMY.beerPrice;
+    const set = (p: number) => this.sim.enqueue({ type: 'setBeerPrice', playerId: 0, siteId: site.id, price: Math.max(0, Math.min(ECONOMY.beerPriceMax, p)) });
+    return h(
+      'div',
+      {},
+      h(
+        'div',
+        { class: 'kv' },
+        h('span', { class: 'k' }, 'Beer price'),
+        h(
+          'span',
+          { class: 'v' },
+          h('button', { class: 'btn btn-small', disabled: price <= 0, onclick: () => set(price - 1) }, '−'),
+          ` ${price === 0 ? 'Free' : `${price} gold`} `,
+          h('button', { class: 'btn btn-small', disabled: price >= ECONOMY.beerPriceMax, onclick: () => set(price + 1) }, '+'),
+        ),
+      ),
+      h('div', { class: 'hint' }, `Cheap beer lifts spirits more (+${barMood(price)} mood a drink at this price) and is easier to afford. Dearer beer brings more of their wages back to the treasury. The usual price is ${ECONOMY.beerPrice}.`),
+    );
   }
 
   // ------------------------------------------------------- System 7 dialogs

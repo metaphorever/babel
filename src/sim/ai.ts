@@ -1,5 +1,5 @@
 import { releaseReservations } from './actions';
-import { barsWithBeer, boardOptions, breadAvailable, runActivity, startActivity } from './activities';
+import { cheapestBeer, boardOptions, breadAvailable, runActivity, startActivity } from './activities';
 import { rand } from './rng';
 import { AI, CONFUSION, ECONOMY, LESSON, MOOD, NEEDS, SCRIBE } from './tuning';
 import { levelOfRow, updateDrift } from './drift';
@@ -65,10 +65,15 @@ export function scoreOptions(s: SimState, w: Worker, inProgress: boolean): Score
   // a translator on the ground is calling this worker's name
   if (levelOfRow(w.y) === 0 && lessonFor(s, w)) add('lesson', 'Answer the call to a lesson', LESSON.pull);
 
-  if (w.purse >= ECONOMY.beerPrice && (cur === 'bar' || barsWithBeer(s).length > 0)) {
-    const gold = Math.min(AI.barCap, w.purse * AI.barPerGold * w.p.spend);
+  const price = cheapestBeer(s);
+  if (cur === 'bar' || (price !== null && w.purse >= price)) {
+    // how many beers the purse would buy, at the usual price's scale; cheap beer tempts more
+    const beers = price === null || price === 0 ? Infinity : w.purse / price;
+    const gold = Math.min(AI.barCap, beers * ECONOMY.beerPrice * AI.barPerGold * w.p.spend);
     const blues = Math.max(0, 60 - w.mood) * AI.barMoodWeight;
-    add('bar', 'Go to the bar', gold + blues);
+    // just had one: had their fill for now
+    const full = cur !== 'bar' && w.moodlets.some((m) => m.kind === 'bar') ? AI.barAfterDrink : 1;
+    add('bar', 'Go to the bar', (gold + blues) * full);
   }
 
   add('wander', 'Wander', AI.wanderBase);

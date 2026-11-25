@@ -78,6 +78,8 @@ export interface Site {
   store: Record<ItemType, number>;
   /** Most goods it can hold, all kinds together. null = no limit; 0 = it never takes deliveries. */
   capacity: number | null;
+  /** Bars: what a beer costs here, if the player set it (otherwise ECONOMY.beerPrice). */
+  price?: number;
   /** The building it stands in, or null outdoors. */
   buildingId: number | null;
   /** Still being built (null once finished). */
@@ -314,6 +316,8 @@ export interface Worker {
   look: number;
   /** How this worker feels about each other worker, by id: 0..1 (see SOCIAL in tuning). Hidden; the labels show. */
   feel: Record<number, number>;
+  /** How they first felt about each (their natural chemistry): feelings drift back toward it. */
+  feelBase: Record<number, number>;
   /** 0..1: how strongly they hold to one partner. Low means open to more than one, and fine with a partner who is. */
   monogamy: number;
   /** Little things they do that others have opinions on. */
@@ -369,6 +373,8 @@ export interface SocialState {
   nextDawn: number;
   /** Who finished recent notices, so a worker beaten to one knows whom to blame. */
   takers: { notice: number; by: number }[];
+  /** Today's shared-time warmth so far, per "from>to" pair (capped daily), and pairs who've already come to blows today. Cleared at dawn. */
+  today: Record<string, number>;
 }
 
 export interface GameEvent {
@@ -381,7 +387,7 @@ export interface GameEvent {
 export type StartMode = 'opening' | 'prebuilt';
 
 export interface SimState {
-  version: 10;
+  version: 11;
   start: StartMode;
   seed: number;
   tick: number;
@@ -434,4 +440,6 @@ export interface SimState {
   events: GameEvent[];
   /** Who feels what about whom: families, couples, friends and enemies. */
   social: SocialState;
+  /** Gold workers have sent home to their families (gone from the colony for good). */
+  sentHome: number;
 }

@@ -178,6 +178,22 @@ export function barsWithBeer(s: SimState): Site[] {
   return sitesOf(s, 'bar').filter((x) => x.store.beer > 0);
 }
 
+/** What a beer costs at this bar. */
+export function beerPrice(bar: Site): number {
+  return bar.price ?? ECONOMY.beerPrice;
+}
+
+/** The cheapest beer a worker could buy right now, or null if no bar has any. */
+export function cheapestBeer(s: SimState): number | null {
+  const bars = barsWithBeer(s);
+  return bars.length ? Math.min(...bars.map(beerPrice)) : null;
+}
+
+/** How much a beer at this price lifts the mood: cheaper cheers more. */
+export function barMood(price: number): number {
+  return Math.max(ECONOMY.barMoodMin, MOOD.bar.value + (ECONOMY.beerPrice - price) * ECONOMY.barMoodPerGold);
+}
+
 /**
  * A beer at the bar: it lifts the mood and takes the edge off thirst. The
  * bar is the colony's own, so what workers pay goes back to the treasury.
@@ -188,28 +204,30 @@ function bar(s: SimState, w: Worker): Result {
   if (a.stage === 0) {
     let b = a.ref === null ? null : s.sites.find((x) => x.id === a.ref) ?? null;
     if (!b) {
-      b = nearest(barsWithBeer(s), w);
+      b = nearest(barsWithBeer(s).filter((x) => beerPrice(x) <= w.purse), w);
       if (!b) return 'failed';
       a.ref = b.id;
     }
     w.thought = 'Off to the bar!';
     const m = moveTo(s, w, spotFor(b, w.id));
     if (m === 'moving') return 'running';
-    if (m === 'unreachable' || w.purse < ECONOMY.beerPrice || b.store.beer <= 0) {
+    if (m === 'unreachable' || w.purse < beerPrice(b) || b.store.beer <= 0) {
       w.thought = b.store.beer <= 0 ? 'The bar is dry!' : "Can't afford it.";
       return 'failed';
     }
     b.store.beer--;
-    w.purse -= ECONOMY.beerPrice;
-    s.gold += ECONOMY.beerPrice;
-    s.takings += ECONOMY.beerPrice;
+    const price = beerPrice(b);
+    w.purse -= price;
+    s.gold += price;
+    s.takings += price;
     a.stage = 1;
     a.timer = ECONOMY.barTicks;
     w.thought = 'A beer and a song.';
   }
   if (--a.timer > 0) return 'running';
   w.thirst = Math.max(0, w.thirst - ECONOMY.beerQuench);
-  addMoodlet(s, w, 'bar', 'A good time at the bar', MOOD.bar.value, MOOD.bar.ticks);
+  const paid = beerPrice(s.sites.find((x) => x.id === a.ref) ?? ({ price: ECONOMY.beerPrice } as Site));
+  addMoodlet(s, w, 'bar', paid === 0 ? 'Free beer!' : paid < ECONOMY.beerPrice ? 'Cheap beer at the bar' : paid > ECONOMY.beerPrice ? 'Pricey beer, but still' : 'A good time at the bar', barMood(paid), MOOD.bar.ticks);
   together(s, w, 'bar', SOCIAL.event.drankTogether);
   return 'done';
 }
