@@ -395,7 +395,7 @@ const HABIT_WHAT: Record<HabitId, (name: string) => string> = {
 /** w gets a dose of o's habit: their taste decides which way it moves them. */
 function habitDose(s: SimState, w: Worker, o: Worker, h: HabitId): void {
   const taste = w.tastes[h] ?? 0;
-  timeNudge(s, w, o, taste * SOCIAL.habits.dose, `habit: ${h}`);
+  timeNudge(s, w, o, taste * SOCIAL.habits.dose * (SOCIAL.habits.weight[h] ?? 1), `habit: ${h}`);
   if (Math.abs(taste) >= SOCIAL.habits.strong) remember(s, w, o, taste > 0 ? 1 : -1, HABIT_WHAT[h](o.name));
 }
 
@@ -440,7 +440,7 @@ function purses(s: SimState, w: Worker, o: Worker): void {
 /** Enemies, or one who hates the other: bad blood both ways. Once a day at most. */
 function canScuffle(s: SimState, a: Worker, b: Worker): boolean {
   if (s.social.today[`fight:${pairKey(a.id, b.id)}`]) return false;
-  return Math.max(feelOf(a, b), feelOf(b, a)) < SOCIAL.dislikes && Math.min(feelOf(a, b), feelOf(b, a)) < SOCIAL.hates;
+  return Math.max(feelOf(a, b), feelOf(b, a)) < SOCIAL.scuffle.bothBelow && Math.min(feelOf(a, b), feelOf(b, a)) < SOCIAL.scuffle.oneBelow;
 }
 
 /** A scuffle at the bar. A friend of either nearby may break it up. */

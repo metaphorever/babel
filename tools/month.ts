@@ -87,6 +87,7 @@ interface Result {
   credit: Record<string, number>;
   changes: number;
   flipBacks: number;
+  drama: Record<string, number>;
 }
 
 function stock(s: SimState) {
@@ -137,7 +138,9 @@ function runColony(seed: number, r: Result) {
       for (const w of s.workers) if (w.activity.kind === 'bar' && w.activity.stage === 1 && w.activity.timer === 1) drinks++;
       const from = last ? s.events.indexOf(last) + 1 : 0;
       for (const e of s.events.slice(from)) {
-        const kind = /came to blows/.test(e.text)
+        const kind = /leaving together/.test(e.text)
+          ? 'spouses who followed'
+          : /came to blows/.test(e.text)
           ? 'scuffles'
           : /have married/.test(e.text)
             ? 'weddings'
@@ -162,6 +165,12 @@ function runColony(seed: number, r: Result) {
       history.set(k, h);
       if (was === undefined || was === now) continue;
       r.changes++;
+      const bump = (k: string) => (r.drama[k] = (r.drama[k] ?? 0) + 1);
+      bump(RANK[now] > RANK[was] ? 'labels warmed' : 'labels cooled');
+      if (RANK[was] < 1 && RANK[now] >= 1) bump('friendships formed');
+      if (RANK[was] >= 1 && RANK[now] < 1) bump('friendships ended');
+      if (h.slice(0, -1).some((l) => RANK[l] >= 1) && RANK[now] < 0 && RANK[was] >= 0) bump('falling outs (once friends, now foes)');
+      if (RANK[was] >= 0 && now === 'enemies') bump('new enemies');
       if (h.length >= 4 && (h[h.length - 3] === now || h[h.length - 4] === now)) r.flipBacks++;
       const dir = Math.sign(RANK[now] - RANK[was]);
       let best = 'other';
@@ -200,7 +209,7 @@ function runVariant(overrides: Override[]): Result {
     obj[key] = o.value;
     return () => (obj[key] = was);
   });
-  const r: Result = { labels: {}, meanFeel: 0, meanMood: 0, events: {}, econ: {}, moved: {}, capped: {}, credit: {}, changes: 0, flipBacks: 0 };
+  const r: Result = { labels: {}, meanFeel: 0, meanMood: 0, events: {}, econ: {}, moved: {}, capped: {}, credit: {}, changes: 0, flipBacks: 0, drama: {} };
   try {
     for (const seed of SEEDS) runColony(seed, r);
   } finally {
@@ -220,9 +229,9 @@ const COL = 16;
 const cols = (cells: string[]) => cells.map((c) => c.padStart(COL)).join('');
 const header = (title: string) => {
   console.log(`\n${title}`);
-  console.log(''.padEnd(30) + cols(results.map((x, i) => (i === 0 ? 'baseline' : `variant ${i}`))));
+  console.log(''.padEnd(40) + cols(results.map((x, i) => (i === 0 ? 'baseline' : `variant ${i}`))));
 };
-const row = (label: string, f: (r: Result) => string) => console.log(label.padEnd(30) + cols(results.map((x) => f(x.r))));
+const row = (label: string, f: (r: Result) => string) => console.log(label.padEnd(40) + cols(results.map((x) => f(x.r))));
 const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
 
 console.log(`A month in a colony: ${N} seeds, ${SIZE} workers, ${DAYS} days${RICH ? ', 400 gold each to start' : ''}. Averages per colony.`);
@@ -235,6 +244,9 @@ row('average feeling', (r) => (r.meanFeel / N).toFixed(3));
 row('average mood', (r) => (r.meanMood / N).toFixed(1));
 row('label changes a day', (r) => (r.changes / N / DAYS).toFixed(1));
 row('  of which flipped back', (r) => pct(r.flipBacks / Math.max(1, r.changes)));
+
+header('Drama over the month');
+for (const d of ['labels warmed', 'labels cooled', 'friendships formed', 'friendships ended', 'falling outs (once friends, now foes)', 'new enemies']) row(d, (r) => ((r.drama[d] ?? 0) / N).toFixed(1));
 
 header('Events over the month');
 const evs = [...new Set(results.flatMap((x) => Object.keys(x.r.events)))].sort();

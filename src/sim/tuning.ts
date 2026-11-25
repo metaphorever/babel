@@ -337,9 +337,19 @@ export const POPULATION = {
 
 /**
  * Relationships. Every worker feels something about every other, 0..1,
- * rolled when they're created and moved by what happens (drinking and
- * eating together, so far). The feelings name themselves; pairs get a label
- * from both sides; family and couples are ties rolled on top.
+ * rolled when they're created and moved by what happens.
+ *
+ * Tuned for drama (session 4, the user: "more interpersonal drama is
+ * better unless it gets in the way of work; start big, tune down later"):
+ * common things (help with work, whistling) are weak, and what happens
+ * once a day or less (a drink together, gossip, a scuffle, a grudge) is
+ * strong. Measured with npm run sim:month (12 workers, 30 days): about 1.5
+ * label changes a day, warming and cooling about evenly, 9 friendships
+ * formed and 6 ended, 2 new enemies, 3 new couples a month, few flip-backs,
+ * and no change to work done or mood. See DESIGN.md 15.13.
+ *
+ * The feelings name themselves; pairs get a label from both sides; family
+ * and couples are ties rolled on top.
  */
 export const SOCIAL = {
   /** Feeling lines, as fractions of 0..1. 0.3 to 0.5 is a neutral gap with no word. */
@@ -386,7 +396,7 @@ export const SOCIAL = {
   },
   /** Each dawn, for every pair. */
   dawn: {
-    lover: 0.01,
+    lover: 0.04,
     marryLovers: 0.02,
     marryFriends: 0.001,
     /** Chance that a monogamous partner finds out about a secret lover. */
@@ -400,8 +410,8 @@ export const SOCIAL = {
   /** Feeling nudges from things that happen. */
   event: {
     /** Each person you finish a drink beside, how much warmer you feel about them. */
-    drankTogether: 0.005,
-    ateTogether: 0.0025,
+    drankTogether: 0.06,
+    ateTogether: 0.03,
     /** "Beside": within this many tiles. */
     near: 4,
     /**
@@ -410,7 +420,7 @@ export const SOCIAL = {
      * much a day, either way. One-off events (scuffles, gossip, lessons,
      * grudges) aren't capped. A pair can only come to blows once a day.
      */
-    dailyCap: 0.02,
+    dailyCap: 0.1,
   },
   /**
    * Each dawn, every feeling drifts this share of the way back toward how
@@ -429,17 +439,19 @@ export const SOCIAL = {
     spread: 0.6,
     /** A taste this strong either way is remembered (and gossiped about). */
     strong: 0.4,
-    /** One dose (a night of snoring, a song at the bar, a job finished whistling) moves feeling by taste times this. */
-    dose: 0.006,
+    /** One dose (a night of snoring, a song at the bar, a job finished whistling) moves feeling by taste times this... */
+    dose: 0.06,
+    /** ...times this per habit: whistling is heard at every finished job, so each dose counts for less. */
+    weight: { whistles: 0.15, sings: 1, stories: 1, snores: 1 } as Record<string, number>,
   },
-  /** Enemies drinking side by side may come to blows. */
-  scuffle: { chance: 0.3, mood: -8, moodTicks: 3000, sour: 0.04, thanks: 0.03 },
+  /** Bad blood drinking side by side may come to blows: both feel below bothBelow about each other, and one below oneBelow. */
+  scuffle: { chance: 0.6, bothBelow: 0.35, oneBelow: 0.2, mood: -8, moodTicks: 3000, sour: 0.3, thanks: 0.15 },
   /** Work: beaten to a job, or helped with one. Industrious workers resent lazy helpers. Help is common, so only some of it sticks in memory. */
-  job: { beatMe: 0.03, help: 0.006, lazyHelp: -0.006, remember: 0.15 },
+  job: { beatMe: 0.15, help: 0.001, lazyHelp: -0.02, remember: 0.15 },
   /** Purses: greedy workers resent those this much richer; frugal ones are impressed. */
-  wealth: { gap: 15, jealous: 0.008, admire: 0.006 },
+  wealth: { gap: 15, jealous: 0.08, admire: 0.06 },
   /** Each word taught warms teacher and student to each other. */
-  lessonWord: 0.008,
+  lessonWord: 0.04,
   /** A friend (or an enemy) beside you over a drink or a meal. */
   company: { friend: 3, enemy: -3, ticks: 2400 },
   /** When a worker quits: a spouse may go too; those close are sad, those who hated them glad. */
@@ -452,7 +464,7 @@ export const SOCIAL = {
    * by whom they like better; praise warms them to its subject, unless they
    * can't stand that person.
    */
-  gossip: { chance: 0.3, maxAge: TIME.dayTicks * 2, side: 0.03, pile: 0.015, bond: 0.01 },
+  gossip: { chance: 0.7, maxAge: TIME.dayTicks * 2, side: 0.2, pile: 0.12, bond: 0.06 },
 };
 
 /**
