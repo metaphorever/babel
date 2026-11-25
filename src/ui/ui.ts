@@ -30,7 +30,7 @@ import {
   type SimState,
   type Worker,
 } from '../sim';
-import { HABIT_LABEL, relationsOf } from '../sim/social';
+import { HABIT_LABEL, relationsOf, temperWords } from '../sim/social';
 import { bar, clear, h } from './dom';
 import { ScriptoriumPanel } from './scriptorium';
 import { TowerPanel } from './tower';
@@ -250,6 +250,7 @@ export class Ui {
     const traits = h('div', { class: 'traits' });
     for (const t of w.traits) traits.append(h('span', { class: 'trait', title: TRAITS[t].blurb }, TRAITS[t].label));
     for (const hb of w.habits) traits.append(h('span', { class: 'trait habit', title: 'A habit. Others have opinions about it.' }, HABIT_LABEL[hb]));
+    for (const word of temperWords(w)) traits.append(h('span', { class: 'trait temper', title: 'Their temperament: how they take what happens between people.' }, word));
     const kv = (k: string, v: Node | string) => h('div', { class: 'kv' }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v));
     const need = (label: string, v: number) => h('div', { class: 'need' }, h('span', { class: 'k' }, label), bar(v, true), h('span', { class: 'num' }, Math.round(v)));
     const moodlets = h('ul', { class: 'moodlets' });

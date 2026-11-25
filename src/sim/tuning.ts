@@ -372,6 +372,24 @@ export const SOCIAL = {
   shared: 0.55,
   /** Cheerful people are easier to like, grumpy ones harder: added to what others feel about them. */
   traitPull: { cheerful: 0.06, grumpy: -0.06 } as Record<string, number>,
+  /**
+   * Temperament: each worker's warmth, touchiness and forgiveness is
+   * 2^(spread x a bell curve), so about two in three fall between 0.66 and
+   * 1.5, and one in twenty beyond 0.44 or 2.3. Traits lean it: cheerful
+   * workers warmer and harder to offend, grumpy ones the other way.
+   * Beyond "shows" (or under its inverse), the worker window names it:
+   * about half the workers get a word. Measured over a month: the
+   * warmest third end with about 1.75 times the friends of the coolest,
+   * the touchiest about 1.5 times the foes of the thickest-skinned.
+   */
+  temper: {
+    spread: 0.6,
+    traits: {
+      cheerful: { warmth: 1.25, touchiness: 0.8 },
+      grumpy: { warmth: 0.75, touchiness: 1.25, forgiveness: 0.8 },
+    } as Record<string, Partial<Record<'warmth' | 'touchiness' | 'forgiveness', number>>>,
+    shows: 1.75,
+  },
   /** Monogamy is rolled as rand^this: under 1 leans most people monogamous. */
   monogamySkew: 0.5,
   /** Below this, a worker is open to more than one partner (and fine with a partner who is). */

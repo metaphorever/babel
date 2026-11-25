@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { addWorker, createState } from '../src/sim/sim';
+import { addWorker, createState as newColony } from '../src/sim/sim';
 import { applyCommand } from '../src/sim/commands';
-import { beatenTo, childrenOf, farewell, feelingWatch, feelOf, gossip, lessonWord, pairLabel, parentsOf, partnersOf, related, relationsOf, socialArrival, together, tookNotice, updateSocial, wokeBeside } from '../src/sim/social';
+import { beatenTo, childrenOf, farewell, feelingWatch, feelOf, gossip, lessonWord, pairLabel, parentsOf, partnersOf, related, relationsOf, rollTemper, temperWords, socialArrival, together, tookNotice, updateSocial, wokeBeside } from '../src/sim/social';
 import { ECONOMY, REMIT, SOCIAL, TIME } from '../src/sim/tuning';
 import { updatePatron } from '../src/sim/patron';
 import { barMood, runActivity } from '../src/sim/activities';
 import type { SimState, Worker } from '../src/sim/types';
+/** A colony whose workers are all even-tempered, so tests can check exact amounts (temperament has its own test). */function createState(...args: Parameters<typeof newColony>): SimState {  const s = newColony(...args);  for (const w of s.workers) w.temper = { warmth: 1, touchiness: 1, forgiveness: 1 };  return s;}
 
 /** Run the social web's dawn check once, a day after the last. */
 function nextDawn(s: SimState) {
@@ -236,7 +237,11 @@ describe('social life', () => {
   it('enemies drinking side by side may come to blows; a friend breaks it up', () => {
     const s = createState(7);
     const [a, b, c] = s.workers;
-    for (const w of [a, b, c]) for (const o of s.workers) if (w !== o) w.feel[o.id] = 0.4;
+    for (const w of [a, b, c]) {
+      for (const o of s.workers) if (w !== o) w.feel[o.id] = 0.4;
+      w.habits = [];
+      w.purse = 0;
+    }
     set(a, b, 0.05);
     set(c, a, 0.6, 0.4);
     atBar(a, 50, 20);
@@ -381,5 +386,55 @@ describe('purses and the bar', () => {
     expect(s.events.some((e) => e.text === `${rejun.name} heard from ${haftra.name} that ${enbet.name} has been badmouthing them, and they were friends.`)).toBe(true);
     // told once: Haftra has nothing more to pass on about it
     expect(haftra.lately.some((m) => m.target === rejun.id)).toBe(false);
+  });
+});
+
+describe('temperament', () => {
+  it('warm people take more from a good moment, touchy ones more from a slight', () => {
+    const s = createState(7);
+    const [warm, touchy, o] = s.workers;
+    warm.temper = { warmth: 1.5, touchiness: 1, forgiveness: 1 };
+    touchy.temper = { warmth: 1, touchiness: 2, forgiveness: 1 };
+    set(warm, o, 0.4);
+    set(touchy, o, 0.4);
+    lessonWord(s, o, warm);
+    expect(feelOf(warm, o)).toBeCloseTo(0.4 + SOCIAL.lessonWord * 1.5, 6);
+    tookNotice(s, o, 5);
+    beatenTo(s, touchy, 5);
+    expect(feelOf(touchy, o)).toBeCloseTo(0.4 - SOCIAL.job.beatMe * 2, 6);
+  });
+
+  it('the forgiving get over a grudge faster; good feeling fades at the usual pace', () => {
+    const s = createState(7);
+    const [quick, slow, o] = s.workers;
+    quick.temper = { warmth: 1, touchiness: 1, forgiveness: 2 };
+    slow.temper = { warmth: 1, touchiness: 1, forgiveness: 0.5 };
+    for (const w of [quick, slow]) {
+      w.feelBase[o.id] = 0.5;
+      w.feel[o.id] = 0.1;
+    }
+    nextDawn(s);
+    expect(feelOf(quick, o)).toBeCloseTo(0.1 + 0.4 * SOCIAL.drift * 2, 6);
+    expect(feelOf(slow, o)).toBeCloseTo(0.1 + 0.4 * SOCIAL.drift * 0.5, 6);
+  });
+
+  it('temperaments vary, lean with traits, and only the extremes are named', () => {
+    const s = newColony(7);
+    const w = s.workers[0];
+    w.traits = ['cheerful'];
+    let warmer = 0;
+    const n = 400;
+    for (let i = 0; i < n; i++) {
+      const t = rollTemper(s, w);
+      w.traits = [];
+      const plain = rollTemper(s, w);
+      w.traits = ['cheerful'];
+      if (t.warmth > plain.warmth) warmer++;
+    }
+    expect(warmer / n).toBeGreaterThan(0.6);
+    w.temper = { warmth: 1.8, touchiness: 1, forgiveness: 0.5 };
+    expect(temperWords(w)).toEqual(['Warm-hearted', 'Holds grudges']);
+    w.temper = { warmth: 1.5, touchiness: 0.7, forgiveness: 1 };
+    expect(temperWords(w)).toEqual([]);
   });
 });

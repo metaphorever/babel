@@ -1,7 +1,7 @@
 import { addMoodlet, log } from './actions';
 import { rand, seedRng } from './rng';
 import { SOCIAL, TIME } from './tuning';
-import type { HabitId, PairLabel, SimState, SocialState, Tie, Worker } from './types';
+import type { HabitId, PairLabel, SimState, SocialState, Temperament, Tie, Worker } from './types';
 
 // Relationships. Every worker feels something about every other worker:
 // a number from 0 to 1, rolled when they're created and nudged by what
@@ -25,6 +25,33 @@ export function newSocial(seed: number): SocialState {
 
 export function rollMonogamy(s: SimState): number {
   return rand(s.social.rng) ** SOCIAL.monogamySkew;
+}
+
+/** A worker's temperament, rolled once (see SOCIAL.temper). */
+export function rollTemper(s: SimState, w: Worker): Temperament {
+  const r = s.social.rng;
+  const bell = () => (rand(r) + rand(r) + rand(r) - 1.5) * 2;
+  const t: Temperament = { warmth: 1, touchiness: 1, forgiveness: 1 };
+  for (const k of ['warmth', 'touchiness', 'forgiveness'] as const) {
+    t[k] = 2 ** (SOCIAL.temper.spread * bell());
+    for (const trait of w.traits) t[k] *= SOCIAL.temper.traits[trait]?.[k] ?? 1;
+  }
+  return t;
+}
+
+/** The temperament words the worker window shows: only the extremes. */
+export function temperWords(w: Worker): string[] {
+  const hi = SOCIAL.temper.shows;
+  const lo = 1 / hi;
+  const t = w.temper;
+  const out: string[] = [];
+  if (t.warmth >= hi) out.push('Warm-hearted');
+  if (t.warmth <= lo) out.push('Slow to warm');
+  if (t.touchiness >= hi) out.push('Thin-skinned');
+  if (t.touchiness <= lo) out.push('Thick-skinned');
+  if (t.forgiveness >= hi) out.push('Quick to forgive');
+  if (t.forgiveness <= lo) out.push('Holds grudges');
+  return out;
 }
 
 export const HABITS: HabitId[] = ['whistles', 'sings', 'stories', 'snores'];
@@ -69,8 +96,13 @@ export const feelingWatch: {
   capped: ((why: string, amount: number) => void) | null;
 } = { moved: null, capped: null };
 
-/** Nudge how a feels about b; why is what caused it (for the tuning tools). */
+/**
+ * Something happened that moves how a feels about b; why is what caused it
+ * (for the tuning tools). a's temperament scales it: warm people take more
+ * from a good moment, touchy ones more from a slight.
+ */
 export function nudge(a: Worker, b: Worker, by: number, why = 'other'): void {
+  if (why !== 'drift back') by *= by > 0 ? a.temper.warmth : a.temper.touchiness;
   const before = feelOf(a, b);
   a.feel[b.id] = clamp01(before + by);
   if (feelingWatch.moved && a.feel[b.id] !== before) feelingWatch.moved(a.id, b.id, why, a.feel[b.id] - before);
@@ -643,7 +675,9 @@ function dawn(s: SimState): void {
     for (const b of ws) {
       if (a === b) continue;
       const base = a.feelBase[b.id];
-      if (base !== undefined) nudge(a, b, (base - feelOf(a, b)) * SOCIAL.drift, 'drift back');
+      // a grudge fades at the pace of their forgiveness; good feeling fades at the usual pace
+      const gap = (base ?? 0) - feelOf(a, b);
+      if (base !== undefined) nudge(a, b, gap * SOCIAL.drift * (gap > 0 ? a.temper.forgiveness : 1), 'drift back');
     }
   }
 

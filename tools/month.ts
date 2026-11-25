@@ -88,6 +88,7 @@ interface Result {
   changes: number;
   flipBacks: number;
   drama: Record<string, number>;
+  people: Record<string, number>;
 }
 
 function stock(s: SimState) {
@@ -199,6 +200,32 @@ function runColony(seed: number, r: Result) {
   for (const a of ws) for (const b of ws) if (a !== b) (sum += feelOf(a, b)), n++;
   r.meanFeel += sum / n;
   r.meanMood += ws.reduce((m, w) => m + w.mood, 0) / ws.length;
+  // how differently workers end up: friends and foes each
+  const friendsOf = ws.map((a) => ws.filter((b) => b !== a && RANK[pairLabel(feelOf(a, b), feelOf(b, a))] >= 1).length);
+  const foesOf = ws.map((a) => ws.filter((b) => b !== a && RANK[pairLabel(feelOf(a, b), feelOf(b, a))] < 0).length);
+  const mean = friendsOf.reduce((x, y) => x + y, 0) / ws.length;
+  const add = (k: string, v: number) => (r.people[k] = (r.people[k] ?? 0) + v);
+  add('friends each (average)', mean);
+  add('friends each (spread, s.d.)', Math.sqrt(friendsOf.reduce((x, y) => x + (y - mean) ** 2, 0) / ws.length));
+  add('most friends anyone has', Math.max(...friendsOf));
+  add('workers with no friends', friendsOf.filter((x) => x === 0).length / ws.length);
+  add('workers with 3+ foes', foesOf.filter((x) => x >= 3).length / ws.length);
+  // does temperament show? the warmest third against the coolest, the touchiest against the thickest-skinned
+  const third = Math.max(1, Math.floor(ws.length / 3));
+  const by = (k: 'warmth' | 'touchiness' | 'forgiveness', of: number[]) => {
+    const order = ws.map((w, i) => ({ v: w.temper[k], n: of[i] })).sort((x, y) => y.v - x.v);
+    const avg = (xs: { n: number }[]) => xs.reduce((m, x) => m + x.n, 0) / xs.length;
+    return [avg(order.slice(0, third)), avg(order.slice(-third))];
+  };
+  const [warm, cool] = by('warmth', friendsOf);
+  const [touchy, thick] = by('touchiness', foesOf);
+  const [forgiving, grudging] = by('forgiveness', foesOf);
+  add('friends: warmest third', warm);
+  add('friends: coolest third', cool);
+  add('foes: touchiest third', touchy);
+  add('foes: thickest-skinned third', thick);
+  add('foes: most forgiving third', forgiving);
+  add('foes: most grudging third', grudging);
   const workerDays = SIZE * DAYS;
   r.econ['drinks a day'] = (r.econ['drinks a day'] ?? 0) + drinks / workerDays;
   r.econ['jobs a day'] = (r.econ['jobs a day'] ?? 0) + s.workers.reduce((m, w) => m + w.jobsDone, 0) / workerDays;
@@ -213,7 +240,7 @@ function runVariant(overrides: Override[]): Result {
     obj[key] = o.value;
     return () => (obj[key] = was);
   });
-  const r: Result = { labels: {}, meanFeel: 0, meanMood: 0, events: {}, econ: {}, moved: {}, capped: {}, credit: {}, changes: 0, flipBacks: 0, drama: {} };
+  const r: Result = { labels: {}, meanFeel: 0, meanMood: 0, events: {}, econ: {}, moved: {}, capped: {}, credit: {}, changes: 0, flipBacks: 0, drama: {}, people: {} };
   try {
     for (const seed of SEEDS) runColony(seed, r);
   } finally {
@@ -248,6 +275,11 @@ row('average feeling', (r) => (r.meanFeel / N).toFixed(3));
 row('average mood', (r) => (r.meanMood / N).toFixed(1));
 row('label changes a day', (r) => (r.changes / N / DAYS).toFixed(1));
 row('  of which flipped back', (r) => pct(r.flipBacks / Math.max(1, r.changes)));
+
+header(`How differently workers end up (day ${DAYS})`);
+for (const k of ['friends each (average)', 'friends each (spread, s.d.)', 'most friends anyone has']) row(k, (r) => ((r.people[k] ?? 0) / N).toFixed(1));
+for (const k of ['workers with no friends', 'workers with 3+ foes']) row(k, (r) => pct((r.people[k] ?? 0) / N));
+for (const k of ['friends: warmest third', 'friends: coolest third', 'foes: touchiest third', 'foes: thickest-skinned third', 'foes: most forgiving third', 'foes: most grudging third']) row(k, (r) => ((r.people[k] ?? 0) / N).toFixed(1));
 
 header(`Drama over ${DAYS} days`);
 for (const d of ['labels warmed', 'labels cooled', 'friendships formed', 'friendships ended', 'falling outs (once friends, now foes)', 'new enemies']) row(d, (r) => ((r.drama[d] ?? 0) / N).toFixed(1));

@@ -394,6 +394,11 @@ label {
   border-style: dotted;
 }
 
+.trait.temper {
+  border-style: dashed;
+  font-style: italic;
+}
+
 .lately .bad {
   font-weight: bold;
 }

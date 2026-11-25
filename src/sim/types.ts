@@ -326,6 +326,19 @@ export interface Worker {
   tastes: Record<HabitId, number>;
   /** Their latest social moments, newest first: what they'd gossip about. */
   lately: SocialMemory[];
+  /** How they take what happens between people. Hidden; the extremes show as words. */
+  temper: Temperament;
+}
+
+/**
+ * A worker's temperament: multipliers around 1. Warmth scales how much a
+ * good moment warms them; touchiness, how much a slight stings; forgiveness,
+ * how fast a grudge fades back toward how they first felt.
+ */
+export interface Temperament {
+  warmth: number;
+  touchiness: number;
+  forgiveness: number;
 }
 
 export type HabitId = 'whistles' | 'sings' | 'stories' | 'snores';
@@ -389,7 +402,7 @@ export interface GameEvent {
 export type StartMode = 'opening' | 'prebuilt';
 
 export interface SimState {
-  version: 11;
+  version: 12;
   start: StartMode;
   seed: number;
   tick: number;
