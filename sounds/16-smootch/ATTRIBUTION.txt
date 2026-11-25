@@ -1,0 +1,20 @@
+16-bit Smooch - Clixsounds
+==========================
+Attribution rider - written 2026-11-25 from the readme files, embedded version/credit
+resources and download notes that shipped with the original archives.
+Converted to WAV from the original classic Mac sound files; audio otherwise unaltered.
+
+Credit:   "16-bit Smooch" alert sound (c) 1999 Clixsounds - www.clixsounds.com
+Creator:  Clixsounds (Jeff Click), Oklahoma, USA. Free alert sound from the Audion /
+          Hystereo era; embedded credit reads "Alert Sound (c) 1999, Clixsounds".
+
+Original terms (from the Clixsounds instructions document):
+  "This sound file was created by CLIXSOUNDS. It is to be used only for their described
+  intent. If you wish to use it for any purpose other than their intent, you must obtain
+  permission from Clixsounds. This file may be distributed freely only in its original
+  form, with this document. It may be used on CD-ROM and Shareware packages."
+  -> Intended use = Mac alert / system sound. Other uses (video, games, products) would
+     technically need permission. Clixsounds appears long defunct.
+
+Suggested credit line:
+  "16-bit Smooch" (c) 1999 Clixsounds (clixsounds.com)

@@ -1,0 +1,16 @@
+Mac System Sounds - Apple Computer
+==================================
+Attribution rider - written 2026-11-25 from the readme files, embedded version/credit
+resources and download notes that shipped with the original archives.
+Converted to WAV from the original classic Mac sound files; audio otherwise unaltered.
+
+Credit:   Apple Computer, Inc. - classic Mac OS alert sounds.
+Origin:   Sosumi dates from System 7. Glass, Purr and Submarine were added in Mac OS 9.
+          Indigo, Quack, Wild Eep, Droplet and the rest are other System 7 - Mac OS 9 era
+          alert sounds. This folder held them already converted to WAV (with no
+          extension), so whoever converted them is unknown.
+Terms:    Apple copyright, shipped with the Mac OS. Widely shared as nostalgia; not
+          formally licensed for reuse outside a Mac.
+
+Suggested credit line:
+  "Classic Mac OS alert sounds - Apple Computer, Inc."

@@ -1,0 +1,60 @@
+FREESOUND HORSES & DONKEY - SOURCES AND LICENSES
+Downloaded 2026-11-25 as Freesound 128 kbps MP3 previews; converted to 16-bit WAV.
+Licenses checked on each sound's Freesound page on 2026-11-25.
+
+== RESTRICTED - NOT public domain ==
+
+Donkey bray [CC BY-NC 4.0 - credit acclivity, non-commercial only].wav
+  Original: "Donkey.wav" by acclivity, recorded Morocco, Feb 2006
+  Source:   https://freesound.org/s/16933  (file 16933_37876-hq.mp3)
+  License:  Creative Commons Attribution-NonCommercial 4.0 (CC BY-NC 4.0)
+            https://creativecommons.org/licenses/by-nc/4.0/
+  Terms:    - You MUST credit the author wherever you use it.
+            - NO commercial use.
+  Credit line to use:
+    "Donkey.wav" by acclivity (https://freesound.org/s/16933), licensed CC BY-NC 4.0
+
+== PUBLIC DOMAIN (CC0) - no credit required, commercial use OK ==
+All by craigsmith (Craig Smith). Hollywood optical/mag effects from the 1930s-60s,
+transferred by USC Cinema and released by him as CC0 for preservation.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Classic horse whinny.wav
+  Original: S01-07_Classic horse whinny.wav
+  Source:   https://freesound.org/s/675418  (file 675418_2524442-hq.mp3)
+
+Horse whinnies.wav
+  Original: G38-07-Horse Whinnies.wav
+  Source:   https://freesound.org/s/437100  (file 437100_2524442-hq.mp3)
+
+Horse whinny indoors.wav
+  Original: S01-04_Int horse whinny, some distortion.wav
+  Source:   https://freesound.org/s/675424  (file 675424_2524442-hq.mp3)
+
+Excited horse whinny.wav
+  Original: S01-06_Excited horse whinny; strange squealing; some distortion.wav
+  Source:   https://freesound.org/s/675419  (file 675419_2524442-hq.mp3)
+
+Four horse snorts.wav
+  Original: G38-16-Four Horse Snorts.wav
+  Source:   https://freesound.org/s/437111  (file 437111_2524442-hq.mp3)
+
+Horse breath and snort.wav
+  Original: R13-33-Horse Breath and Snort.wav
+  Source:   https://freesound.org/s/479705  (file 479705_2524442-hq.mp3)
+
+Horse walking on cobblestones.wav
+  Original: G38 Vintage Horses - horse walking on pavement/cobblestones (first 12.8 s of projector noise trimmed)
+  Source:   https://freesound.org/s/437103  (file 437103_2524442-hq.mp3)
+
+Horse slow walk on stone.wav
+  Original: R13-29-Horse with Slow Pace on Stone.wav
+  Source:   https://freesound.org/s/479701  (file 479701_2524442-hq.mp3)
+
+Horse trots in stable.wav
+  Original: S15-16 Horse trots in stable; movement in background.wav
+  Source:   https://freesound.org/s/675423  (file 675423_2524442-hq.mp3)
+
+Horse trots in on hard dirt.wav
+  Original: S01-01_Horse trots in on hard dirt; stops; trotting out.wav
+  Source:   https://freesound.org/s/675422  (file 675422_2524442-hq.mp3)

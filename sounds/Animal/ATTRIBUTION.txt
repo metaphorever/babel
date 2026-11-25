@@ -1,0 +1,20 @@
+Animal sound collection
+=======================
+Attribution rider - written 2026-11-25 from the readme files, embedded version/credit
+resources and download notes that shipped with the original archives.
+Converted to WAV from the original classic Mac sound files; audio otherwise unaltered.
+
+Credit:   UNKNOWN. The Animal-Sounds.sit archive contained no readme, author name or
+          copyright notice.
+
+What the files themselves reveal (editing tools only, not authors):
+  - Many AIFFs were saved with SoundEdit 16 v2 (Macromedia).
+  - American Robin, Mourning Dove, Large monkey growing: Sound Designer II files.
+  - Common Loon: "Converted by SndConverter Pro 2.0" (D. Lambert's conversion utility).
+  - toucan singing: saved with "SoundEffects" (Alberto Ricci's editor).
+These look like 1990s clips gathered from multimedia/sound-effect CD-ROMs, possibly
+professional nature-recording libraries, but there is no way to confirm the source.
+
+Suggested credit line:
+  "Animal sound effects - 1990s Macintosh sound archive, original author unknown"
+https://mac-classic.com/downloads/system-sounds
