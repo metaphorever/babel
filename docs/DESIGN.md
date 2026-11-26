@@ -866,6 +866,7 @@ A popup message when something needs the player's attention, with a little sound
   - Demolitions go with their kind: buildings with "build buildings" or "build camp", fixtures with "build fixtures".
 - **Planning ahead in the tower:** fixtures can be planned on any level up to the highest one with a blueprint started, and a ladder on any level with a level started above it. They wait until their level (for a ladder, the level it climbs to) is finished, then "build fixtures in tower" builds them. The ladder tutorial step and its hints say "build fixtures in tower" now.
 - **The time words** became dawn / noon / dusk / midnight quarters (§15.16).
+- **Fixtures come in whole blocks** (the user, with the third art delivery): a block is two tiles (16 pixels), every fixture is at least one block wide, and ladders and shelves are two blocks tall. **Ladders are two tiles wide now**, in the tower and in two-story houses.
 - **Shorter names:** "Brewing station" is now **Brewery**, "Storage shelves" just **Shelves**.
 - **Windows:**
   - **Scriptorium:** wider (520), the composer on top, and only the writing queue under it, scrolling past two entries. Presets are one "Start from…" menu. A haul line's from and to sit on an indented row under it: still one line of the order (the 8-line limit counts lines of the order, not rows on the page). The summary is one line; the details are on hover (ⓘ).

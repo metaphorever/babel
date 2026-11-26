@@ -22,12 +22,13 @@ const SHOTS = join(process.cwd(), 'art-src', 'shots');
 
 /** Screenshots of whole sheets, by page name. */
 export const SHEET_SHOTS: Record<string, string> = {
-  'Babel World': 'world-clover.png',
-  'Babel Buildings': 'clover-buildings.png',
+  'Babel World': 'world-clover-horse-ladder.png',
+  'Babel Buildings': 'clover-buildings-final.png',
 };
 
 /** Sheet slots that a screenshot leaves alone or draws over by accident: keep the built-in art. */
-export const KEEP_BUILT_IN = ['sky.cloud', 'sky.sun', 'sky.moon', 'nature.wagon', 'terrain.dirt-top'];
+// (tree and crop: the horse is drawn over their boxes; the forest and field set pieces replaced them anyway)
+export const KEEP_BUILT_IN = ['sky.cloud', 'sky.sun', 'sky.moon', 'nature.wagon', 'terrain.dirt-top', 'tower.ladder', 'nature.tree', 'nature.crop'];
 
 export interface Loose {
   name: string;
@@ -44,12 +45,18 @@ export const LOOSE: Loose[] = [
   { name: 'nature.forest', file: 'clover-forest.png' },
   { name: 'nature.field', file: 'clover-field.png' },
   // drawn just right of its box (the box itself is unchanged)
-  { name: 'terrain.dirt-top', file: 'world-clover.png', rect: [32, 49, 8, 8], opaque: true },
+  { name: 'terrain.dirt-top', file: 'world-clover-horse-ladder.png', rect: [32, 49, 8, 8], opaque: true },
   // Stunt Copter's wagon (after Duane Blehm), two frames of a walk cycle
-  { name: 'nature.wagon', file: 'world-clover.png', rect: [146, 147, 70, 22] },
-  { name: 'nature.wagon-step', file: 'world-clover.png', rect: [224, 147, 70, 22] },
-  { name: 'sky.sun', file: 'world-clover.png', rect: [2, 188, 46, 45], maskDx: 58 },
-  { name: 'sky.moon', file: 'world-clover.png', rect: [116, 187, 40, 44], maskDx: 48 },
+  { name: 'nature.wagon', file: 'world-clover-horse-ladder.png', rect: [146, 147, 70, 22] },
+  { name: 'nature.wagon-step', file: 'world-clover-horse-ladder.png', rect: [224, 147, 70, 22] },
+  // third delivery (2026-11-25): the ladder is a full block, 16x16, drawn over its old 8x8 box (the box wasn't moved,
+  // so nothing below it on the sheet shifts); the wagon has no driver now (the game draws a worker there)
+  { name: 'tower.ladder', file: 'world-clover-horse-ladder.png', rect: [233, 49, 16, 16], maskDx: 20 },
+  // a free horse, two walking frames, for later (not used in the game yet)
+  { name: 'nature.horse', file: 'world-clover-horse-ladder.png', rect: [70, 82, 25, 19] },
+  { name: 'nature.horse-step', file: 'world-clover-horse-ladder.png', rect: [103, 82, 25, 19] },
+  { name: 'sky.sun', file: 'world-clover-horse-ladder.png', rect: [2, 188, 46, 45], maskDx: 58 },
+  { name: 'sky.moon', file: 'world-clover-horse-ladder.png', rect: [116, 187, 40, 44], maskDx: 48 },
 ];
 
 const cache = new Map<string, ReturnType<typeof decodePngBits>>();

@@ -15,6 +15,13 @@ const NATURE_ART = { home: 'nature.sign-home', forest: 'nature.forest', field: '
 const BOARD_NOTICES: [number, number, number, number][] = [[2, 4, 6, 7], [9, 4, 6, 7], [2, 13, 6, 3], [9, 13, 6, 3]];
 /** The supply wagon's bed in its art: where it starts, how wide, the row of its top rail, and the most items piled per good. */
 const WAGON_BED = { x: 1, w: 32, rail: 11, most: 10 };
+/**
+ * Whoever drives the wagon: an ordinary worker for now (the trader gets a
+ * sprite of their own later). They stand 1 pixel below the bed's top rail,
+ * centered on this column of the wagon art, and only what's above the rail
+ * shows, so the cart hides their legs. The look is just a fixed face.
+ */
+const WAGON_DRIVER = { x: 37, railRow: 10, look: 11 };
 /** The gaps between each pair of columns in the scriptorium's art (rows from its top), where the writing queue stacks up. */
 const SCRIPTORIUM_GAPS = [{ x: 6, top: 6, bottom: 27 }, { x: 37, top: 6, bottom: 27 }] as const;
 const SCRIPTORIUM_GAP_W = 5;
@@ -207,7 +214,16 @@ export class Renderer {
           if (!s.tower || x < s.tower.x0 || x > s.tower.x1) continue;
           name = 'tower.deck';
         } else if (t === Tile.Wall) name = 'tower.wall';
-        else name = 'tower.ladder';
+        else {
+          // a ladder is two tiles wide, drawn from one 16x16 picture: which half and which half-height this tile shows
+          const spr = worldSprite('tower.ladder');
+          let run = 0;
+          while (x - run - 1 >= 0 && s.tiles[y * s.width + x - run - 1] === Tile.Ladder) run++;
+          const hx = spr.width > TILE ? (run % 2) * TILE : 0;
+          const hy = spr.height > TILE ? (y % 2) * TILE : 0;
+          this.g.drawImage(spr, hx, hy, TILE, TILE, px, py, TILE, TILE);
+          continue;
+        }
         this.g.drawImage(worldSprite(name), px, py);
       }
     }
@@ -405,8 +421,9 @@ export class Renderer {
         // a tower ladder: once built it's ladder tiles in the world; until then, its shape fills in as it's built
         if (!site.build && !site.demolish) break;
         const rows = TOWER.floorHeight;
+        const spr = worldSprite('tower.ladder');
         withProgress(rows * TILE, () => {
-          for (let r = 0; r < rows; r++) this.g.drawImage(worldSprite('tower.ladder'), left, base - (r + 1) * TILE);
+          for (let y = 0; y < rows * TILE; y += spr.height) this.g.drawImage(spr, left, base - y - spr.height);
         });
         break;
       }
@@ -603,6 +620,11 @@ export class Renderer {
         }
       });
     }
+    // the driver, behind the cart's side
+    const d = workerSprite(WAGON_DRIVER.look, 0, 1, false);
+    const feet = top + WAGON_DRIVER.railRow + 1;
+    const shown = d.canvas.height - (feet + 1 - (top + WAGON_DRIVER.railRow));
+    this.g.drawImage(d.canvas, 0, 0, d.canvas.width, shown, x + WAGON_DRIVER.x - d.anchorX, feet + 1 - d.canvas.height, d.canvas.width, shown);
     this.g.drawImage(spr, x, top);
   }
 

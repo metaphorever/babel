@@ -158,7 +158,7 @@ export function footprint(s: SimState, req: PlaceRequest): Footprint {
       const x = x0 + i;
       const taken = s.sites.some((f) => f.buildingId === b.id && f.y === fp.y && x >= f.x0 && x <= f.x1);
       // the ladder up a two-story building runs up its left end
-      const ladder = b.stories === 2 && x === b.x0;
+      const ladder = b.stories === 2 && x < b.x0 + LADDER_WIDTH;
       fp.blocked[i] = taken || ladder;
     }
     // a building still being built can have its fixtures planned: they wait until it's up
@@ -497,7 +497,7 @@ function pleasePatron(s: SimState, units: number): void {
 /** A finished tower ladder: from its room up through a hole in the deck above. */
 function layLadder(s: SimState, site: Site): void {
   const r = ladderRows(site.level);
-  for (let y = r.top; y <= r.bottom; y++) setTile(s, site.x0, y, Tile.Ladder);
+  for (let x = site.x0; x <= site.x1; x++) for (let y = r.top; y <= r.bottom; y++) setTile(s, x, y, Tile.Ladder);
 }
 
 /**
@@ -506,7 +506,7 @@ function layLadder(s: SimState, site: Site): void {
  */
 function removeLadder(s: SimState, site: Site): void {
   const r = ladderRows(site.level);
-  for (let y = r.top; y <= r.bottom; y++) if (tileAt(s, site.x0, y) === Tile.Ladder) setTile(s, site.x0, y, y === r.top ? Tile.Deck : Tile.Air);
+  for (let x = site.x0; x <= site.x1; x++) for (let y = r.top; y <= r.bottom; y++) if (tileAt(s, x, y) === Tile.Ladder) setTile(s, x, y, y === r.top ? Tile.Deck : Tile.Air);
   const down = { x: site.x0, y: site.y };
   for (const w of s.workers) {
     if (w.y >= site.y || findPath(s, { x: w.x, y: w.y }, { x: down.x, y: down.y }) !== null) continue;
@@ -518,11 +518,14 @@ function removeLadder(s: SimState, site: Site): void {
   }
 }
 
+/** How wide a ladder is: a full block, two tiles, like every fixture. */
+export const LADDER_WIDTH = 2;
+
 /** The second story's floor: a deck across the building with a ladder up its left end. */
 function layUpperFloor(s: SimState, b: Building): void {
   const deck = houseDeckRow();
   for (let x = b.x0; x <= b.x1; x++) setTile(s, x, deck, Tile.Deck);
-  for (let y = deck; y <= groundRow(); y++) setTile(s, b.x0, y, Tile.Ladder);
+  for (let x = b.x0; x < b.x0 + LADDER_WIDTH; x++) for (let y = deck; y <= groundRow(); y++) setTile(s, x, y, Tile.Ladder);
 }
 
 function finishDemolition(s: SimState, j: Job): void {
@@ -551,7 +554,7 @@ function finishDemolition(s: SimState, j: Job): void {
 function clearUpperFloor(s: SimState, b: Building): void {
   const deck = houseDeckRow();
   for (let x = b.x0; x <= b.x1; x++) setTile(s, x, deck, Tile.Air);
-  for (let y = deck; y <= groundRow(); y++) if (tileAt(s, b.x0, y) === Tile.Ladder) setTile(s, b.x0, y, Tile.Air);
+  for (let x = b.x0; x < b.x0 + LADDER_WIDTH; x++) for (let y = deck; y <= groundRow(); y++) if (tileAt(s, x, y) === Tile.Ladder) setTile(s, x, y, Tile.Air);
   const inside = (x: number, y: number) => x >= b.x0 && x <= b.x1 && y < groundRow() && y > storyRow(2);
   for (const w of s.workers) {
     if (!inside(w.x, w.y)) continue;

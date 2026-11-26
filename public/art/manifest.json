@@ -112,149 +112,149 @@
         "tower.ladder": [
           45,
           0,
-          8,
-          8
+          16,
+          16
         ],
         "nature.tree": [
-          54,
+          62,
           0,
           16,
           32
         ],
         "nature.crop": [
-          71,
+          79,
           0,
           8,
           8
         ],
         "nature.rock": [
-          80,
+          88,
           0,
           16,
           16
         ],
         "nature.well": [
-          97,
+          105,
           0,
           16,
           24
         ],
         "nature.shack": [
-          114,
+          122,
           0,
           32,
           24
         ],
         "nature.sign-home": [
-          147,
+          155,
           0,
           24,
           24
         ],
         "nature.wagon": [
-          172,
+          180,
           0,
           70,
           22
         ],
         "building.wall-left": [
-          243,
-          0,
-          8,
-          24
-        ],
-        "building.wall": [
           0,
           33,
           8,
           24
         ],
-        "building.wall-right": [
+        "building.wall": [
           9,
           33,
           8,
           24
         ],
-        "building.door": [
+        "building.wall-right": [
           18,
           33,
           8,
           24
         ],
-        "building.window": [
+        "building.door": [
           27,
           33,
           8,
           24
         ],
-        "building.roof-left": [
+        "building.window": [
           36,
           33,
           8,
-          6
+          24
         ],
-        "building.roof": [
+        "building.roof-left": [
           45,
           33,
           8,
           6
         ],
-        "building.roof-right": [
+        "building.roof": [
           54,
           33,
           8,
           6
         ],
-        "building.scriptorium": [
+        "building.roof-right": [
           63,
+          33,
+          8,
+          6
+        ],
+        "building.scriptorium": [
+          72,
           33,
           48,
           32
         ],
         "building.board": [
-          112,
+          121,
           33,
           16,
           24
         ],
         "fixture.bed": [
-          129,
+          138,
           33,
           16,
           6
         ],
         "fixture.oven": [
-          146,
+          155,
           33,
           16,
           16
         ],
         "fixture.oven-broken": [
-          163,
+          172,
           33,
           16,
           16
         ],
         "fixture.pantry": [
-          180,
+          189,
           33,
           16,
           16
         ],
         "fixture.brew": [
-          197,
+          206,
           33,
           16,
           16
         ],
         "fixture.bar": [
-          214,
+          223,
           33,
           16,
           16
         ],
         "fixture.table": [
-          231,
+          240,
           33,
           16,
           8
@@ -295,12 +295,6 @@
           24,
           32
         ],
-        "building.deck": [
-          180,
-          66,
-          8,
-          8
-        ],
         "nature.forest": [
           0,
           112,
@@ -318,6 +312,18 @@
           147,
           70,
           22
+        ],
+        "nature.horse": [
+          71,
+          147,
+          25,
+          19
+        ],
+        "nature.horse-step": [
+          97,
+          147,
+          25,
+          19
         ]
       }
     }

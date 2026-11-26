@@ -91,8 +91,8 @@ export const BUILD = {
     stockpile: { cost: { stone: 0, wood: 0 } },
     /** Shelves: indoors only (a building or a tower room), and they hold twice what a stockpile does. */
     shelves: { cost: { stone: 0, wood: 3 } },
-    /** A ladder: tower rooms only, one tile wide, from its room up through the deck above. */
-    ladder: { cost: { stone: 0, wood: 2 }, width: 1 },
+    /** A ladder: tower rooms only, a full block (two tiles) wide like every fixture, from its room up through the deck above. */
+    ladder: { cost: { stone: 0, wood: 2 } },
   } as Record<'bed' | 'oven' | 'pantry' | 'brewery' | 'bar' | 'stockpile' | 'shelves' | 'ladder', FixtureSpec>,
   /** How much a fixture holds. A stockpile holds the same anywhere; shelves hold twice as much. */
   capacity: { pantry: 20, bar: 12, stockpile: 24, shelves: 48 },
