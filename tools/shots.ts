@@ -59,6 +59,51 @@ export const LOOSE: Loose[] = [
   { name: 'sky.moon', file: 'world-clover-horse-ladder.png', rect: [116, 187, 40, 44], maskDx: 48 },
 ];
 
+/**
+ * Portraits: one Photoshop file of parts. Each layer named for its part
+ * (Body, Head, Beard, Nose, Eyes, Eyebrows, Mouth, Hair, Hat) inside any
+ * group is one variant of that part; the groups are only for the user's
+ * convenience. Layers outside groups (tracing references, a backdrop) are
+ * ignored.
+ */
+export const PORTRAIT_PSD = 'portraits-working-file-.psd';
+
+/**
+ * The portrait backgrounds: a screenshot of MacPaint's pattern palette. A
+ * grid of boxes, each with a 1-pixel black border and the 8x8 pattern
+ * repeating inside it. `dropped` are the ones the user ruled out
+ * (2026-11-25: they fight the outline's dither).
+ */
+export const PORTRAIT_PATTERNS = { file: 'macpaint-patterns.png', cols: 5, rows: 7, pitchX: 20, pitchY: 17, dropped: [2, 5, 10, 11, 12] };
+
+/** The kept patterns as 8x8 grids, numbered as on the palette (1 at the top left, by rows). */
+export function readPatterns(): { n: number; grid: Grid }[] {
+  const p = PORTRAIT_PATTERNS;
+  const s = shot(p.file);
+  const out: { n: number; grid: Grid }[] = [];
+  for (let r = 0; r < p.rows; r++) {
+    for (let c = 0; c < p.cols; c++) {
+      const n = r * p.cols + c + 1;
+      if (p.dropped.includes(n)) continue;
+      const x0 = c * p.pitchX + 1;
+      const y0 = r * p.pitchY + 1;
+      const at = (x: number, y: number) => s.bits[(y0 + y) * s.w + x0 + x];
+      const grid: string[] = [];
+      for (let y = 0; y < 8; y++) {
+        let line = '';
+        for (let x = 0; x < 8; x++) line += at(x, y) ? '1' : '0';
+        grid.push(line);
+      }
+      // it should repeat every 8 pixels across its whole box
+      let off = 0;
+      for (let y = 0; y < p.pitchY - 1; y++) for (let x = 0; x < p.pitchX - 1; x++) if (String(at(x, y)) !== grid[y % 8][x % 8]) off++;
+      if (off) console.warn(`  note     pattern ${n} doesn't repeat cleanly (${off} pixels)`);
+      out.push({ n, grid });
+    }
+  }
+  return out;
+}
+
 const cache = new Map<string, ReturnType<typeof decodePngBits>>();
 function shot(file: string) {
   let s = cache.get(file);

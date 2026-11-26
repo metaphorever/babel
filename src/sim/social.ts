@@ -246,6 +246,12 @@ function canAdopt(s: SimState, c: number, parents: number[], bio: boolean): bool
 /** Add parent ties; a parent's spouses become parents too, by marriage. */
 function addParents(s: SimState, c: number, parents: number[], bio: boolean): void {
   for (const p of parents) s.social.ties.push({ kind: 'parent', a: p, b: c, bio });
+  // a child by birth takes after their parents: their portrait is built partly from the parents' looks
+  const child = s.workers.find((w) => w.id === c);
+  if (bio && child) {
+    const looks = parents.map((p) => s.workers.find((w) => w.id === p)?.look).filter((l): l is number => l !== undefined);
+    child.parentLooks = [...(child.parentLooks ?? []), ...looks].slice(0, 2);
+  }
   for (const p of parents) for (const sp of spousesOf(s, p)) if (canAdopt(s, c, [sp], false)) s.social.ties.push({ kind: 'parent', a: sp, b: c, bio: false });
 }
 

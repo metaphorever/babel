@@ -33,6 +33,7 @@ import {
   type Worker,
 } from '../sim';
 import { HABIT_LABEL, relationsOf, temperWords } from '../sim/social';
+import { portraitCanvas } from '../render/sprites';
 import { bar, clear, h } from './dom';
 import { ScriptoriumPanel } from './scriptorium';
 import { TowerPanel } from './tower';
@@ -345,8 +346,7 @@ export class Ui {
       h(
         'div',
         { class: 'bio-head' },
-        // the portrait goes here once the portrait art settles
-        h('div', { class: 'portrait', 'aria-hidden': 'true' }),
+        this.portraitOf(w),
         h('div', { class: 'bio-side' }, traits, h('div', { class: 'thought', title: 'What you can see them doing. Body language needs no translation.' }, w.thought || '...')),
       ),
       this.saying(w),
@@ -392,6 +392,15 @@ export class Ui {
    * know it in. Words you can read in that language get a gloss; the rest
    * stay as they are. Mixed languages are the first sign of drift.
    */
+  /** Their portrait, or the empty frame while there's no portrait art. */
+  private portraitOf(w: Worker): HTMLElement {
+    const src = portraitCanvas(w.look, w.parentLooks);
+    if (!src) return h('div', { class: 'portrait', 'aria-hidden': 'true' });
+    const c = h('canvas', { class: 'portrait portrait-art', width: src.width, height: src.height, role: 'img', 'aria-label': 'Portrait of ' + w.name });
+    c.getContext('2d')!.drawImage(src, 0, 0);
+    return c;
+  }
+
   private saying(w: Worker): HTMLElement {
     const words = sayingFor(w);
     const line = h('div', { class: 'saying' }, h('span', { class: 'k' }, 'Says'));

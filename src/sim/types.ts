@@ -318,8 +318,10 @@ export interface Worker {
   noticeUntil: number | null;
   /** On their way home for good. */
   leaving: boolean;
-  /** Look seed for the procedural sprite later. */
+  /** Look seed: picks their sprite's parts and their portrait. */
   look: number;
+  /** A child by birth: their parents' look seeds, kept so the family likeness survives a parent leaving. */
+  parentLooks?: number[];
   /** How this worker feels about each other worker, by id: 0..1 (see SOCIAL in tuning). Hidden; the labels show. */
   feel: Record<number, number>;
   /** How they first felt about each (their natural chemistry): feelings drift back toward it. */

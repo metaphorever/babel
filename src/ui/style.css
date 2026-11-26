@@ -378,6 +378,11 @@ label {
   margin-bottom: 6px;
 }
 
+.portrait-art {
+  border: 1px solid var(--ink);
+  image-rendering: pixelated;
+}
+
 .bio-side {
   flex: 1;
   min-width: 0;

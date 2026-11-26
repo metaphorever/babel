@@ -1,4 +1,5 @@
-import { setArt, setNightSky, setWorldArt } from './sprites';
+import { setArt, setNightSky, setPortraitArt, setWorldArt } from './sprites';
+import { emptyPortraitArt, PORTRAIT_KINDS, type PortraitKind } from './portrait';
 import {
   CELL,
   GLYPH_NAMES,
@@ -31,6 +32,8 @@ interface Manifest {
   atlases?: { world?: { file: string; sprites: Record<string, [number, number, number, number]> } };
   /** The night sky picture, as wide as the map. */
   nightSky?: string;
+  /** Portrait parts (a row per kind, in kinds order) and the background patterns (8x8 grids). */
+  portraits?: { file: string; cell: [number, number]; kinds: string[]; patterns: string[][] };
 }
 
 async function loadPixels(url: string): Promise<ImageData> {
@@ -161,6 +164,22 @@ export async function loadArt(): Promise<void> {
       loaded.push(manifest.nightSky);
     } catch (e) {
       console.warn(`Babel art: couldn't load ${manifest.nightSky}; keeping the built-in stars.`, e);
+    }
+  }
+  if (manifest.portraits) {
+    const info = manifest.portraits;
+    try {
+      const px = await loadPixels(`art/${info.file}${bust}`);
+      loaded.push(info.file);
+      const rows = cells(px, info.cell[0], info.cell[1], stray);
+      const p = emptyPortraitArt();
+      info.kinds.forEach((k, i) => {
+        if ((PORTRAIT_KINDS as readonly string[]).includes(k)) p.parts[k as PortraitKind] = (rows[i] ?? []).filter((g) => !isEmpty(g));
+      });
+      p.patterns = info.patterns;
+      setPortraitArt(p);
+    } catch (e) {
+      console.warn(`Babel art: couldn't load ${info.file}; no portraits.`, e);
     }
   }
   console.info(`Babel art: loaded ${loaded.join(', ')}.`);

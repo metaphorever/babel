@@ -13,6 +13,7 @@ import {
   type Grid,
 } from './spriteData';
 import { allWorldArt, extraWorldArt } from './worldArt';
+import { composePortrait, emptyPortraitArt, hasPortraitArt, portraitRecipe, type PortraitArt } from './portrait';
 
 // Turns art (grids) into canvases, cached. The art starts as the built-in
 // placeholder set; loadArt() swaps in PNG sheets from public/art/ if they
@@ -28,6 +29,19 @@ export function setArt(next: ArtSet): void {
 
 export function currentArt(): ArtSet {
   return art;
+}
+
+let portraitArt: PortraitArt = emptyPortraitArt();
+
+export function setPortraitArt(next: PortraitArt): void {
+  portraitArt = next;
+  for (const k of [...cache.keys()]) if (k.startsWith('portrait:')) cache.delete(k);
+}
+
+/** A worker's 64x64 portrait, or null while there's no portrait art. */
+export function portraitCanvas(look: number, parentLooks: readonly number[] = []): HTMLCanvasElement | null {
+  if (!hasPortraitArt(portraitArt)) return null;
+  return cached(`portrait:${look}:${parentLooks.join(',')}`, () => composePortrait(portraitArt, portraitRecipe(portraitArt, look, parentLooks)));
 }
 
 function toCanvas(grid: Grid): HTMLCanvasElement {
