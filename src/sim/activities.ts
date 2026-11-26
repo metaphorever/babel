@@ -10,7 +10,7 @@ import { beatenTo, sharedJob, together, tookNotice, wokeBeside, workedBeside } f
 import type { ActivityKind, BuildMaterial, Carrier, FixtureKind, Item, ItemType, Notice, SimState, Site, SiteKind, SkillId, Worker } from './types';
 import { depotFor, findSite, nearest, siteOf, siteRef, sitesOf, sourceFor, spotFor, standable, stockpiles, storesAt, usable } from './world';
 import { activeProject, buildSpot, placeMaterial } from './tower';
-import { accepts, campJobs, campJobsFor, jobSpot, placeUnit, stillNeeded, undoUnit, type Job } from './build';
+import { accepts, buildScope, campJobs, jobsFor, jobSpot, placeUnit, scopeText, stillNeeded, undoUnit, type BuildScope, type Job } from './build';
 
 export type Result = 'running' | 'done' | 'failed';
 
@@ -265,7 +265,7 @@ function allDone(s: SimState, n: Notice): boolean {
 export function nothingToHaul(s: SimState, n: Notice): boolean {
   const o = parseOrder(n.order);
   // the tower and the camp are in plain sight: nothing planned, nothing to build
-  if (o.verb === 'BUILD') return o.noun === 'TOWER' ? activeProject(s) === null : campJobsFor(s, o.target).length === 0;
+  if (o.verb === 'BUILD') return o.noun === 'TOWER' ? activeProject(s) === null : jobsFor(s, buildScope(o.noun, o.target, o.within)).length === 0;
   if (o.verb === 'COOK' || o.verb === 'BREW') return !canProcess(s, PROCESS[o.verb]);
   if (o.verb !== 'HAUL') return false;
   if (o.noun === 'ANY') return !anythingToHaul(s, o.from, o.to, true);
@@ -396,7 +396,7 @@ export function workOrder(s: SimState, w: Worker, order: Order): Result {
     if (reading.guesses > 0 && orderText(reading.order) !== orderText(order)) log(s, `${w.name} read «${orderText(order)}» as "${orderText(reading.order)}".`, w.id);
     a.read = reading.order;
   }
-  const { verb, noun, from, to, target } = parseOrder(a.read);
+  const { verb, noun, from, to, target, within } = parseOrder(a.read);
   const prod = PRODUCE[verb];
   if (prod) return produceJob(s, w, verb as WorkVerb, prod.site, prod.ticks, prod.doing, nounItem(noun as Noun));
   if (verb === 'HAUL') {
@@ -411,7 +411,7 @@ export function workOrder(s: SimState, w: Worker, order: Order): Result {
     return haulJob(s, w, nounItem(noun as Noun), to);
   }
   if (verb === 'COOK' || verb === 'BREW') return processJob(s, w, PROCESS[verb]);
-  if (verb === 'BUILD') return noun === 'TOWER' ? buildJob(s, w) : campJob(s, w, target);
+  if (verb === 'BUILD') return noun === 'TOWER' ? buildJob(s, w) : campJob(s, w, buildScope(noun, target, within));
   return failWork(s, w, "I don't know how to do that.");
 }
 
@@ -477,7 +477,11 @@ function finishWork(s: SimState, w: Worker, units: number): Result {
 function failWork(s: SimState, w: Worker, why: string, empty: boolean | 'wait' = false): Result {
   if (empty === 'wait') {
     w.thought = `${why} I'll check again soon.`;
-    if (w.activity.kind === 'scroll' && w.held[0]) w.held[0].waitUntil = s.tick + SCRIBE.lineRetryTicks;
+    if (w.activity.kind === 'scroll' && w.held[0]) {
+      w.held[0].waitUntil = s.tick + SCRIBE.lineRetryTicks;
+      // things may have changed by the time they come back to it: look again
+      w.held[0].checked = false;
+    }
     // a notice's job is simply let go: the notice is still on the board for later
     else w.memory = null;
     return 'failed';
@@ -492,6 +496,7 @@ function failWork(s: SimState, w: Worker, why: string, empty: boolean | 'wait' =
     if (empty && c && n === FOREVER) {
       w.thought = `${why} I'll check again soon.`;
       c.waitUntil = s.tick + SCRIBE.lineRetryTicks;
+      c.checked = false;
       return 'failed';
     }
     return scrollLineFailed(s, w, why);
@@ -857,7 +862,7 @@ interface Process {
 
 const PROCESS: Record<'COOK' | 'BREW', Process> = {
   COOK: { station: 'oven', store: 'pantry', product: 'bread', ticks: WORK.cookTicks, per: WORK.breadPerGrain, doing: 'Baking bread.', stationName: 'oven', storeName: 'pantry' },
-  BREW: { station: 'brewery', store: 'bar', product: 'beer', ticks: ECONOMY.brewTicks, per: ECONOMY.beerPerGrain, doing: 'Brewing beer.', stationName: 'brewing station', storeName: 'bar' },
+  BREW: { station: 'brewery', store: 'bar', product: 'beer', ticks: ECONOMY.brewTicks, per: ECONOMY.beerPerGrain, doing: 'Brewing beer.', stationName: 'brewery', storeName: 'bar' },
 };
 
 /** Grain at the base, a working station, and somewhere to keep what comes out. */
@@ -874,7 +879,7 @@ function whyNotProcess(s: SimState, p: Process): string | null {
 
 /**
  * Bake bread or brew beer: fetch a grain from a stockpile, work it at the
- * oven (or brewing station), then carry what comes out to a pantry (or the
+ * oven (or brewery), then carry what comes out to a pantry (or the
  * bar). One grain makes a batch; a practiced cook gets an extra out of it.
  */
 function processJob(s: SimState, w: Worker, p: Process): Result {
@@ -984,12 +989,12 @@ function wanted(s: SimState, j: Job, m: BuildMaterial): number {
  * activity.ref counts units done, activity.timer holds the source while
  * fetching.
  */
-function campJob(s: SimState, w: Worker, target: Place | null): Result {
+function campJob(s: SimState, w: Worker, scope: BuildScope): Result {
   const a = w.activity;
   const current = () => (a.aim === null ? null : campJobs(s).find((j) => j.id === a.aim) ?? null);
   if (a.stage === 0) {
-    const jobs = campJobsFor(s, target);
-    if (jobs.length === 0) return failWork(s, w, target === null ? 'Nothing to build.' : `Nothing left to build at ${placeName(target)}.`, true);
+    const jobs = jobsFor(s, scope);
+    if (jobs.length === 0) return failWork(s, w, `Nothing to build ${scopeText(scope)}.`, true);
     a.ref = a.ref ?? 0;
     // already carrying something one of them needs: take it there
     const held = w.carrying === 'stone' || w.carrying === 'wood' ? w.carrying : null;
@@ -1090,7 +1095,7 @@ function campJob(s: SimState, w: Worker, target: Place | null): Result {
     }
     if (w.carrying) {
       // left over: keep it for the next job if anything wants it, else put it down here
-      const next = campJobsFor(s, w.activity.read ? parseOrder(w.activity.read).target : null).find((x) => !x.demolish && stillNeeded(x, w.carrying as BuildMaterial) > 0);
+      const next = jobsFor(s, scope).find((x) => !x.demolish && stillNeeded(x, w.carrying as BuildMaterial) > 0);
       if (next) {
         a.aim = next.id;
         a.stage = 2;

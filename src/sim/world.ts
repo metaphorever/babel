@@ -296,12 +296,18 @@ export function storesFor(s: SimState, type: ItemType): Site[] {
   return s.sites.filter((x) => usable(x) && (x.supplies ? x.store[type] > 0 || kinds.includes(x.kind) : kinds.includes(x.kind)));
 }
 
+/** Is this inside the tower's walls (any level, the Ground Level room included)? */
+export function inTowerSpan(s: SimState, x: { x0: number; x1: number }): boolean {
+  return !!s.tower && x.x1 >= s.tower.x0 && x.x0 <= s.tower.x1;
+}
+
 /** The stores of this good that an order's place means (null = all of them). Finished ones only. */
 export function storesAt(s: SimState, place: Place | null, type: ItemType): Site[] {
   const all = storesFor(s, type);
   if (place === null) return all;
   if (typeof place === 'number') return all.filter((x) => x.level === place);
   if (place === 'tower') return all.filter((x) => x.level > 0);
+  if (place === 'camp') return all.filter((x) => !inTowerSpan(s, x));
   if ('fixture' in place) return all.filter((x) => x.kind === FIXTURE_WORD_KIND[place.fixture] && x.num === place.n);
   const name = place.name.toLowerCase();
   return all.filter((x) => x.named && x.label.toLowerCase() === name);

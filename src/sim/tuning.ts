@@ -89,7 +89,7 @@ export const BUILD = {
     bar: { cost: { stone: 0, wood: 3 } },
     /** A stockpile is just marked-out ground (or floor): free, and ready at once. */
     stockpile: { cost: { stone: 0, wood: 0 } },
-    /** Storage shelves: indoors only (a building or a tower room), and they hold twice what a stockpile does. */
+    /** Shelves: indoors only (a building or a tower room), and they hold twice what a stockpile does. */
     shelves: { cost: { stone: 0, wood: 3 } },
     /** A ladder: tower rooms only, one tile wide, from its room up through the deck above. */
     ladder: { cost: { stone: 0, wood: 2 }, width: 1 },
@@ -109,10 +109,10 @@ export const FIXTURE_LABEL = {
   bed: 'Bed',
   oven: 'Oven',
   pantry: 'Pantry',
-  brewery: 'Brewing station',
+  brewery: 'Brewery',
   bar: 'Bar',
   stockpile: 'Stockpile',
-  shelves: 'Storage shelves',
+  shelves: 'Shelves',
   ladder: 'Ladder',
 } as const;
 
@@ -171,11 +171,29 @@ export const SCRIBE = {
   retryTicks: 600,
   /** After a failed line, the holder waits this long before going on. */
   lineRetryTicks: 300,
-  maxLines: 6,
+  /** IF and OTHERWISE take a line each, so a scroll with a branch in it needs the room. */
+  maxLines: 8,
   /** Hit this many unreadable lines on a scroll and the holder gives up on it. */
   giveUpAfter: 3,
   /** Extra pull of a scroll in hand over free time (it's an obligation). */
   duty: 8,
+};
+
+/** Conditions, WAIT and UNTIL (the logic words). */
+export const LOGIC = {
+  /**
+   * A store can be read from this many tiles away on the same level; any
+   * further and the worker walks over to look. State lives in the world:
+   * finding out costs a walk (flags, later, are the way round that).
+   */
+  lookRange: 6,
+  /** "Hungry" and "tired" mean at least this hungry or tired (the same point where they say so). */
+  hungryAt: 55,
+  tiredAt: 65,
+  /** The hour each time word starts. Each names the 6 hours that follow it: dawn is 6:00 to noon. */
+  timeOfDay: { DAWN: 6, NOON: 12, DUSK: 18, MIDNIGHT: 0 },
+  /** WAIT's count is in hours. */
+  waitMaxHours: 48,
 };
 
 export const DRIFT = {

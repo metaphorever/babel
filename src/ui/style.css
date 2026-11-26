@@ -586,6 +586,56 @@ p {
   min-width: 0;
 }
 
+/* the Help window's folded reference */
+details > summary {
+  cursor: pointer;
+  font-weight: bold;
+  margin-top: 4px;
+}
+
+.help-list {
+  margin: 2px 0 4px;
+  padding-left: 16px;
+  font-size: 11px;
+}
+
+/* a heading with its explanation on hover */
+.section-label.tip {
+  cursor: help;
+}
+
+/* the scribe's queue sits under the composer and scrolls past two entries */
+.queue-capped {
+  max-height: 84px;
+  overflow-y: auto;
+}
+
+.compose-top {
+  justify-content: space-between;
+}
+
+.compose-top .preset-select {
+  flex: 0 0 auto;
+  max-width: 150px;
+}
+
+.compose-summary[title]:not([title='']) {
+  cursor: help;
+}
+
+/* an UNTIL clause under its work line */
+.compose-sub {
+  padding-left: 20px;
+}
+
+.compose-line .cond-kind {
+  flex: 3;
+}
+
+.compose-line .cond-n {
+  width: 44px;
+}
+
 .line-no {
   width: 16px;
   text-align: right;

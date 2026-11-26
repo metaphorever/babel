@@ -162,6 +162,12 @@ export interface Carrier {
   waitUntil: number;
   /** A courier who couldn't hand it over waits until then to try again. */
   retryAfter: number;
+  /** Did the last IF (or run of IFs) hold? OTHERWISE runs its line only when it didn't. */
+  branch?: boolean;
+  /** The current line's UNTIL was checked, and didn't hold yet, since the last unit of work. */
+  checked?: boolean;
+  /** A WAIT line in progress: the tick it's over. */
+  waitEnd?: number;
 }
 
 /** A carrier the player has composed, waiting in the scriptorium to be written out. */

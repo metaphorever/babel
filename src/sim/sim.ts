@@ -108,7 +108,7 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
  * The prebuilt colony, laid out much as P0 had it: a kitchen (oven and
  * pantry), a bunkhouse with six beds, the scriptorium and board, two
  * stockpiles with the patron's gift, the tower site, and a bar with a
- * brewing station. Everything is finished from the start.
+ * brewery. Everything is finished from the start.
  */
 function prebuild(s: SimState): void {
   fixedMap(s);

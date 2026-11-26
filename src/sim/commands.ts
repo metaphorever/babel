@@ -1,11 +1,12 @@
 import { log } from './actions';
 import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCarrier, queueDesign } from './carriers';
-import { ALL, FOREVER, allowsAll, allowsForever, isSpecialCount, isStoreWord, isValidLine, langName, makeOrder, placeKey, placeName, FIXTURE_WORDS, FIXTURE_WORD_KIND, STORES_FOR, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
+import { ALL, FOREVER, GOODS, STATE_WORDS, allowsAll, allowsForever, condRule, isSpecialCount, isStoreWord, isWorkVerb, takesWithin, isValidLine, type Condition, langName, makeOrder, placeKey, placeName, FIXTURE_WORDS, FIXTURE_WORD_KIND, STORES_FOR, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
 
 function cap(t: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
-import { BUILD, ECONOMY, SCRIBE, TOWER } from './tuning';
+import { BUILD, ECONOMY, LOGIC, SCRIBE, TOWER } from './tuning';
+import { branchError } from './logic';
 import type { Dest, SimState } from './types';
 import { applyDemolish, applyPlace, applyRename, applyRenameFixture, validateDemolish, validatePlace, validateRename, validateRenameFixture, type DemolishTarget, type PlaceRequest } from './build';
 
@@ -27,7 +28,11 @@ export interface ComposeLine {
   to?: Place | null;
   /** One planned build to work on, in place of the object (BUILD only): a building, a fixture, or a tower level. */
   target?: Place | null;
-  /** Units to finish before moving to the next line (the notice count, for a notice). */
+  /** "build fixtures in …": the camp, the tower, a level, or a building by name. */
+  within?: Place | null;
+  /** IF's condition (required), WAIT's "until" (instead of a count of hours), or a work line's UNTIL clause. */
+  cond?: Condition | null;
+  /** Units to finish before moving to the next line (the notice count, for a notice; hours, for WAIT). */
   count: number;
 }
 
@@ -68,13 +73,35 @@ export function availableGold(s: SimState): number {
 
 /** Lines whose count means nothing (they're control words). */
 function countless(verb: Verb): boolean {
-  return verb === 'REPEAT' || verb === 'CHECK';
+  return verb === 'REPEAT' || verb === 'CHECK' || verb === 'IF' || verb === 'OTHERWISE';
+}
+
+/** What's wrong with a condition, if anything. Like places, stores that don't exist yet are fine. */
+function conditionError(c: Condition): string | null {
+  if (typeof c !== 'object' || c === null) return 'No such condition.';
+  if (c.kind === 'state') return STATE_WORDS.includes(c.state) && typeof c.not === 'boolean' ? null : 'No such condition.';
+  if (c.kind !== 'has') return 'No such condition.';
+  if (!GOODS.includes(c.noun)) return 'Check for which goods?';
+  if (c.cmp !== 'least' && c.cmp !== 'fewer' && c.cmp !== 'none') return 'No such comparison.';
+  if (c.cmp !== 'none' && (!Number.isInteger(c.n) || c.n < 1 || c.n > 999)) return 'Amounts must be 1 to 999.';
+  const p = c.place;
+  // one store, a store by name, or one tower level: somewhere a worker can go and look
+  if (p === 0 || p === 'tower' || p === 'camp') return 'Check one store, or one level of the tower.';
+  const bad = placeError(p);
+  if (bad) return bad;
+  if (typeof p === 'object' && 'fixture' in p) {
+    if (!isStoreWord(p.fixture)) return `${cap(placeName(p))} doesn't keep goods.`;
+    if (!(STORES_FOR[c.noun] as readonly string[]).includes(FIXTURE_WORD_KIND[p.fixture])) return `${cap(placeName(p))} doesn't keep ${c.noun.toLowerCase()}.`;
+  }
+  return null;
 }
 
 function buildCarrier(s: SimState, cmd: Extract<Command, { type: 'compose' }>, dryRun = false) {
   const lines = cmd.lines.map((l) => {
     const who = l.who !== undefined && l.who !== null ? { id: l.who, name: s.workers.find((w) => w.id === l.who)?.name ?? '?' } : null;
-    return { order: makeOrder(l.verb, l.noun, { from: l.from, to: l.to, who, target: l.target }, cmd.lang ?? 'en'), count: countless(l.verb) ? 1 : l.count };
+    // a WAIT UNTIL has no count of hours
+    const count = countless(l.verb) || (l.verb === 'WAIT' && l.cond) ? 1 : l.count;
+    return { order: makeOrder(l.verb, l.noun, { from: l.from, to: l.to, who, target: l.target, cond: l.cond ?? null, within: l.within ?? null }, cmd.lang ?? 'en'), count };
   });
   if (dryRun) {
     // a throwaway carrier for checking words; don't use up an id
@@ -89,7 +116,7 @@ function buildCarrier(s: SimState, cmd: Extract<Command, { type: 'compose' }>, d
 /** What's wrong with a place in an order, if anything. Places that don't exist (yet) are fine: the order just fails when it's carried out. */
 function placeError(p: Place): string | null {
   if (typeof p === 'number') return Number.isInteger(p) && p >= 0 && p <= TOWER.maxFloors ? null : 'No such level.';
-  if (p === 'tower') return null;
+  if (p === 'tower' || p === 'camp') return null;
   if (typeof p !== 'object' || p === null) return 'No such place.';
   if ('fixture' in p) return FIXTURE_WORDS.includes(p.fixture) && Number.isInteger(p.n) && p.n >= 1 && p.n <= 999 ? null : 'No such fixture.';
   return typeof p.name === 'string' && p.name.trim() !== '' && p.name.length <= BUILD.house.maxName ? null : 'No such name.';
@@ -105,6 +132,13 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
         if (!isValidLine(l.verb, l.noun, target)) return { ok: false, error: 'One of the lines makes no sense.' };
         const badTarget = target === null ? null : placeError(target);
         if (badTarget) return { ok: false, error: badTarget };
+        const cond = l.cond ?? null;
+        const rule = condRule(l.verb);
+        if (rule === 'must' && cond === null) return { ok: false, error: '"If" what? Choose something to check.' };
+        if (rule === 'never' && cond !== null) return { ok: false, error: `"${l.verb.toLowerCase()}" can't take an "until".` };
+        const badCond = cond === null ? null : conditionError(cond);
+        if (badCond) return { ok: false, error: badCond };
+        if (l.verb === 'WAIT' && cond === null && (!Number.isInteger(l.count) || l.count < 1 || l.count > LOGIC.waitMaxHours)) return { ok: false, error: `Wait from 1 to ${LOGIC.waitMaxHours} hours.` };
         if (l.count === ALL && !allowsAll(l.verb)) return { ok: false, error: `"All" doesn't work for ${l.verb.toLowerCase()}: it never runs out.` };
         if (l.count === FOREVER && !allowsForever(l.verb)) return { ok: false, error: `"Forever" doesn't work for ${l.verb.toLowerCase()}.` };
         if (!countless(l.verb) && !isSpecialCount(l.count) && (!Number.isInteger(l.count) || l.count < 1 || l.count > 999)) return { ok: false, error: 'Counts must be 1 to 999, all, or forever.' };
@@ -117,9 +151,19 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
         if (notStore) return { ok: false, error: `${cap(placeName(notStore))} doesn't keep goods.` };
         const wrong = places.find((p) => typeof p === 'object' && 'fixture' in p && l.noun && l.noun in STORES_FOR && !(STORES_FOR[l.noun as keyof typeof STORES_FOR] as readonly string[]).includes(FIXTURE_WORD_KIND[p.fixture]));
         if (wrong && l.noun) return { ok: false, error: `${placeName(wrong)} doesn't keep ${l.noun.toLowerCase()}.` };
+        if (places.includes('camp')) return { ok: false, error: 'Haul to or from a store, a level or the tower.' };
+        const within = l.within ?? null;
+        if (within !== null) {
+          if (!takesWithin(l.verb, l.noun)) return { ok: false, error: 'Only "build fixtures" takes an "in".' };
+          if (typeof within === 'object' && 'fixture' in within) return { ok: false, error: 'Build fixtures in the camp, the tower, a level or a building.' };
+          const badIn = placeError(within);
+          if (badIn) return { ok: false, error: badIn };
+        }
         if (l.from !== undefined && l.from !== null && placeKey(l.from) === placeKey(l.to ?? null)) return { ok: false, error: 'From and to are the same place.' };
       }
       if (cmd.lines[0].verb === 'REPEAT') return { ok: false, error: 'Repeat what? Put it after the lines to repeat.' };
+      const branching = branchError(cmd.lines.map((l) => l.verb));
+      if (branching) return { ok: false, error: branching };
       for (const l of cmd.lines) {
         if (takesWho(l.verb) && (l.who === undefined || l.who === null || !s.workers.some((w) => w.id === l.who))) return { ok: false, error: 'Teach or learn from whom?' };
       }
@@ -127,14 +171,15 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       const lang = cmd.lang ?? 'en';
       const lex = s.lexicon[lang] ?? [];
       for (const tok of buildCarrier(s, cmd, true).orders.flat()) {
-        if (tok.t !== 'WHO' && tok.t !== 'NAMED' && !lex.includes(tok.t)) return { ok: false, error: `You don't know how to write «${tok.t.toLowerCase()}» in ${langName(lang)} yet.` };
+        if (tok.t !== 'WHO' && tok.t !== 'NAMED' && tok.t !== 'NUM' && !lex.includes(tok.t)) return { ok: false, error: `You don't know how to write «${tok.t.toLowerCase()}» in ${langName(lang)} yet.` };
       }
       if (!Number.isInteger(cmd.wage) || cmd.wage < 0 || cmd.wage > 50) return { ok: false, error: 'Wage must be 0 to 50.' };
       if (cmd.dest.kind === 'tower') return { ok: false, error: 'Only blueprints go to the top of the tower.' };
       const who = cmd.dest.kind === 'board' ? cmd.dest.addressee : cmd.dest.workerId;
       if (who !== null && !s.workers.some((w) => w.id === who)) return { ok: false, error: 'Who is it for?' };
       // what it would promise up front (only notices do)
-      const promise = cmd.dest.kind === 'board' && cmd.lines.length === 1 && !['WRITE', 'DELIVER', 'REPEAT', 'CHECK', 'TEACH', 'LEARN'].includes(cmd.lines[0].verb) && !isSpecialCount(cmd.lines[0].count) ? cmd.lines[0].count * cmd.wage : 0;
+      const one = cmd.lines[0];
+      const promise = cmd.dest.kind === 'board' && cmd.lines.length === 1 && isWorkVerb(one.verb) && !one.cond && !isSpecialCount(one.count) ? one.count * cmd.wage : 0;
       if (promise > availableGold(s)) return { ok: false, error: `Needs ${promise} gold; only ${availableGold(s)} available.` };
       return { ok: true };
     }

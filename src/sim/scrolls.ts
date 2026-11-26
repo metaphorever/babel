@@ -1,10 +1,11 @@
-import { addMoodlet, log, moveTo, releaseReservations } from './actions';
+import { addMoodlet, log, moveTo, releaseReservations, settle } from './actions';
 import { startActivity, train, workOrder, type Result } from './activities';
 import { carrierText, hasWriteLine, lineText, pinCarrier, writingCost } from './carriers';
 import { addConfusion, knows, knowsWord } from './drift';
-import { ALL, DRIFTABLE, LANGS, isSpecialCount, isWorkVerb, langName, orderText, parseOrder, word, type LangId, type Order, type TokenId, type Verb } from './lang';
+import { ALL, DRIFTABLE, LANGS, conditionText, isSpecialCount, isWorkVerb, langName, orderText, parseOrder, splitUntil, word, type LangId, type Order, type TokenId, type Verb } from './lang';
+import { evalCondition, readCondition, statementEnd } from './logic';
 import { skillLevel } from './skills';
-import { LESSON, MOOD, SCRIBE } from './tuning';
+import { LESSON, MOOD, SCRIBE, TIME } from './tuning';
 import { startFloorFromBlueprint, topSpot } from './tower';
 import type { Carrier, SimState, Worker } from './types';
 import { findSite, spotFor } from './world';
@@ -31,6 +32,8 @@ export function giveCarrier(s: SimState, to: Worker, c: Carrier): void {
   c.pc = 0;
   c.lineDone = 0;
   c.waitUntil = 0;
+  resetLine(c);
+  c.branch = undefined;
   to.held = [c];
   to.memory = null;
   // a released courier leaves undelivered carriers at the scriptorium
@@ -50,6 +53,8 @@ export function runScroll(s: SimState, w: Worker): Result {
   if (c.pc >= c.orders.length) return endCarrier(s, w, c);
   const line = c.orders[c.pc];
   const verb = line[0].t as Verb;
+  // IF and OTHERWISE have their own rules for a word they can't read
+  if (verb === 'IF' || verb === 'OTHERWISE') return branchLine(s, w, c, line);
   // a line they can't read is skipped; work lines are read word by word in workOrder
   if (!isWorkVerb(verb) && !knows(w, line[0])) {
     addConfusion(w, { order: null, guesses: 0 });
@@ -60,7 +65,8 @@ export function runScroll(s: SimState, w: Worker): Result {
       // a scroll that is only REPEAT would spin forever
       if (c.pc === 0) return endCarrier(s, w, c);
       c.pc = 0;
-      c.lineDone = 0;
+      resetLine(c);
+      c.branch = undefined;
       c.loops++;
       startActivity(w, 'scroll');
       return 'running';
@@ -77,9 +83,145 @@ export function runScroll(s: SimState, w: Worker): Result {
     case 'TEACH':
     case 'LEARN':
       return lessonLine(s, w, c, verb);
+    case 'WAIT':
+      return waitLine(s, w, c, line);
     default:
-      return workOrder(s, w, line);
+      return untilThenWork(s, w, c, line);
   }
+}
+
+/** Starting a line afresh: nothing done on it, nothing checked, no wait under way. */
+function resetLine(c: Carrier): void {
+  c.lineDone = 0;
+  c.checked = false;
+  c.waitEnd = undefined;
+}
+
+/** Carry on from line `pc` (or finish, past the end). */
+function jumpTo(s: SimState, w: Worker, c: Carrier, pc: number): Result {
+  c.pc = pc;
+  resetLine(c);
+  if (c.pc >= c.orders.length) return endCarrier(s, w, c);
+  startActivity(w, 'scroll');
+  return 'running';
+}
+
+/** Words on a line that couldn't be read. */
+function puzzled(w: Worker, line: Order, words = 1): void {
+  if (words > 0) addConfusion(w, { order: line, guesses: words });
+}
+
+/**
+ * IF: check the condition; if it holds, go on to the line it guards, and if
+ * not, skip that line (and any further IFs in a row: two IFs are an AND).
+ * OTHERWISE: the line after it runs only if the last IF didn't hold.
+ *
+ * Drift: an IF they can't read isn't seen as a condition at all, so they do
+ * the line anyway. An OTHERWISE they can't read is ignored, so both lines run.
+ */
+function branchLine(s: SimState, w: Worker, c: Carrier, line: Order): Result {
+  if (line[0].t === 'OTHERWISE') {
+    if (!knows(w, line[0])) {
+      puzzled(w, line);
+      return jumpTo(s, w, c, c.pc + 1);
+    }
+    return jumpTo(s, w, c, c.branch === false ? c.pc + 1 : statementEnd(c.orders, c.pc + 1) + 1);
+  }
+  let holds: boolean;
+  if (!knows(w, line[0])) {
+    puzzled(w, line);
+    holds = true;
+  } else {
+    const r = readCondition(w, line.slice(1));
+    puzzled(w, line, r.guesses);
+    if (r.cond === null) {
+      w.thought = "Couldn't make out what to check. I'll just do it.";
+      holds = true;
+    } else {
+      const v = evalCondition(s, w, r.cond);
+      if (v === 'looking') return 'running';
+      if (v === 'unreachable') {
+        w.thought = "Couldn't get over there to look.";
+        holds = false;
+      } else holds = v;
+    }
+  }
+  c.branch = holds;
+  return jumpTo(s, w, c, holds ? c.pc + 1 : statementEnd(c.orders, c.pc + 1) + 1);
+}
+
+/**
+ * WAIT: stand by, for a number of hours or until a condition holds. Waiting
+ * on a store means standing where you can see it. Needs still pull a waiting
+ * worker away (the clock keeps running while they eat).
+ * Drift: an UNTIL they can't read leaves a plain wait, for the line's count.
+ */
+function waitLine(s: SimState, w: Worker, c: Carrier, line: Order): Result {
+  if (settle(s, w)) return 'running';
+  const untilTok = line[1];
+  if (untilTok?.t === 'UNTIL' && knows(w, untilTok)) {
+    const r = readCondition(w, line.slice(2));
+    if (r.cond === null) {
+      puzzled(w, line, r.guesses);
+      w.thought = "Waiting until... something. I'll stop waiting.";
+      return scrollLineDone(s, w, 0, true);
+    }
+    const v = evalCondition(s, w, r.cond);
+    if (v === 'looking') return 'running';
+    if (v === 'unreachable') return scrollLineFailed(s, w, "Can't get where I'm meant to wait.");
+    if (v) {
+      w.thought = 'Done waiting.';
+      return scrollLineDone(s, w, 0, true);
+    }
+    w.thought = `Waiting until ${conditionText(r.cond)}.`;
+    return 'running';
+  }
+  if (c.waitEnd === undefined) {
+    if (untilTok?.t === 'UNTIL') puzzled(w, line);
+    c.waitEnd = s.tick + c.counts[c.pc] * hourTicks();
+  }
+  if (s.tick >= c.waitEnd) {
+    w.thought = 'Done waiting.';
+    return scrollLineDone(s, w, 0, true);
+  }
+  const left = Math.ceil((c.waitEnd - s.tick) / hourTicks());
+  w.thought = `Waiting, ${left} ${left === 1 ? 'hour' : 'hours'} to go.`;
+  return 'running';
+}
+
+export function hourTicks(): number {
+  return TIME.dayTicks / 24;
+}
+
+/**
+ * A work line with UNTIL: before each unit of work (and before the first),
+ * check whether the condition holds yet; once it does, the line is done.
+ * A count on the line still caps it. Checking a store can mean a walk.
+ * Drift: an UNTIL they can't read is dropped, so they work to the count; an
+ * UNTIL whose condition they can't make out counts as met, so they stop.
+ */
+function untilThenWork(s: SimState, w: Worker, c: Carrier, line: Order): Result {
+  const { action, until } = splitUntil(line);
+  if (until && !c.checked) {
+    const untilTok = line[action.length];
+    if (!knows(w, untilTok)) puzzled(w, line);
+    else {
+      const r = readCondition(w, until);
+      puzzled(w, line, r.guesses);
+      if (r.cond === null) {
+        w.thought = "Can't make out when to stop, so I'll call it done.";
+        return scrollLineDone(s, w, 0, true);
+      }
+      const v = evalCondition(s, w, r.cond);
+      if (v === 'looking') return 'running';
+      if (v === true) {
+        w.thought = `Done: ${conditionText(r.cond)}.`;
+        return scrollLineDone(s, w, 0, true);
+      }
+    }
+    c.checked = true;
+  }
+  return workOrder(s, w, action);
 }
 
 /**
@@ -101,10 +243,12 @@ export function scrollLineDone(s: SimState, w: Worker, units: number, finish = f
   }
   if (units > 0) w.jobsDone++;
   c.lineDone += units;
+  // the next unit starts with a fresh look at any UNTIL
+  if (units > 0) c.checked = false;
   const target = c.counts[c.pc];
   if (finish || (!isSpecialCount(target) && c.lineDone >= target)) {
     c.pc++;
-    c.lineDone = 0;
+    resetLine(c);
   }
   if (c.pc >= c.orders.length) return endCarrier(s, w, c);
   startActivity(w, 'scroll');
@@ -118,7 +262,7 @@ export function scrollLineFailed(s: SimState, w: Worker, why: string): Result {
   log(s, `${w.name} skipped "${lineText(c, c.pc)}": ${why}`, w.id);
   addMoodlet(s, w, 'failed', "Couldn't do a line on my scroll", MOOD.failedJob.value, MOOD.failedJob.ticks);
   c.pc++;
-  c.lineDone = 0;
+  resetLine(c);
   c.waitUntil = s.tick + SCRIBE.lineRetryTicks;
   if (c.pc >= c.orders.length) return endCarrier(s, w, c);
   return 'failed';

@@ -9,7 +9,6 @@ import {
   FOREVER,
   allowsAll,
   allowsForever,
-  countText,
   levelName,
   isSpecialCount,
   LANGS,
@@ -17,14 +16,21 @@ import {
   takesPlaces,
   takesWho,
   wordIn,
-  word,
   placeKey,
   placeName,
-  placeTokens,
   STORE_WORD,
   STORES_FOR,
   FIXTURE_WORD,
   takesTarget,
+  takesWithin,
+  condRule,
+  makeOrder,
+  orderLineText,
+  GOODS,
+  type Condition,
+  type Compare,
+  type Good,
+  type StateWord,
   type FixtureKind,
   type Place,
   type Site,
@@ -67,6 +73,10 @@ export interface DraftLine {
   who?: number | null;
   /** Building: one planned build (a building, a fixture, or a tower level) instead of the whole camp. */
   target?: Place | null;
+  /** IF's condition; WAIT's "until" (null: wait a number of hours); a work line's UNTIL (null: none). */
+  cond?: Condition | null;
+  /** "build fixtures in …": where (null: anywhere). */
+  within?: Place | null;
   count: number;
 }
 
@@ -99,7 +109,26 @@ const VERB_LABEL: Record<Verb, string> = {
   REPEAT: 'Repeat from the top',
   TEACH: 'Teach',
   LEARN: 'Learn from',
+  IF: 'If…',
+  OTHERWISE: 'Otherwise',
+  WAIT: 'Wait',
 };
+
+/** How each kind of condition reads in the composer, and the words it needs. */
+const COMPARE_LABEL: { cmp: Compare; text: string; words: TokenId[] }[] = [
+  { cmp: 'least', text: 'a store has at least…', words: ['HAS'] },
+  { cmp: 'fewer', text: 'a store has fewer than…', words: ['HAS', 'FEWER'] },
+  { cmp: 'none', text: 'a store has no…', words: ['HAS', 'NO'] },
+];
+const STATE_LABEL: { state: StateWord; yes: string; no: string }[] = [
+  { state: 'HUNGRY', yes: 'I’m hungry', no: 'I’m not hungry' },
+  { state: 'TIRED', yes: 'I’m tired', no: 'I’m not tired' },
+  { state: 'CARRYING', yes: 'I’m carrying something', no: 'my hands are empty' },
+  { state: 'DAWN', yes: 'dawn (6:00 to noon)', no: 'not dawn (outside 6:00 to noon)' },
+  { state: 'NOON', yes: 'noon (noon to 18:00)', no: 'not noon (outside noon to 18:00)' },
+  { state: 'DUSK', yes: 'dusk (18:00 to midnight)', no: 'not dusk (outside 18:00 to midnight)' },
+  { state: 'MIDNIGHT', yes: 'midnight (midnight to 6:00)', no: 'not midnight (outside midnight to 6:00)' },
+];
 
 /** What the second slot holds for each verb. Places (from/to) come with the tower. */
 function nounsFor(verb: Verb): readonly Noun[] {
@@ -109,6 +138,7 @@ function nounsFor(verb: Verb): readonly Noun[] {
 }
 
 const COUNT_HINT: Partial<Record<Verb, string>> = {
+  WAIT: 'hours',
   WRITE: 'designs',
   BUILD: 'materials',
   TEACH: 'words',
@@ -116,9 +146,12 @@ const COUNT_HINT: Partial<Record<Verb, string>> = {
   DELIVER: '',
 };
 
-function hasCount(verb: Verb): boolean {
+function hasCount(line: DraftLine): boolean {
+  const verb = line.verb;
   if (verb === 'TEACH' || verb === 'LEARN') return true;
-  return verb !== 'REPEAT' && verb !== 'CHECK' && verb !== 'DELIVER';
+  // waiting until something has no count of hours
+  if (verb === 'WAIT') return !line.cond;
+  return verb !== 'REPEAT' && verb !== 'CHECK' && verb !== 'DELIVER' && verb !== 'IF' && verb !== 'OTHERWISE';
 }
 
 const VERB_ORDER: Verb[] = [...new Set(SCROLL_LINES.map((l) => l.verb))];
@@ -165,6 +198,24 @@ const PRESETS: { label: string; lines: DraftLine[] }[] = [
     ],
   },
   {
+    label: 'Day shift',
+    lines: [
+      { verb: 'MINE', noun: 'STONE', from: null, to: null, cond: { kind: 'state', state: 'DUSK', not: false }, count: FOREVER },
+      { verb: 'WAIT', noun: null, from: null, to: null, cond: { kind: 'state', state: 'DAWN', not: false }, count: 1 },
+      { verb: 'REPEAT', noun: null, from: null, to: null, count: 1 },
+    ],
+  },
+  {
+    label: 'Keep a pantry stocked',
+    lines: [
+      { verb: 'IF', noun: null, from: null, to: null, cond: { kind: 'has', place: { fixture: 'PANTRY', n: 1 }, cmp: 'fewer', n: 10, noun: 'BREAD' }, count: 1 },
+      { verb: 'COOK', noun: 'BREAD', from: null, to: null, count: 2 },
+      { verb: 'OTHERWISE', noun: null, from: null, to: null, count: 1 },
+      { verb: 'HAUL', noun: 'ANY', from: null, to: null, count: ALL },
+      { verb: 'REPEAT', noun: null, from: null, to: null, count: 1 },
+    ],
+  },
+  {
     label: 'Release (check the board)',
     lines: [{ verb: 'CHECK', noun: 'BOARD', from: null, to: null, count: 1 }],
   },
@@ -178,7 +229,6 @@ const PRESETS: { label: string; lines: DraftLine[] }[] = [
  */
 export class ScriptoriumPanel {
   private queue: HTMLElement;
-  private transit: HTMLElement;
   private linesEl: HTMLElement;
   private lines: DraftLine[] = PRESETS[0].lines.map((l) => ({ ...l }));
   private wageIn: HTMLInputElement;
@@ -191,7 +241,6 @@ export class ScriptoriumPanel {
   private summary: HTMLElement;
   private error: HTMLElement;
   private whoCount = -1;
-  private bpError = h('span', { class: 'error', role: 'alert' });
   private langSel = h('select', { 'aria-label': 'Written in' });
   private preview = h('div', { class: 'compose-preview' });
   private lexSeen = -1;
@@ -200,9 +249,8 @@ export class ScriptoriumPanel {
     private wm: WindowManager,
     private sim: Sim,
   ) {
-    const win = wm.create('scriptorium', 'Scriptorium', 390, 34, 400);
-    this.queue = h('div', { class: 'notices' });
-    this.transit = h('div', { class: 'notices' });
+    const win = wm.create('scriptorium', 'Scriptorium', 390, 34, 520);
+    this.queue = h('div', { class: 'notices queue-capped' });
     this.linesEl = h('div', { class: 'compose-lines' });
     this.wageIn = h('input', { type: 'number', min: 0, max: 50, value: 2, 'aria-label': 'Wage per unit', oninput: () => this.updateSummary() });
     this.whoSel = h('select', { 'aria-label': 'Which worker', onchange: () => this.updateSummary() });
@@ -216,30 +264,22 @@ export class ScriptoriumPanel {
     }
     this.summary = h('div', { class: 'compose-summary' });
     this.error = h('div', { class: 'error', role: 'alert' });
-    const presets = h('div', { class: 'row presets' }, h('span', { class: 'hint' }, 'Start from:'));
-    for (const p of PRESETS) {
-      presets.append(h('button', { class: 'btn btn-small', onclick: () => this.usePreset(p.lines) }, p.label));
-    }
+    // presets as one menu: a row of buttons got too long
+    const presets = h('select', { 'aria-label': 'Start from a preset', class: 'preset-select' }, h('option', { value: '' }, 'Start from…'));
+    PRESETS.forEach((p, i) => presets.append(h('option', { value: String(i) }, p.label)));
+    presets.addEventListener('change', () => {
+      const p = PRESETS[Number(presets.value)];
+      if (p) this.usePreset(p.lines);
+      presets.value = '';
+    });
     win.body.append(
-      h('div', { class: 'section-label' }, 'Waiting to be written'),
-      this.queue,
-      h('div', { class: 'section-label' }, 'Written, on the way'),
-      this.transit,
-      h('div', { class: 'section-label' }, 'Blueprints'),
-      h(
-        'div',
-        { class: 'row' },
-        h('button', { class: 'btn', onclick: () => this.blueprint() }, 'Draw a blueprint for the next level'),
-        this.bpError,
-      ),
-      h('div', { class: 'hint' }, 'Someone with DELIVER carries it to the top of the tower; then builders can start.'),
-      h('div', { class: 'section-label' }, 'Compose'),
       modes,
       this.composeBox,
+      h('div', { class: 'section-label', title: 'Written out by a scribe in this order, then carried where they go. Once out in the world, they show in the Orders window.' }, 'Waiting to be written'),
+      this.queue,
     );
     this.composeBox.append(
-      this.banner,
-      presets,
+      h('div', { class: 'row compose-top' }, this.banner, presets),
       this.linesEl,
       h('div', { class: 'row' }, h('label', {}, 'Written in', this.langSel), h('label', {}, 'Wage', this.wageIn, 'g per unit')),
       this.preview,
@@ -318,10 +358,6 @@ export class ScriptoriumPanel {
     this.wm.show('scriptorium');
   }
 
-  private blueprint(): void {
-    const r = this.sim.enqueue({ type: 'blueprint', playerId: 0 });
-    this.bpError.textContent = r.ok ? '' : r.error;
-  }
 
   /**
    * Where a haul can come from or go to: nowhere in particular (lying
@@ -388,8 +424,6 @@ export class ScriptoriumPanel {
       const what = b.build ? (inside ? `${b.name}, and the ${inside} ${inside === 1 ? 'fixture' : 'fixtures'} planned in it` : b.name) : `what’s planned in ${b.name}`;
       opts.push({ key: placeKey({ name: b.name }), target: { name: b.name }, text: what, words: [] });
     }
-    const levels = [...new Set(planned.filter((x) => x.level > 0).map((x) => x.level))].sort((a, b) => a - b);
-    for (const k of levels) opts.push({ key: placeKey(k), target: k, text: `everything planned on ${levelName(k)}`, words: ['FLOOR'] });
     for (const x of planned) {
       const fw = FIXTURE_WORD[x.kind as FixtureKind];
       const target: Place = x.named ? { name: x.label } : { fixture: fw, n: x.num };
@@ -404,13 +438,50 @@ export class ScriptoriumPanel {
       .filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves' || x.kind === 'pantry' || x.kind === 'bar') && x.num > 0)
       .map((x) => `${x.id}:${x.label}:${x.build ? 0 : 1}`)
       .join('|');
-    return `${stores}#${this.buildTargets().map((o) => o.key + o.text).join('|')}`;
+    return `${stores}#${this.buildTargets().map((o) => o.key + o.text).join('|')}#${this.withinOptions().map((o) => o.key).join('|')}`;
   }
 
-  /** The "what" slot of a build line: the whole camp, the tower, or one planned build. */
+  /** Where "build fixtures" can be narrowed to: the camp, the tower, a tower level or a building with fixtures planned in it. */
+  private withinOptions(): { key: string; place: Place | null; text: string; words: TokenId[] }[] {
+    const s = this.s;
+    const planned = s.sites.filter((x) => x.build && x.kind in FIXTURE_WORD);
+    const opts: { key: string; place: Place | null; text: string; words: TokenId[] }[] = [
+      { key: '', place: null, text: 'anywhere', words: [] },
+      { key: placeKey('camp'), place: 'camp', text: 'in the camp', words: ['IN', 'CAMP'] },
+      { key: placeKey('tower'), place: 'tower', text: 'in the tower', words: ['IN', 'TOWER'] },
+    ];
+    const levels = [...new Set(planned.filter((x) => x.level > 0).map((x) => x.level))].sort((a, b) => a - b);
+    for (const k of levels) opts.push({ key: placeKey(k), place: k, text: `on ${levelName(k)}`, words: ['IN', 'FLOOR'] });
+    for (const b of s.buildings) {
+      if (b.kind === 'house' && planned.some((x) => x.buildingId === b.id)) opts.push({ key: placeKey({ name: b.name }), place: { name: b.name }, text: `in ${b.name}`, words: ['IN'] });
+    }
+    return opts;
+  }
+
+  private withinSelect(i: number, line: DraftLine): HTMLSelectElement {
+    const opts = this.withinOptions();
+    const current = line.within ?? null;
+    if (current !== null && !opts.some((o) => o.key === placeKey(current))) opts.push({ key: placeKey(current), place: current, text: `in ${placeName(current)} (nothing planned there now)`, words: [] });
+    const sel = h('select', { 'aria-label': `Line ${i + 1} where` });
+    for (const o of opts) sel.append(h('option', { value: o.key, disabled: o.words.some((t) => !this.canWrite(t)) && o.key !== placeKey(current) }, o.text));
+    sel.value = placeKey(current);
+    sel.addEventListener('change', () => {
+      line.within = opts.find((o) => o.key === sel.value)?.place ?? null;
+      this.updateSummary();
+    });
+    return sel;
+  }
+
+  /** The "what" slot of a build line: the camp, buildings, fixtures, the tower, or one planned build. */
   private buildSelect(i: number, line: DraftLine): HTMLSelectElement {
     const sel = h('select', { 'aria-label': `Line ${i + 1} what` });
-    for (const n of ['CAMP', 'TOWER'] as const) sel.append(h('option', { value: `N:${n}`, disabled: !this.canWrite(n) && n !== line.noun }, this.label(n === 'CAMP' ? 'camp (everything planned)' : 'tower', n)));
+    const what: Record<'CAMP' | 'BUILDINGS' | 'FIXTURES' | 'TOWER', string> = {
+      CAMP: 'camp (everything outside the tower)',
+      BUILDINGS: 'buildings',
+      FIXTURES: 'fixtures',
+      TOWER: 'tower (the level under way)',
+    };
+    for (const n of ['CAMP', 'BUILDINGS', 'FIXTURES', 'TOWER'] as const) sel.append(h('option', { value: `N:${n}`, disabled: !this.canWrite(n) && n !== line.noun }, this.label(what[n], n)));
     const targets = this.buildTargets();
     const current = line.target ?? null;
     if (current !== null && !targets.some((o) => o.key === placeKey(current))) targets.push({ key: placeKey(current), target: current, text: `${placeName(current)} (nothing planned there now)`, words: [] });
@@ -428,9 +499,99 @@ export class ScriptoriumPanel {
         line.noun = null;
         line.target = targets.find((o) => `P:${o.key}` === sel.value)?.target ?? null;
       }
-      this.updateSummary();
+      if (!takesWithin(line.verb, line.noun)) line.within = null;
+      // "fixtures" grows an "in…" slot
+      this.renderLines();
     });
     return sel;
+  }
+
+  /** A condition to start a new IF or UNTIL from: the first stockpile running low on stone. */
+  private defaultCond(): Condition {
+    return { kind: 'has', place: this.storePlaces('STONE')[0]?.place ?? { fixture: 'STOCKPILE', n: 1 }, cmp: 'fewer', n: 10, noun: 'STONE' };
+  }
+
+  /** Where a condition can look for a good: each store that keeps it, and each tower level with one. */
+  private storePlaces(noun: Good): { key: string; place: Place; text: string; words: TokenId[] }[] {
+    const stores = this.storesFor(noun);
+    const out: { key: string; place: Place; text: string; words: TokenId[] }[] = [];
+    for (const x of stores) {
+      const fw = STORE_WORD[x.kind as keyof typeof STORE_WORD];
+      const p: Place = x.named ? { name: x.label } : { fixture: fw, n: x.num };
+      out.push({ key: placeKey(p), place: p, text: siteTitle(this.s, x), words: x.named ? [] : [fw] });
+    }
+    const levels = [...new Set(stores.filter((x) => x.level > 0).map((x) => x.level))].sort((a, b) => a - b);
+    for (const k of levels) out.push({ key: placeKey(k), place: k, text: `${levelName(k)} (all its stores)`, words: ['FLOOR'] });
+    return out;
+  }
+
+  /**
+   * The slots of a condition: what kind of check, and for a store, which
+   * store, how many and of what. `noneLabel` offers "no condition" first
+   * (WAIT's plain count of hours).
+   */
+  private condSlots(i: number, line: DraftLine, noneLabel: string | null): { kind: HTMLElement; detail: HTMLElement[] } {
+    const c = line.cond ?? null;
+    const kindSel = h('select', { 'aria-label': `Line ${i + 1} condition`, class: 'cond-kind' });
+    if (noneLabel) kindSel.append(h('option', { value: '' }, noneLabel));
+    const group = (label: string) => h('optgroup', { label });
+    const until = line.verb === 'WAIT' ? group('until') : null;
+    const into = (el: HTMLElement) => (until ?? kindSel).append(el);
+    const writable = (words: TokenId[]) => words.every((t) => this.canWrite(t));
+    for (const o of COMPARE_LABEL) into(h('option', { value: o.cmp, disabled: !writable(o.words) && !(c?.kind === 'has' && c.cmp === o.cmp) }, o.text));
+    for (const o of STATE_LABEL) {
+      into(h('option', { value: `S:${o.state}`, disabled: !writable([o.state]) }, o.yes));
+      into(h('option', { value: `N:${o.state}`, disabled: !writable([o.state, 'NOT']) }, o.no));
+    }
+    if (until) kindSel.append(until);
+    kindSel.value = c === null ? '' : c.kind === 'has' ? c.cmp : `${c.not ? 'N' : 'S'}:${c.state}`;
+    kindSel.addEventListener('change', () => {
+      const v = kindSel.value;
+      if (v === '') line.cond = null;
+      else if (v.includes(':')) line.cond = { kind: 'state', state: v.slice(2) as StateWord, not: v.startsWith('N:') };
+      else {
+        const base = c?.kind === 'has' ? c : this.defaultCond();
+        if (base.kind === 'has') line.cond = { ...base, cmp: v as Compare, n: Math.max(1, base.n) };
+      }
+      this.renderLines();
+    });
+    const els: HTMLElement[] = [];
+    if (c?.kind !== 'has') return { kind: kindSel, detail: els };
+    // which store
+    const places = this.storePlaces(c.noun);
+    if (!places.some((o) => o.key === placeKey(c.place))) places.unshift({ key: placeKey(c.place), place: c.place, text: `${placeName(c.place)} (not there now)`, words: [] });
+    const placeSel = h('select', { 'aria-label': `Line ${i + 1} which store` });
+    for (const o of places) placeSel.append(h('option', { value: o.key, disabled: o.words.some((t) => !this.canWrite(t)) && o.key !== placeKey(c.place) }, o.text));
+    placeSel.value = placeKey(c.place);
+    placeSel.addEventListener('change', () => {
+      const o = places.find((x) => x.key === placeSel.value);
+      if (o) line.cond = { ...c, place: o.place };
+      this.updateSummary();
+    });
+    els.push(placeSel);
+    // how many
+    if (c.cmp !== 'none') {
+      const n = h('input', { type: 'number', min: 1, max: 999, value: c.n, class: 'cond-n', 'aria-label': `Line ${i + 1} how many` });
+      n.addEventListener('input', () => {
+        if (line.cond?.kind === 'has') line.cond = { ...line.cond, n: Math.max(1, Math.min(999, Math.floor(Number(n.value)) || 1)) };
+        this.updateSummary();
+      });
+      els.push(n);
+    }
+    // of what
+    const goodSel = h('select', { 'aria-label': `Line ${i + 1} of what` });
+    for (const g of GOODS) goodSel.append(h('option', { value: g, disabled: !this.canWrite(g) && g !== c.noun }, this.label(wordIn(g, 'en'), g)));
+    goodSel.value = c.noun;
+    goodSel.addEventListener('change', () => {
+      const noun = goodSel.value as Good;
+      // a store that doesn't keep the new good (bread isn't kept on a stockpile) gives way to one that does
+      const keeps = this.storePlaces(noun);
+      const place = keeps.some((o) => o.key === placeKey(c.place)) ? c.place : keeps[0]?.place ?? { fixture: STORE_WORD[STORES_FOR[noun][0]], n: 1 };
+      line.cond = { ...c, noun, place };
+      this.renderLines();
+    });
+    els.push(goodSel);
+    return { kind: kindSel, detail: els };
   }
 
   private usePreset(lines: DraftLine[]): void {
@@ -450,6 +611,8 @@ export class ScriptoriumPanel {
         line.from = null;
         line.to = null;
         line.target = null;
+        line.cond = line.verb === 'IF' ? this.defaultCond() : null;
+        if (line.verb === 'WAIT') line.count = 1;
         this.renderLines();
       });
       const nouns = nounsFor(line.verb);
@@ -482,11 +645,28 @@ export class ScriptoriumPanel {
         whoSel.addEventListener('change', () => ((line.who = Number(whoSel.value)), this.updateSummary()));
         placeEls.push(whoSel);
       }
-      if (takesPlaces(line.verb)) {
-        placeEls.push(this.placeSelect(i, 'from', line), this.placeSelect(i, 'to', line));
+      // where from and where to sit on their own indented row: they're still the same line of the order
+      const placeRow = takesPlaces(line.verb) ? h('div', { class: 'row compose-line compose-sub' }, this.placeSelect(i, 'from', line), this.placeSelect(i, 'to', line)) : null;
+      if (takesWithin(line.verb, line.noun)) placeEls.push(this.withinSelect(i, line));
+      // conditions: IF's, WAIT's "until", and an UNTIL under a work line
+      // (a store check's which / how many / of what goes on a row of its own underneath)
+      const subRows: HTMLElement[] = [];
+      const sub = (...els: HTMLElement[]) => subRows.push(h('div', { class: 'row compose-line compose-sub' }, ...els));
+      if (line.verb === 'IF' || line.verb === 'WAIT') {
+        const slots = this.condSlots(i, line, line.verb === 'WAIT' ? 'for a number of hours' : null);
+        placeEls.push(slots.kind);
+        if (slots.detail.length) sub(...slots.detail);
+      } else if (condRule(line.verb) === 'may' && line.cond) {
+        const slots = this.condSlots(i, line, null);
+        sub(
+          h('span', { class: 'slot-fixed' }, this.label('until', 'UNTIL')),
+          slots.kind,
+          h('button', { class: 'btn btn-small', title: 'Take the “until” off', onclick: () => ((line.cond = null), this.renderLines()) }, '×'),
+        );
+        if (slots.detail.length) sub(...slots.detail);
       }
       let countEl: HTMLElement = h('span', { class: 'slot-empty' });
-      if (hasCount(line.verb)) {
+      if (hasCount(line)) {
         // a number, or "all" (until it runs out) / "forever", where those make sense
         if (line.count === ALL && !allowsAll(line.verb)) line.count = 1;
         if (line.count === FOREVER && !allowsForever(line.verb)) line.count = 1;
@@ -513,11 +693,30 @@ export class ScriptoriumPanel {
           nounEl,
           ...placeEls,
           countEl,
+          condRule(line.verb) === 'may' && line.verb !== 'WAIT' && !line.cond
+            ? h(
+                'button',
+                {
+                  class: 'btn btn-small',
+                  title: 'Stop this line once something is true',
+                  disabled: !this.canWrite('UNTIL'),
+                  onclick: () => {
+                    line.cond = this.defaultCond();
+                    // "until" usually means "keep going until"
+                    if (!isSpecialCount(line.count)) line.count = allowsForever(line.verb) ? FOREVER : ALL;
+                    this.renderLines();
+                  },
+                },
+                '+ until',
+              )
+            : '',
           this.lines.length > 1
             ? h('button', { class: 'btn btn-small', title: 'Remove line', onclick: () => (this.lines.splice(i, 1), this.renderLines()) }, '×')
             : '',
         ),
       );
+      if (placeRow) this.linesEl.append(placeRow);
+      this.linesEl.append(...subRows);
     });
     if (this.lines.length < SCRIBE.maxLines) {
       this.linesEl.append(
@@ -563,33 +762,46 @@ export class ScriptoriumPanel {
     const wage = Math.floor(Number(this.wageIn.value)) || 0;
     const name = (id: number | null) => (id === null ? 'anyone' : this.s.workers.find((w) => w.id === id)?.name ?? '?');
     const first = this.lines[0];
-    const notice = d.kind === 'board' && this.lines.length === 1 && isWorkVerb(first.verb);
+    const notice = d.kind === 'board' && this.lines.length === 1 && isWorkVerb(first.verb) && !first.cond;
     const loops = this.lines.some((l) => l.verb === 'REPEAT');
+    // one short line says what it is; the details are on hover
     let text: string;
+    const more: string[] = [];
     if (notice) {
-      text = `A notice. ${d.addressee === null ? 'Anyone' : name(d.addressee)} can take one job at a time from it ${first.count === ALL ? 'until there is nothing left to do' : first.count === FOREVER ? 'forever' : `until ${first.count} are done`}.${isSpecialCount(first.count) ? ' Paid from the treasury as the work is done.' : ` Sets aside ${first.count * wage} gold now.`}`;
+      text = `A notice: one job at a time, ${first.count === ALL ? 'until there’s nothing left to do' : first.count === FOREVER ? 'forever' : `until ${first.count} are done`}.${isSpecialCount(first.count) ? '' : ` Sets aside ${first.count * wage} gold now.`}`;
+      more.push(`${d.addressee === null ? 'Anyone' : name(d.addressee)} can take a job from it; it stays up until it's used up.`);
     } else if (d.kind === 'board') {
-      text = `A ${this.lines.length > 1 ? 'scroll' : 'card'} on the board. The first ${d.addressee === null ? 'free worker' : name(d.addressee)} to read it takes it down and carries it out${loops ? ', looping until someone hands them something else' : ''}.`;
+      text = `A ${this.lines.length > 1 ? 'scroll' : 'card'}: the first ${d.addressee === null ? 'free worker' : name(d.addressee)} to read it takes it down${loops ? ' and loops it' : ''}.`;
     } else if (d.kind === 'worker') {
-      text = `Handed straight to ${name(d.workerId)}. It replaces whatever they're doing${loops ? ', and loops until they are handed something else' : ''}.`;
+      text = `Handed straight to ${name(d.workerId)}, replacing what they're doing${loops ? '; they loop it' : ''}.`;
     } else {
       text = 'A blueprint, carried to the top of the tower.';
     }
-    if (!notice && wage > 0) text += ` Paid from the treasury as the work is done.`;
-    if (this.lines.some((l) => takesWho(l.verb))) text += ' Lessons happen at the scriptorium: the student has to be on the ground to hear their name.';
-    if (this.lang !== 'en') text += ` Written in ${langName(this.lang)}: only workers who know these words can read it.`;
-    this.summary.textContent = text;
+    if (loops) more.push('A loop runs until they are handed something else.');
+    if (!notice || isSpecialCount(first.count)) more.push('Paid from the treasury as the work is done.');
+    if (this.lines.some((l) => takesWho(l.verb))) more.push('Lessons happen at the scriptorium: the student has to be on the ground to hear their name.');
+    if (this.lines.some((l) => l.cond?.kind === 'has')) more.push('To check a store, a worker has to go and look at it.');
+    if (this.lang !== 'en') more.push(`Written in ${langName(this.lang)}: only workers who know these words can read it.`);
+    this.summary.textContent = more.length ? `${text} ⓘ` : text;
+    this.summary.title = more.join(' ');
     // how it will actually read, word for word, in the chosen language
     const nameOf = (id: number | null | undefined) => this.s.workers.find((w) => w.id === id)?.name ?? '?';
     const lineWords = this.lines.map((l) => {
-      const words = [wordIn(l.verb, this.lang)];
-      if (takesWho(l.verb)) words.push(nameOf(l.who));
-      if (takesTarget(l.verb) && l.target) words.push(...placeTokens(l.target, this.lang).map(word));
-      else if (l.noun && l.verb !== 'CHECK') words.push(wordIn(l.noun, this.lang));
-      if (l.verb === 'CHECK') words.push(wordIn('BOARD', this.lang));
-      if (takesPlaces(l.verb) && l.from !== null) words.push(wordIn('FROM', this.lang), ...placeTokens(l.from, this.lang).map(word));
-      if (takesPlaces(l.verb) && l.to !== null) words.push(wordIn('TO', this.lang), ...placeTokens(l.to, this.lang).map(word));
-      return words.join(' ') + (hasCount(l.verb) && (l.count > 1 || isSpecialCount(l.count)) ? ` ×${countText(l.count)}` : '');
+      const who = takesWho(l.verb) && l.who !== undefined && l.who !== null ? { id: l.who, name: nameOf(l.who) } : null;
+      const order = makeOrder(
+        l.verb,
+        l.noun,
+        {
+          who,
+          from: takesPlaces(l.verb) ? l.from : null,
+          to: takesPlaces(l.verb) ? l.to : null,
+          target: takesTarget(l.verb) ? l.target ?? null : null,
+          cond: condRule(l.verb) === 'never' ? null : l.cond ?? null,
+          within: takesWithin(l.verb, l.noun) ? l.within ?? null : null,
+        },
+        this.lang,
+      );
+      return orderLineText(order, hasCount(l) ? l.count : 1);
     });
     this.preview.textContent = `«${lineWords.join(' → ')}»`;
   }
@@ -605,6 +817,8 @@ export class ScriptoriumPanel {
         from: takesPlaces(l.verb) ? l.from : null,
         to: takesPlaces(l.verb) ? l.to : null,
         target: takesTarget(l.verb) ? l.target ?? null : null,
+        cond: condRule(l.verb) === 'never' ? null : l.cond ?? null,
+        within: takesWithin(l.verb, l.noun) ? l.within ?? null : null,
         count: l.count,
       })),
       lang: this.lang,
@@ -644,26 +858,5 @@ export class ScriptoriumPanel {
         ),
       );
     }
-    clear(this.transit);
-    const rows: HTMLElement[] = [];
-    for (const w of s.workers) {
-      for (const c of w.bag) {
-        rows.push(
-          h(
-            'div',
-            { class: 'notice notice-pending' },
-            h('span', { class: 'notice-order' }, cap(carrierText(c))),
-            h('span', { class: 'notice-meta' }, `${w.name} is carrying it to ${destText(s, c.dest)}${c.retryAfter > s.tick ? ' (will try again soon)' : ''}`),
-          ),
-        );
-      }
-    }
-    for (const c of s.outbox) {
-      rows.push(
-        h('div', { class: 'notice notice-pending' }, h('span', { class: 'notice-order' }, cap(carrierText(c))), h('span', { class: 'notice-meta' }, `In the outbox, for ${destText(s, c.dest)}; waiting for someone who delivers`)),
-      );
-    }
-    if (rows.length === 0) rows.push(h('div', { class: 'hint' }, 'Nothing in anyone’s bag.'));
-    this.transit.append(...rows);
   }
 }

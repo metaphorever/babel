@@ -1,5 +1,5 @@
 import { log } from './actions';
-import { countText, isSpecialCount, isWorkVerb, makeOrder, orderText, type LangId, type Order } from './lang';
+import { ALL, countText, isSpecialCount, isWorkVerb, makeOrder, orderText, untilIndex, type LangId, type Order } from './lang';
 import { SCRIBE, TOWER } from './tuning';
 import type { Carrier, Design, Dest, Notice, SimState } from './types';
 
@@ -47,10 +47,12 @@ export function scribeLoop(s: SimState, dest: Dest, patron: boolean, lang: LangI
 
 /**
  * A one-line work card pinned on the board is a notice: it stays up, and
- * each reader takes one job from it until its count runs out.
+ * each reader takes one job from it until its count runs out. A card with an
+ * UNTIL on it isn't: one worker takes it down and carries it out, checking
+ * as they go.
  */
 export function isNoticeCard(c: Carrier): boolean {
-  return c.dest.kind === 'board' && c.orders.length === 1 && isWorkVerb(c.orders[0][0].t);
+  return c.dest.kind === 'board' && c.orders.length === 1 && isWorkVerb(c.orders[0][0].t) && untilIndex(c.orders[0]) < 0;
 }
 
 export function writingCost(c: Carrier): number {
@@ -93,14 +95,26 @@ export function pinCarrier(s: SimState, c: Carrier): void {
   else {
     c.pc = 0;
     c.lineDone = 0;
+    c.checked = false;
+    c.branch = undefined;
+    c.waitEnd = undefined;
     s.boardScrolls.push(c);
   }
 }
 
 export function lineText(c: Carrier, i: number): string {
-  const text = orderText(c.orders[i]);
-  const n = c.counts[i];
-  return isSpecialCount(n) || n > 1 ? `${text} ×${countText(n)}` : text;
+  return orderLineText(c.orders[i], c.counts[i]);
+}
+
+/** A line as written: its words, with the count after the work. */
+export function orderLineText(order: Order, n: number): string {
+  // the count goes with the work, before any UNTIL: "mine stone ×20 until night"
+  const at = untilIndex(order);
+  const work = at < 0 ? order : order.slice(0, at);
+  const rest = at < 0 ? '' : ` ${orderText(order.slice(at))}`;
+  // "forever, until..." reads as just "until..."
+  const showCount = at >= 0 ? n > 1 || n === ALL : isSpecialCount(n) || n > 1;
+  return `${orderText(work)}${showCount ? ` ×${countText(n)}` : ''}${rest}`;
 }
 
 export function carrierText(c: Carrier): string {

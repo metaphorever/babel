@@ -487,9 +487,9 @@ When both are finished:
 
 ### 15.5 Fixtures
 
-Fixtures are permanently fixed in place inside a building. The word covers amenities and tools: beds, ovens, pantries, brewing stations, bars, stockpiles, and later tables.
+Fixtures are permanently fixed in place inside a building. The word covers amenities and tools: beds, ovens, pantries, breweries, bars, stockpiles, and later tables.
 - **Ovens** bake bread; **pantries** store it (the pantry replaces P0's "larder").
-- **Drink:** grain is brewed into beer at a **brewing station** and stored at a **bar**, where workers drink. The bar is a fixture and takes over from P0's ready-made tavern. Workers still spend their wages there.
+- **Drink:** grain is brewed into beer at a **brewery** and stored at a **bar**, where workers drink. The bar is a fixture and takes over from P0's ready-made tavern. Workers still spend their wages there.
 - **Tables** (later) give extra mood when eating, drinking and socializing.
 - **Stockpiles** can go outside or inside buildings. Workers can only use resources that have been stored. Stockpiles inside buildings hold more. P0's stockpiles have no limit yet.
 
@@ -541,13 +541,13 @@ Fixtures are permanently fixed in place inside a building. The word covers ameni
 - **CAMP is a new noun:** `[BUILD] [CAMP]` works on everything planned on the ground (buildings, fixtures, the scriptorium and board), oldest plan first, and takes things down that are marked for demolition. `[BUILD] [TOWER]` is unchanged. *Why a word and not automatic:* the player can't touch anything; placing lays out the plan, and the labour still has to be ordered. Placing is the one direct action, the way a patron's architect would draw plans.
 - **Builders** take stone and wood from the nearest stockpile (or the supplies). *Changed in session 3:* if nothing is stored, they pick loose materials up off the ground instead, at a small mood cost (−3 for a minute, "had to pick wood up off the ground"). The camp can never stall for want of hauling, but they always prefer a store. Cooks and brewers do the same for grain. Each counts what others are already carrying, and when everything is on its way they take a short breather rather than give up.
 - **"Build camp ×all"** comes down once nothing planned is left, so new plans need new work. Players may prefer "forever" for a standing crew.
-- **Costs:** a generic building is 1 wood per tile per story. Scriptorium 6 wood + 4 stone; board 2 wood; bed 2 wood; oven 4 stone; pantry 2 wood; brewing station 2 wood + 1 stone; bar 3 wood. **A stockpile costs nothing and is ready at once:** it's marked-out ground. That also means stored goods can never be locked out by a lack of somewhere to store them.
+- **Costs:** a generic building is 1 wood per tile per story. Scriptorium 6 wood + 4 stone; board 2 wood; bed 2 wood; oven 4 stone; pantry 2 wood; brewery 2 wood + 1 stone; bar 3 wood. **A stockpile costs nothing and is ready at once:** it's marked-out ground. That also means stored goods can never be locked out by a lack of somewhere to store them.
 - **Building widths** are 3 to 16 tiles, chosen while placing (the − / + buttons, or [ and ]). Every fixture is 2 tiles wide.
 - **Two stories:** finishing a two-story building lays a deck across it and a ladder up its left end; fixtures can go upstairs (not over the ladder). Demolishing takes the deck out and brings anyone up there down.
 
 **Fixtures:**
 - **Ovens and pantries:** "cook bread" fetches a grain from a stockpile, bakes at the nearest oven and carries the bread to the nearest pantry with room. Pantries hold 20. Eating takes from the nearest pantry (or the supplies).
-- **Beer:** "brew beer" is the same at a brewing station, into a bar (holds 12). A worker with money and the mood for it buys a beer (5 gold), which lifts their mood and takes the edge off thirst. *Decided here: what workers pay at the bar goes back to the treasury,* since the bar is the colony's own. That's a change from P0's tavern, whose gold left the economy. It makes brewing worth doing; watch whether it makes gold too easy.
+- **Beer:** "brew beer" is the same at a brewery, into a bar (holds 12). A worker with money and the mood for it buys a beer (5 gold), which lifts their mood and takes the edge off thirst. *Decided here: what workers pay at the bar goes back to the treasury,* since the bar is the colony's own. That's a change from P0's tavern, whose gold left the economy. It makes brewing worth doing; watch whether it makes gold too easy.
 - **Beds:** one worker per bed, nearest free bed first. Otherwise they sleep rough.
 - **Stockpiles:** hold 24 anywhere (all goods together): a stockpile is just designated space. *Changed in session 3* (it was 24 outside, 48 inside). **Storage shelves** (3 wood, indoors only) hold 48; they are the way to store more. Haulers fill the nearest one with room (see §15.11 for naming a particular one). "From base" takes from the nearest base stockpile with that good. Tower floors no longer get an automatic stockpile (§15.12).
 - **The old shack's oven** is broken and can't be used.
@@ -754,7 +754,7 @@ A popup message when something needs the player's attention, with a little sound
 **Loops and waiting**
 - `REPEAT ×n` (the whole scroll n times).
 - `UNTIL <condition>`: "haul stone to Counter until it has 40". In a colony sim this is the loop people actually want.
-- `WAIT`, `WAIT UNTIL <condition>`, with time words `DAWN` and `NIGHT`.
+- `WAIT`, `WAIT UNTIL <condition>`, with time words `DAWN`, `NOON`, `DUSK` and `MIDNIGHT` (built: §15.16).
 
 **Flags (decided): state you can see from far away.**
 - A flagpole is a fixture: on the ground, on a tower level, wherever. A worker raises or lowers its flag with an order (`raise flag 2`, `lower flag 2`), which means walking there. `IF flag 2 is up` is a condition anyone who can see the pole can check.
@@ -802,14 +802,14 @@ A popup message when something needs the player's attention, with a little sound
 
 **Kept out (decided):** named variables, arithmetic, nesting, labels or GOTO, subroutines, and the full set of comparison and logic operators.
 
-**What happens when these words drift** (Claude's proposal, to decide before building):
+**What happens when these words drift** (built in session 6 as proposed; see §15.16):
 - An unreadable `IF`: the worker doesn't know the line has a condition, so they do it anyway.
 - An unreadable `NOT` is dropped, so they do the opposite.
 - An unreadable `OTHERWISE`: both branches run.
-- *Open:* are numerals universal, like names? Conditions put numbers inside sentences, so §14's question becomes real. Claude leans yes, so one drifted digit doesn't wreck an otherwise readable condition.
+- **Numerals are universal**, like names (built that way), so one drifted digit doesn't wreck an otherwise readable condition.
 
 **Still to decide**
-- **Checking a store means walking there?** Flags and bells already settle the principle (you check what you can see or hear). The proposal: a store can only be checked by going to it, or by standing at it.
+- ~~Checking a store means walking there?~~ *Built as proposed in session 6, for the user to confirm in playtests:* a store can be read from 6 tiles away on the same level (`LOGIC.lookRange`); any further and the worker walks over to look. Setting the range very high turns the walk off.
 - The exact ranges and costs of each size of bell and flag; whether night hides flags; whether walls block a flag from view (simplest: they don't).
 - Whether any bell pattern has a built-in meaning (say, a long peal means "everyone come down").
 - Standing orders on boards, modeled on the charter: "if pantry 1 has fewer than 10 bread, post cook bread ×10". Probably the most useful single piece, and what gives upper boards their job.
@@ -836,6 +836,53 @@ A popup message when something needs the player's attention, with a little sound
 - **A build target nobody can read** is dropped: the worker builds whatever's planned, like "build camp". Building names never drift.
 - **Fixtures in unfinished buildings:** they can be planned as soon as the building is. They wait until the building is up (as fixture jobs always did), then "build camp" or "build <the building>" builds them. Calling off the building calls them off too.
 
+### 15.16 Conditions, branches and waiting (session 6, 2026-11-25)
+
+*The first slice of §16.7: the logic words. Flags and bells come next; they need new fixtures, art and range circles.*
+
+- **New words** (all in the starting vocabulary for now; gradual unlocks come later): IF, OTHERWISE, WAIT, UNTIL, NOT, HAS, FEWER ("fewer than"), NO, and the states HUNGRY, TIRED, CARRYING, DAWN, NOON, DUSK, MIDNIGHT. French: *si, sinon, attendre, jusqu’à, pas, contient, moins de, aucun, affamé, fatigué, chargé, aube, midi, crépuscule, minuit*. Greek: *αν, αλλιώς, περίμενε, μέχρι, όχι, έχει, λιγότερα από, καθόλου, πεινασμένος, κουρασμένος, φορτωμένος, αυγή, μεσημέρι, σούρουπο, μεσάνυχτα*. Numbers are a token of their own (NUM) that never drifts.
+- **Conditions:**
+  - *A store's amount:* "stockpile 3 has 20 stone" (at least), "has fewer than 20 stone", "has no stone". The place is one store (by number or name) or one tower level (all its stores together). Not the base or "the tower": somewhere a worker can go and look. A store that doesn't exist holds nothing.
+  - *Yes/no:* hungry (55+), tired (65+), carrying something. **The time of day comes in quarters** (the user, for shifts): dawn is 6:00 to noon, noon to 18:00, dusk to midnight, midnight to 6:00. So "until dusk" ends a day shift and "wait until dawn" starts the next. *(First built as "night", meaning the sky at least half dark; renamed the same session, since it read like 18:00 and wasn't.)* NOT only goes in front of these; the three store comparisons already cover "not".
+- **IF** is its own line: the next line only runs if the condition holds. **Two IFs in a row are an AND.** **OTHERWISE** is its own line, right after the line an IF decided: the line after it runs only if that IF didn't hold. "Otherwise, if…" works as an else-if chain. No nesting. The composer rejects an IF with nothing after it and an OTHERWISE in the wrong place.
+- **UNTIL** goes on a work line ("mine stone until dusk", "haul stone to Counter until Counter has 40 stone"). The worker checks before each unit of work, and the line is done once it holds. A count still caps it: "×20 until dusk" stops at whichever comes first. Adding an UNTIL in the composer sets the count to ∞ (or "all"). A one-line card with an UNTIL isn't a notice: one worker takes it down and carries it out.
+- **WAIT** stands by for a number of hours (1 to 48), or "wait until…" a condition. Waiting on a store means standing where you can see it. Needs still pull a waiting worker away. Waiting and checking pay nothing.
+- **Checking a store costs a walk** unless it's within 6 tiles on the same level (see §16.7). Workers always know how they feel and can always see the sky.
+- **Drift:** an unreadable IF means no condition (they do the line); an unreadable OTHERWISE is ignored (both lines run); an unreadable NOT is dropped (the opposite). A condition with any other unreadable word counts as met: the IF line runs, the UNTIL stops, the WAIT ends. An unreadable UNTIL is dropped, so the line runs to its count, which for ∞ means forever. That's the sharpest edge; watch it in playtests.
+- **Scrolls hold 8 lines now** (was 6), since IF and OTHERWISE each take one.
+- **Composer:** "If…", "Otherwise" and "Wait" are verbs; a "+ until" button on each work line adds an "until" row. A store check's which / how many / of what sit on a row of their own. Two new presets: *Day shift* (mine until dusk, wait until dawn, repeat) and *Keep a pantry stocked* (if pantry 1 has fewer than 10 bread, cook bread ×2, otherwise haul anything, repeat).
+- **Code:** conditions are `Condition` in `lang.ts` (`condTokens` / `parseCondition`); reading, checking and branch layout are in `logic.ts`; running the lines is in `scrolls.ts` (`branchLine`, `waitLine`, `untilThenWork`). Tests: `tests/logic.test.ts`.
+
+### 15.17 Build orders by place, planning ahead, a tidier composer (session 6, later)
+
+*The user: "build tower" didn't build fixtures in the tower (only "build camp" did, left over from when fixtures were camp-only), and a ladder couldn't be planned until the level under it was finished. Their suggestion: separate orders for buildings, the tower, fixtures in the camp and fixtures in the tower.*
+
+- **Four build orders,** each covering its own place:
+  - **build camp:** everything planned outside the tower's walls (kept as the shortcut a new player writes first).
+  - **build buildings:** houses, the scriptorium and boards, not what goes in them.
+  - **build fixtures** (*installations*, *εγκαταστάσεις*), with **IN** (*dans*, *εντός*) to narrow it: "in camp", "in tower", "in level 4", "in Kitchen". No IN means every planned fixture. An IN nobody can read is dropped (every fixture).
+  - **build tower:** the level under way, nothing else.
+  - One planned build by name or number ("build Kitchen", "build ladder 1") is unchanged. "Everything planned on a level" moved to "build fixtures in level N".
+  - Demolitions go with their kind: buildings with "build buildings" or "build camp", fixtures with "build fixtures".
+- **Planning ahead in the tower:** fixtures can be planned on any level up to the highest one with a blueprint started, and a ladder on any level with a level started above it. They wait until their level (for a ladder, the level it climbs to) is finished, then "build fixtures in tower" builds them. The ladder tutorial step and its hints say "build fixtures in tower" now.
+- **The time words** became dawn / noon / dusk / midnight quarters (§15.16).
+- **Shorter names:** "Brewing station" is now **Brewery**, "Storage shelves" just **Shelves**.
+- **Windows:**
+  - **Scriptorium:** wider (520), the composer on top, and only the writing queue under it, scrolling past two entries. Presets are one "Start from…" menu. A haul line's from and to sit on an indented row under it: still one line of the order (the 8-line limit counts lines of the order, not rows on the page). The summary is one line; the details are on hover (ⓘ).
+  - **Orders** (was Job Board): everything out in the world: **On the board**, **On the way** (in a courier's bag or the outbox), and **In hand** (each worker's card or scroll and the line they're on; click to open their window). Ready for more boards and mailboxes later.
+  - **Build window:** a **The tower** section with "Draw a blueprint" (levels built and planned). Explanations moved into hover tips on the section headings. A "Write “build fixtures in tower”…" button sits beside "build camp".
+  - **Help:** two folded sections, "Building" and "Conditions and waiting", hold the reference that used to sit in the windows.
+
+### 16.8 Hauling equipment and USE (the user's notes, 2026-11-25)
+
+*From IDEAS_BRAINDUMP.md. Decided: carts and the like get a streamlined USE, and can also be hauled directly, as things to haul and as somewhere to haul from and to. Hitch/unhitch is skipped for now.*
+
+- **Ground:** wheelbarrow (small loads), cart (medium), horse-drawn wagon (large). **Up and down the tower:** a rope pulley (what one worker could carry, but faster), a human-powered winch (medium), a winch turned by a beast of burden (large).
+- **USE** is a clause in front of a line: "use cart 4 to haul all stone from stockpile 1 to stockpile 4". The worker fetches the cart, brings it to the source, loads up, and moves the bigger load at once. The long way still works without the word: haul cart to stockpile 1, haul stone from stockpile 1 to cart, haul cart to stockpile 2, haul stone from cart to stockpile 2.
+- **Carts are stores**, so conditions already reach them: "if cart 4 has 20 stone".
+- **Beasts of burden** need a stable, fed with wheat and water.
+- *Claude's notes:* UNTIL was built as a clause after the line (§15.16), so USE slots in the same way, as a clause before it. Watch for an abandoned full cart: a USE line that fails part-way should leave the cart somewhere sensible, not soft-lock its load.
+
 ## Glossary
 
 | Term | Meaning |
@@ -855,4 +902,4 @@ A popup message when something needs the player's attention, with a little sound
 | **Courier** | A worker carrying a bag of carriers to deliver. |
 | **Patron** | The funder. Their patience is the difficulty. |
 | **Camp** | Everything built on the ground (buildings and fixtures), as opposed to the tower. `[BUILD] [CAMP]` builds it. |
-| **Fixture** | Something fixed in place inside a building: bed, oven, pantry, brewing station, bar, stockpile, storage shelves. |
+| **Fixture** | Something fixed in place inside a building: bed, oven, pantry, brewery, bar, stockpile, shelves. |

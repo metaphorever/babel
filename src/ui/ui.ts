@@ -5,6 +5,7 @@ import {
   ALL,
   FOREVER,
   carrierText,
+  destText,
   clockText,
   isNight,
   currentStipend,
@@ -16,6 +17,7 @@ import {
   wordIn,
   CHARTER_TEXT,
   lineText,
+  isWorkVerb,
   workerName,
   bonusChance,
   carryCapacity,
@@ -60,7 +62,11 @@ export function formatTime(tick: number): string {
 /** One current job: the line of the scroll in hand, else the notice they took. */
 function currentJob(w: Worker): string {
   const c = w.held[0];
-  if (c && c.pc < c.orders.length) return `${cap(lineText(c, c.pc))} (from their ${c.kind}, ${c.wage}g each)`;
+  if (c && c.pc < c.orders.length) {
+    // only work lines pay; waiting and checking are free
+    const paid = isWorkVerb(c.orders[c.pc][0].t) && c.wage > 0;
+    return `${cap(lineText(c, c.pc))} (from their ${c.kind}${paid ? `, ${c.wage}g each` : ''})`;
+  }
   if (w.memory) return `${cap(orderText(w.memory.order))} (from a notice, ${w.memory.wage}g each)`;
   return '—';
 }
@@ -90,6 +96,8 @@ export class Ui {
   private clock!: HTMLElement;
   private speedBtns: HTMLButtonElement[] = [];
   private noticeList!: HTMLElement;
+  private wayList!: HTMLElement;
+  private handList!: HTMLElement;
   private charterEl!: HTMLElement;
   private debugOpen = true;
   /** Rebuilding panels mid-click would swallow the click, so wait. */
@@ -145,7 +153,7 @@ export class Ui {
       { class: 'menubar' },
       h('span', { class: 'menu-apple' }, 'Babel'),
       menu('Build', 'build'),
-      menu('Job Board', 'board'),
+      menu('Orders', 'board'),
       menu('Scriptorium', 'scriptorium'),
       menu('Tower', 'tower'),
       menu('Languages', 'languages'),
@@ -165,14 +173,26 @@ export class Ui {
 
   // ---------------------------------------------------------------- board
 
+  /**
+   * Orders: every order out in the world. What's posted on the board, what's
+   * on its way somewhere in a courier's bag (or waiting in the outbox), and
+   * the cards and scrolls workers are carrying out. What's still waiting to
+   * be written is in the Scriptorium.
+   */
   private buildBoard(): void {
-    const win = this.wm.create('board', 'Job Board', 16, 40, 360);
+    const win = this.wm.create('board', 'Orders', 16, 40, 380);
     this.noticeList = h('div', { class: 'notices' });
-    this.charterEl = h('div', { class: 'charter', title: "The patron's standing order. You can't write conditions like this yet." });
+    this.wayList = h('div', { class: 'notices' });
+    this.handList = h('div', { class: 'notices' });
+    this.charterEl = h('div', { class: 'charter', title: "The patron's standing order. You can't write standing orders like this yet." });
     win.body.append(
       this.charterEl,
-      h('div', { class: 'section-label' }, 'On the board'),
+      h('div', { class: 'section-label', title: 'A notice stays up and hands out one job at a time. A card or scroll hangs there until someone takes it down.' }, 'On the board'),
       this.noticeList,
+      h('div', { class: 'section-label', title: 'Written, and in a courier’s bag or the scriptorium’s outbox. Someone with DELIVER on their scroll carries them.' }, 'On the way'),
+      this.wayList,
+      h('div', { class: 'section-label', title: 'Cards and scrolls workers are carrying out, and the line each is on.' }, 'In hand'),
+      this.handList,
       h(
         'div',
         { class: 'row row-end' },
@@ -187,18 +207,6 @@ export class Ui {
     this.charterEl.append(h('div', { class: 'charter-title' }, "The patron's charter"), h('div', { class: 'charter-text' }, CHARTER_TEXT));
     clear(this.noticeList);
     const rows: HTMLElement[] = [];
-    // on its way: still in the writing queue or in a courier's bag
-    for (const d of s.designs) {
-      if (d.carrier.dest.kind !== 'board') continue;
-      const writer = s.workers.find((w) => w.id === d.claimedBy);
-      const status = writer ? `${writer.name} is writing it (${Math.floor((d.progress / d.cost) * 100)}%)` : 'Waiting for a scribe';
-      rows.push(h('div', { class: 'notice notice-pending' }, h('span', { class: 'notice-order' }, cap(carrierText(d.carrier))), h('span', { class: 'notice-meta' }, status)));
-    }
-    for (const w of s.workers) {
-      for (const c of w.bag) {
-        if (c.dest.kind === 'board') rows.push(h('div', { class: 'notice notice-pending' }, h('span', { class: 'notice-order' }, cap(carrierText(c))), h('span', { class: 'notice-meta' }, `${w.name} is bringing it`)));
-      }
-    }
     // cards and scrolls hanging on the board, waiting to be taken down
     for (const c of s.boardScrolls) {
       const to = c.dest.kind === 'board' ? workerName(s, c.dest.addressee) : '?';
@@ -226,6 +234,39 @@ export class Ui {
     }
     if (rows.length === 0) rows.push(h('div', { class: 'hint' }, 'The board is empty. Idle workers will do as they please.'));
     this.noticeList.append(...rows);
+    // on the way: in a courier's bag, or waiting in the outbox
+    clear(this.wayList);
+    const way: HTMLElement[] = [];
+    for (const w of s.workers) {
+      for (const c of w.bag) {
+        way.push(
+          h('div', { class: 'notice notice-pending' }, h('span', { class: 'notice-order' }, cap(carrierText(c))), h('span', { class: 'notice-meta' }, `${w.name} is taking it to ${destText(s, c.dest)}${c.retryAfter > s.tick ? ' (will try again soon)' : ''}`)),
+        );
+      }
+    }
+    for (const c of s.outbox) {
+      way.push(h('div', { class: 'notice notice-pending' }, h('span', { class: 'notice-order' }, cap(carrierText(c))), h('span', { class: 'notice-meta' }, `In the outbox, for ${destText(s, c.dest)}: waiting for someone who delivers`)));
+    }
+    if (way.length === 0) way.push(h('div', { class: 'hint' }, 'Nothing on its way.'));
+    this.wayList.append(...way);
+    // in hand: what each worker is carrying out
+    clear(this.handList);
+    const hand: HTMLElement[] = [];
+    for (const w of s.workers) {
+      const c = w.held[0];
+      if (!c) continue;
+      const at = c.pc < c.orders.length ? ` · on line ${c.pc + 1}: ${lineText(c, c.pc)}` : '';
+      hand.push(
+        h(
+          'div',
+          { class: 'notice notice-scroll', title: 'Open their window', onclick: () => this.select(w.id) },
+          h('span', { class: 'notice-order' }, cap(carrierText(c))),
+          h('span', { class: 'notice-meta' }, `${w.name}'s ${c.kind}${at}`),
+        ),
+      );
+    }
+    if (hand.length === 0) hand.push(h('div', { class: 'hint' }, 'Nobody is carrying out a card or scroll.'));
+    this.handList.append(...hand);
   }
 
   // ------------------------------------------------------------- inspector
@@ -460,7 +501,37 @@ export class Ui {
         h('li', {}, h('b', {}, 'B'), ' the Build window · ', h('b', {}, 'Esc'), ' stop placing · ', h('b', {}, '[ ]'), ' building width'),
         h('li', {}, h('b', {}, 'Space'), ' pause · ', h('b', {}, '1 2 3'), ' speed · ', h('b', {}, 'N'), ' show all names'),
       ),
-      h('p', { class: 'hint' }, `To build anything on the ground: place it from the Build window, then post “build camp” work. Fixtures (beds, ovens, pantries, the bar...) go inside buildings, and can be planned before the building is up. To build the tower: draw a blueprint (Tower window or Scriptorium), then post “build tower” work. Languages drift from ${levelName(DRIFT.lineFloor)} up (see the Languages window). Keep the patron pleased by finishing levels, and keep your workers fed or they’ll quit. Not in yet: mailboxes, upper job boards, COPY.`),
+      h('p', { class: 'hint' }, `Languages drift from ${levelName(DRIFT.lineFloor)} up (see the Languages window). Keep the patron pleased by finishing levels, and keep your workers fed or they’ll quit. Not in yet: mailboxes, upper job boards, COPY.`),
+      // the reference that used to be spread around the windows, folded away until wanted
+      h(
+        'details',
+        {},
+        h('summary', {}, 'Building'),
+        h(
+          'ul',
+          { class: 'help-list' },
+          h('li', {}, 'Place things from the Build window; placing only lays out the plan. Workers build it once you post build work.'),
+          h('li', {}, h('b', {}, 'build camp'), ': everything planned outside the tower.'),
+          h('li', {}, h('b', {}, 'build buildings'), ': the buildings only (not what goes in them).'),
+          h('li', {}, h('b', {}, 'build fixtures'), ': beds, ovens, stores, ladders… Add “in camp”, “in tower”, a level or a building to narrow it.'),
+          h('li', {}, h('b', {}, 'build tower'), ': the level under way. Draw a blueprint first (Build or Tower window); a courier carries it to the top.'),
+          h('li', {}, 'Fixtures can be planned before their building or tower level is finished. They wait until it’s up.'),
+        ),
+      ),
+      h(
+        'details',
+        {},
+        h('summary', {}, 'Conditions and waiting'),
+        h(
+          'ul',
+          { class: 'help-list' },
+          h('li', {}, h('b', {}, 'if'), ' … : the next line only runs if it holds. Two ifs in a row: both must hold. ', h('b', {}, 'otherwise'), ': the line after it runs if the if didn’t.'),
+          h('li', {}, h('b', {}, 'until'), ' … on a work line: stop once it holds (checked before each unit). ', h('b', {}, 'wait'), ': for some hours, or until something holds.'),
+          h('li', {}, 'A store: “has 20 stone”, “has fewer than 20”, “has no stone”. Checking one means walking over to look, unless it’s close by.'),
+          h('li', {}, 'The time: ', h('b', {}, 'dawn'), ' 6:00 to noon, ', h('b', {}, 'noon'), ' to 18:00, ', h('b', {}, 'dusk'), ' to midnight, ', h('b', {}, 'midnight'), ' to 6:00. “Mine until dusk, wait until dawn, repeat” is a day shift.'),
+          h('li', {}, 'Also: hungry, tired, carrying; and “not” in front of any of these.'),
+        ),
+      ),
     );
   }
 

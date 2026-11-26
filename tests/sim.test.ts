@@ -399,9 +399,9 @@ describe('the tower', () => {
     const up = { x: t.x0 + 8, y: groundRow() - TOWER.floorHeight };
     expect(stockpileOn(s, 1)).toBeNull();
     expect(findPath(s, { x: 60, y: groundRow() }, up)).toBeNull();
-    // a ladder on the tower's ground floor, built by "build camp" work, is the way up
+    // a ladder on the tower's ground floor, built by "build fixtures in tower" work, is the way up
     expect(applyCommand(s, placeCmd({ what: 'fixture', fixture: 'ladder', x0: t.x0 + 2, story: 0 })).ok).toBe(true);
-    pinNotice(s, makeOrder('BUILD', 'CAMP'), ALL, 1, null);
+    pinNotice(s, makeOrder('BUILD', 'FIXTURES', { within: 'tower' }), ALL, 1, null);
     s.sites.find((x) => x.kind === 'stockpile' && x.level === 0 && !x.supplies)!.store.wood += 5;
     const ladder = s.sites.find((x) => x.kind === 'ladder')!;
     expect(runUntil(s, () => ladder.build === null, 20 * 600)).toBe(true);
@@ -454,7 +454,7 @@ describe('the tower', () => {
     expect(levelName(0)).toBe('Tower Ground Level');
     expect(levelName(1)).toBe('Tower Level 2');
     expect(levelName(3, true)).toBe('Level 4');
-    expect(parseOrder(o)).toEqual({ verb: 'HAUL', noun: 'STONE', who: null, from: 0, to: 3, target: null });
+    expect(parseOrder(o)).toEqual({ verb: 'HAUL', noun: 'STONE', who: null, from: 0, to: 3, target: null, cond: null, within: null });
   });
 
   it('only hauling takes places', () => {

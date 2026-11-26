@@ -1,12 +1,12 @@
 import { log } from './actions';
 import { newCarrier, pinNotice, scribeLoop } from './carriers';
-import { ALL, FIXTURE_WORD_KIND, floorName, levelName, makeOrder, type Noun, type Place, type WorkVerb } from './lang';
+import { ALL, FIXTURE_WORD, FIXTURE_WORD_KIND, floorName, levelName, makeOrder, placeName, type Noun, type Place, type WorkVerb } from './lang';
 import { giveCarrier } from './scrolls';
 import { BUILD, FIXTURE_LABEL, MAP, PATRON, TOWER, type FixtureSpec } from './tuning';
 import { ladderRows, standRow } from './tower';
 import { findPath } from './path';
 import { FIXTURE_KINDS, Tile, type BuildMaterial, type Building, type FixtureKind, type ItemType, type Pt, type SimState, type Site, type Works } from './types';
-import { buildingOf, groundRow, houseDeckRow, newBuilding, newSite, setTile, siteCenter, spotFor, storedTotal, storyRow, tileAt } from './world';
+import { buildingOf, groundRow, houseDeckRow, inTowerSpan, newBuilding, newSite, setTile, siteCenter, spotFor, storedTotal, storyRow, tileAt } from './world';
 
 // Building on the ground (P1). The player places things; workers build them.
 // Placing is the one thing the player does directly: it's laying out the
@@ -144,7 +144,7 @@ export function footprint(s: SimState, req: PlaceRequest): Footprint {
     // anything else has to go inside a building
     if (!b) {
       fp.blocked.fill(true);
-      fp.error = req.fixture === 'stockpile' ? 'A stockpile goes inside a building or the tower, or on open ground.' : req.fixture === 'shelves' ? 'Storage shelves go inside a building or the tower.' : 'Fixtures go inside a building or the tower.';
+      fp.error = req.fixture === 'stockpile' ? 'A stockpile goes inside a building or the tower, or on open ground.' : req.fixture === 'shelves' ? 'Shelves go inside a building or the tower.' : 'Fixtures go inside a building or the tower.';
       return fp;
     }
     const lowest = fixtureSpec(req.fixture).minStory ?? 0;
@@ -209,8 +209,10 @@ function towerFootprint(s: SimState, req: Extract<PlaceRequest, { what: 'fixture
     fp.blocked[i] = wall || taken || ladder;
   }
   const label = FIXTURE_LABEL[req.fixture];
-  if (level > s.floors) fp.error = `${levelName(level)} isn't built yet.`;
-  else if (req.fixture === 'ladder' && level + 1 > s.floors) fp.error = `A ladder needs a finished level above it to climb to${s.projects.length ? `: ${floorName(level + 1)} is still being built` : ''}.`;
+  // a level being built can be planned ahead: what's planned there waits until it's finished
+  const planned = s.floors + s.projects.length;
+  if (level > planned) fp.error = `${levelName(level)} isn't built yet. Draw a blueprint for it first.`;
+  else if (req.fixture === 'ladder' && level + 1 > planned) fp.error = 'A ladder needs a level above it to climb to. Draw a blueprint for the next level first.';
   else if (level < (fixtureSpec(req.fixture).minStory ?? 0)) fp.error = `${label} can't go on ${storyName(level, true)}.`;
   else if (fp.blocked.some((b, i) => b && (fp.x0 + i <= t.x0 || fp.x0 + i >= t.x1))) fp.error = 'Fixtures go inside the tower’s walls.';
   else if (fp.blocked.some(Boolean)) fp.error = 'Something is already there.';
@@ -278,8 +280,9 @@ export function applyPlace(s: SimState, req: PlaceRequest): void {
       // something that costs nothing (a stockpile is just marked-out ground) is ready at once
       if (cost.stone + cost.wood > 0) site.build = newWorks(s, cost);
       s.sites.push(site);
-      const where = fp.building ? ` in ${fp.building.name}${fp.building.build ? ', once it’s built' : ''}` : fp.towerLevel !== null ? ` on ${storyName(fp.towerLevel, true)}` : ' on open ground';
-      log(s, `Planned: ${site.label}${where}.${req.fixture === 'ladder' ? ' Post "build camp" work to get it built.' : ''}`);
+      const waits = fp.towerLevel !== null && towerSiteWaiting(s, site) ? `, once ${floorName(fp.towerLevel + (req.fixture === 'ladder' ? 1 : 0))} is built` : '';
+      const where = fp.building ? ` in ${fp.building.name}${fp.building.build ? ', once it’s built' : ''}` : fp.towerLevel !== null ? ` on ${storyName(fp.towerLevel, true)}${waits}` : ' on open ground';
+      log(s, `Planned: ${site.label}${where}.${fp.towerLevel !== null ? ' Post "build fixtures in tower" work to get it built.' : ''}`);
       break;
     }
   }
@@ -336,10 +339,76 @@ export function campJobs(s: SimState): Job[] {
   }
   for (const site of s.sites) {
     const b = buildingOf(s, site);
-    if (site.build && !(b && b.build)) jobs.push({ kind: 'site', id: site.id, works: site.build, demolish: false, y: site.y, x0: site.x0, x1: site.x1, label: site.label });
+    if (site.build && !(b && b.build) && !towerSiteWaiting(s, site)) jobs.push({ kind: 'site', id: site.id, works: site.build, demolish: false, y: site.y, x0: site.x0, x1: site.x1, label: site.label });
     else if (site.demolish && storedTotal(site) === 0) jobs.push({ kind: 'site', id: site.id, works: site.demolish, demolish: true, y: site.y, x0: site.x0, x1: site.x1, label: site.label });
   }
   return jobs.sort((a, b) => a.works.since - b.works.since || a.id - b.id);
+}
+
+/**
+ * A fixture planned in the tower waits for the level it stands on to be
+ * finished, and a ladder for the level it climbs to as well.
+ */
+export function towerSiteWaiting(s: SimState, site: Site): boolean {
+  if (!inTowerSpan(s, site) || !(site.kind in FIXTURE_WORD)) return false;
+  return site.level > s.floors || (site.kind === 'ladder' && site.level + 1 > s.floors);
+}
+
+/**
+ * What a build order covers (the tower's floors aside, which are "build tower"):
+ * - camp: everything planned outside the tower's walls;
+ * - buildings: houses, the scriptorium and boards (not what goes in them);
+ * - fixtures: beds, ovens, stores, ladders..., anywhere or within a place
+ *   ("in camp", "in tower", "in level 4", "in Kitchen");
+ * - target: one planned build by name or number ("build Kitchen", "build ladder 1").
+ */
+export type BuildScope =
+  | { kind: 'camp' }
+  | { kind: 'buildings' }
+  | { kind: 'fixtures'; within: Place | null }
+  | { kind: 'target'; target: Place };
+
+export function buildScope(noun: Noun | null, target: Place | null, within: Place | null): BuildScope {
+  if (target !== null) return { kind: 'target', target };
+  if (noun === 'BUILDINGS') return { kind: 'buildings' };
+  if (noun === 'FIXTURES') return { kind: 'fixtures', within };
+  return { kind: 'camp' };
+}
+
+/** "Nothing to build…", for each scope. */
+export function scopeText(scope: BuildScope): string {
+  switch (scope.kind) {
+    case 'camp':
+      return 'in the camp';
+    case 'buildings':
+      return 'among the buildings';
+    case 'fixtures':
+      return scope.within === null ? 'among the fixtures' : `among the fixtures in ${placeName(scope.within)}`;
+    case 'target':
+      return `at ${placeName(scope.target)}`;
+  }
+}
+
+export function jobsFor(s: SimState, scope: BuildScope): Job[] {
+  if (scope.kind === 'target') return campJobsFor(s, scope.target);
+  const jobs = campJobs(s);
+  const siteOfJob = (j: Job) => (j.kind === 'site' ? s.sites.find((x) => x.id === j.id) ?? null : null);
+  const isFixture = (j: Job) => {
+    const x = siteOfJob(j);
+    return !!x && x.kind in FIXTURE_WORD;
+  };
+  const inTower = (j: Job) => {
+    const x = siteOfJob(j);
+    return !!x && inTowerSpan(s, x);
+  };
+  if (scope.kind === 'camp') return jobs.filter((j) => !inTower(j));
+  if (scope.kind === 'buildings') return jobs.filter((j) => !isFixture(j) && !inTower(j));
+  const within = scope.within;
+  const fixtures = jobs.filter(isFixture);
+  if (within === null) return fixtures;
+  if (within === 'camp') return fixtures.filter((j) => !inTower(j));
+  if (within === 'tower') return fixtures.filter(inTower);
+  return campJobsFor(s, within).filter(isFixture);
 }
 
 /**
@@ -354,6 +423,7 @@ export function campJobsFor(s: SimState, target: Place | null): Job[] {
   if (target === null) return jobs;
   const siteOfJob = (j: Job) => (j.kind === 'site' ? s.sites.find((x) => x.id === j.id) ?? null : null);
   if (target === 'tower') return jobs.filter((j) => (siteOfJob(j)?.level ?? 0) > 0);
+  if (target === 'camp') return jobsFor(s, { kind: 'camp' });
   if (typeof target === 'number') return jobs.filter((j) => (j.kind === 'building' ? 0 : siteOfJob(j)?.level ?? 0) === target);
   if ('fixture' in target) {
     const kind = FIXTURE_WORD_KIND[target.fixture];

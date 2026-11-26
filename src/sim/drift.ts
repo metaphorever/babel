@@ -2,8 +2,10 @@ import { log } from './actions';
 import {
   DRIFTABLE,
   LANGS,
+  isLogicVerb,
   isPrep,
   langName,
+  untilIndex,
   makeOrder,
   parseOrder,
   word,
@@ -33,7 +35,7 @@ export function levelOfRow(y: number): number {
 }
 
 export function knows(w: Worker, tok: Token): boolean {
-  if (tok.t === 'WHO' || tok.t === 'NAMED') return true; // everyone recognizes a name
+  if (tok.t === 'WHO' || tok.t === 'NAMED' || tok.t === 'NUM') return true; // everyone recognizes a name, and a number
   return w.vocab[tok.lang]?.includes(tok.t) ?? false;
 }
 
@@ -117,6 +119,7 @@ export function readOrder(s: SimState, w: Worker, order: Order): Reading {
   // places: both the little word and the place have to be readable
   let from = parsed.from;
   let to = parsed.to;
+  let within = parsed.within;
   for (let i = 1; i < order.length - 1; i++) {
     const tok = order[i];
     if (!isPrep(tok.t)) continue;
@@ -124,6 +127,7 @@ export function readOrder(s: SimState, w: Worker, order: Order): Reading {
     if (!readable) {
       guesses++;
       if (tok.t === 'FROM') from = null;
+      else if (tok.t === 'IN') within = null;
       else to = null;
     }
   }
@@ -135,7 +139,7 @@ export function readOrder(s: SimState, w: Worker, order: Order): Reading {
     noun = 'CAMP';
   }
   const who = parsed.who !== null ? { id: parsed.who, name: order.find((t) => t.t === 'WHO')?.name ?? '?' } : null;
-  return { order: makeOrder(parsed.verb as Verb, noun, { from, to, who, target }), guesses };
+  return { order: makeOrder(parsed.verb as Verb, noun, { from, to, who, target, within }), guesses };
 }
 
 /** Reading something unreadable, or guessing at words, is confusing. */
@@ -162,7 +166,10 @@ export function sayingFor(w: Worker): TokenId[] {
   if (w.fatigue >= 65) return ['WANT', 'SLEEP'];
   const c = w.held[0];
   const order = c && c.pc < c.orders.length ? c.orders[c.pc] : w.memory?.order;
-  if (order) return order.filter((t) => t.t !== 'WHO' && t.t !== 'FLOOR' && t.t !== 'BASE' && !isPrep(t.t)).map((t) => t.t);
+  if (order && !isLogicVerb(order[0].t)) {
+    const at = untilIndex(order);
+    return (at < 0 ? order : order.slice(0, at)).filter((t) => t.t !== 'WHO' && t.t !== 'NAMED' && t.t !== 'NUM' && t.t !== 'FLOOR' && t.t !== 'BASE' && !isPrep(t.t)).map((t) => t.t);
+  }
   return [];
 }
 

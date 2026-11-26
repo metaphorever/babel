@@ -75,6 +75,13 @@ Built and tested: the random map, the opening text and founding, placement mode 
 - **The night sky** (the user's Milky Way picture) dithers in as night deepens. **The tower's wall, deck and ladder, the building tops and roofs, and the stockpile** are redrawn (the updated sheet screenshots).
 - **Portraits:** the user's Photoshop layer format is validated (see SPRITES.md), but the art isn't final, so it isn't in the game. The worker window has a blank 64x64 frame for it. Plan: roll relationships first, then build portraits from them, so bio children inherit parts from their parents.
 
+## Where sessions 5 and 6 left things
+
+- **Session 5** (DESIGN.md §15.15): "haul anything", "build <one planned thing>", fixtures planned in unfinished buildings, "Ground Level" naming, flush two-story houses, right-click drops the tool. The full conditions-and-signals toolkit was scoped (§16.7).
+- **Session 6** (§15.16): the logic words are in: IF / OTHERWISE / NOT, store checks (has / fewer than / no), hungry / tired / carrying / night / dawn, UNTIL on work lines, WAIT. Checking a store costs a walk (`LOGIC.lookRange`, for the user to confirm). Scrolls hold 8 lines. The user's hauling-equipment notes are §16.8.
+- **Later in session 6** (§15.17): build orders by place (camp / buildings / fixtures in… / tower), fixtures and ladders planned on a level still being built, dawn/noon/dusk/midnight, Brewery and Shelves, the Orders window, a wider Scriptorium with the composer on top, explanations moved into hover tips and Help.
+- **Next in this thread:** flags and bells (§16.7): fixtures, RAISE / LOWER / RING, range circles, heraldic hatching. Then standing orders on boards.
+
 ## Next steps, in order
 
 1. **Playtest P1** (the user) and fix what comes up. Things to watch:

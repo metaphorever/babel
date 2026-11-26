@@ -1,8 +1,8 @@
-import { ALL, BUILD, DRIFT, ECONOMY, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, levelName, currentStipend, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
-import { fixtureWidth, footprint, houseCost, placeCost, worksFraction, type PlaceRequest } from '../sim/build';
+import { ALL, BUILD, DRIFT, ECONOMY, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
+import { fixtureWidth, footprint, houseCost, placeCost, towerSiteWaiting, worksFraction, type PlaceRequest } from '../sim/build';
 import { barMood } from '../sim/activities';
 import { deckRow } from '../sim/tower';
-import { buildingLabel, groundRow, siteTitle, storedTotal, storyOfRow } from '../sim/world';
+import { buildingLabel, groundRow, inTowerSpan, siteTitle, storedTotal, storyOfRow } from '../sim/world';
 import { buildingHeight, TILE, type Renderer, type Thing } from '../render/renderer';
 import { clear, h } from './dom';
 import { flavor, type FlavorWord } from './flavor';
@@ -133,8 +133,15 @@ export class BuildUi {
         h('button', { class: 'btn btn-small', title: 'Wider (])', onclick: () => setHouse(width + 1, stories) }, '+'),
         h('button', { class: 'btn btn-small', title: 'One or two stories', onclick: () => setHouse(width, stories === 1 ? 2 : 1) }, stories === 1 ? '1 story' : '2 stories'),
       ),
-      h('div', { class: 'hint' }, `An empty wooden shell: ${costText(houseCost(width, stories))}. Fixtures go inside once it's built.`),
-      h('div', { class: 'section-label' }, 'Fixtures'),
+      h('div', { class: 'hint' }, `An empty wooden shell: ${costText(houseCost(width, stories))}.`),
+      h(
+        'div',
+        {
+          class: 'section-label tip',
+          title: `Fixtures go inside a building or a tower room. You can plan them before the building (or the tower level) is finished: they go in once it's up. A stockpile can also be marked out on open ground (it holds ${BUILD.capacity.stockpile} anywhere); shelves hold ${BUILD.capacity.shelves}, indoors only. Each tower level starts as an empty room: a ladder from the room below is the way up to it.`,
+        },
+        'Fixtures ⓘ',
+      ),
     );
     const grid = h('div', { class: 'fixture-grid' });
     for (const f of FIXTURES) {
@@ -148,16 +155,27 @@ export class BuildUi {
         ),
       );
     }
+    into.append(grid);
+    if (s.tower) {
+      const planned = s.floors + s.projects.length + s.designs.filter((d) => d.carrier.kind === 'blueprint').length;
+      into.append(
+        h('div', { class: 'section-label tip', title: 'Each level is built from a blueprint. A courier (DELIVER) carries it to the top of the tower; then “build tower” work raises the level. You can draw blueprints ahead: they wait until they’re needed.' }, 'The tower ⓘ'),
+        h(
+          'div',
+          { class: 'row build-row' },
+          h('button', { class: 'btn', onclick: () => this.drawBlueprint() }, 'Draw a blueprint'),
+          h('span', { class: 'hint' }, `${s.floors} built${planned > s.floors ? `, ${planned - s.floors} more planned` : ''}`),
+        ),
+      );
+    }
     into.append(
-      grid,
-      h('div', { class: 'hint' }, `Fixtures go inside a building or a tower room. You can plan them in a building that isn’t built yet: they go in once it’s up. A stockpile can also be marked out on open ground (it holds ${BUILD.capacity.stockpile} anywhere); storage shelves hold ${BUILD.capacity.shelves}, indoors only. Each tower level starts as an empty room: a ladder from the room below is the way up to it.`),
       h(
         'div',
-        { class: 'row row-end' },
+        { class: 'row row-end', title: 'Placing only lays out the plan. Workers build it once someone posts build work: “build camp” for everything outside the tower, “build fixtures in tower” for what’s inside it.' },
         h('button', { class: `btn${this.demolishing ? ' on' : ''}`, onclick: () => this.startDemolish() }, 'Demolish…'),
         h('button', { class: 'btn', onclick: () => this.scriptorium.openDraft([{ verb: 'BUILD', noun: 'CAMP', from: null, to: null, count: -1 }]) }, 'Write “build camp”…'),
+        h('button', { class: 'btn', onclick: () => this.scriptorium.openDraft([{ verb: 'BUILD', noun: 'FIXTURES', within: 'tower', from: null, to: null, count: -1 }]) }, 'Write “build fixtures in tower”…'),
       ),
-      h('p', { class: 'hint' }, 'Placing only lays out the plan. Workers build it once someone posts “build camp” work.'),
     );
   }
 
@@ -278,7 +296,7 @@ export class BuildUi {
       return;
     }
     const free = placeCost(req).stone + placeCost(req).wood === 0;
-    this.say(`${FIXTURE_LABEL[req.fixture]} ${free ? 'marked out' : 'planned'}. Click to place another, or Esc to stop.${free ? '' : ' Post “build camp” work to have it built.'}`);
+    this.say(`${FIXTURE_LABEL[req.fixture]} ${free ? 'marked out' : 'planned'}. Click to place another, or Esc to stop.${free ? '' : ` Post ${buildWord(this.s, { x0: req.x0, x1: req.x0 + fixtureWidth(req.fixture) - 1 })} work to have it built.`}`);
   }
 
   private confirmPlace(req: PlaceRequest): void {
@@ -477,7 +495,7 @@ export class BuildUi {
           : '',
         kv('Label', buildingLabel(s, b)),
         kv('Size', `${b.x1 - b.x0 + 1} tiles wide, ${b.stories === 1 ? 'one story' : 'two stories'}`),
-        kv('State', statusOf(b)),
+        kv('State', statusOf(this.s, b)),
         h(
           'div',
           { class: 'row row-end' },
@@ -501,7 +519,7 @@ export class BuildUi {
         : '',
       site.named ? kv('Number', `${FIXTURE_LABEL[site.kind as FixtureKind]} ${site.num}`) : '',
       kv('Where', b ? `${b.name}${site.y < groundRow() ? ', upstairs' : ''}` : site.level > 0 || (s.tower && site.x0 >= s.tower.x0 && site.x1 <= s.tower.x1) ? levelName(site.level) : 'Out in the open'),
-      kv('State', statusOf(site)),
+      kv('State', statusOf(this.s, site)),
       site.capacity !== null && !site.supplies ? kv('Holds', `${storedTotal(site)} of ${site.capacity}`) : '',
       goods.length ? kv('Has', goods.join(', ')) : '',
       site.kind === 'bar' && !site.build ? this.priceRow(site) : '',
@@ -670,12 +688,21 @@ function blueprintsSoFar(s: SimState): number {
   return s.floors + s.projects.length + drawing + carried;
 }
 
-function statusOf(x: Building | Site): string {
+/** The build order that covers something planned: what's in the tower is "build fixtures in tower", the rest "build camp". */
+function buildWord(s: SimState, x: { x0: number; x1: number }): string {
+  return inTowerSpan(s, x) ? '“build fixtures in tower”' : '“build camp”';
+}
+
+function statusOf(s: SimState, x: Building | Site): string {
+  if ('kind' in x && x.build && 'level' in x && towerSiteWaiting(s, x as Site)) {
+    const site = x as Site;
+    return `Planned: waits until ${floorName(site.level + (site.kind === 'ladder' ? 1 : 0))} is built.`;
+  }
   if (x.demolish) return x.demolish.undone > 0 ? `Coming down (${Math.floor((x.demolish.undone / Math.max(1, x.demolish.needs.stone + x.demolish.needs.wood)) * 100)}%)` : 'Marked to come down (waits until it’s empty)';
   if (x.build) {
     const f = worksFraction(x.build);
     const missing = costText({ stone: x.build.needs.stone - x.build.placed.stone, wood: x.build.needs.wood - x.build.placed.wood });
-    return f === 0 ? `Planned: needs ${missing}. Post “build camp” work.` : `Being built (${Math.floor(f * 100)}%, still needs ${missing})`;
+    return f === 0 ? `Planned: needs ${missing}. Post ${buildWord(s, x)} work.` : `Being built (${Math.floor(f * 100)}%, still needs ${missing})`;
   }
   return 'Built';
 }
@@ -713,7 +740,7 @@ function steps(s: SimState): Step[] {
     },
     {
       title: 'Stockpiles',
-      text: `You will need a place to store the supplies you’ll be using. Place one or more stockpile markers to show where supplies can be stored for later. Workers don’t like having to search for materials to make things, so be sure to write haul orders to get loose supplies moved to a storage area where they can be put to proper use. A stockpile holds ${BUILD.capacity.stockpile}; later, storage shelves inside a building hold ${BUILD.capacity.shelves}.`,
+      text: `You will need a place to store the supplies you’ll be using. Place one or more stockpile markers to show where supplies can be stored for later. Workers don’t like having to search for materials to make things, so be sure to write haul orders to get loose supplies moved to a storage area where they can be put to proper use. A stockpile holds ${BUILD.capacity.stockpile}; later, shelves inside a building hold ${BUILD.capacity.shelves}.`,
       buttons: [
         { label: 'Place a stockpile…', run: (b) => b.start({ what: 'fixture', fixture: 'stockpile' }) },
         { label: 'Write “haul stone”…', run: (b) => b.openComposer([{ verb: 'HAUL', noun: 'STONE', from: null, to: null, count: -1 }]) },
@@ -754,9 +781,9 @@ function steps(s: SimState): Step[] {
     },
     {
       title: 'Drink',
-      text: 'Many workers enjoy a drink now and then. Grain brewed at a brewing station becomes beer, kept at a bar, where workers spend their wages. What they pay goes back into your treasury.',
+      text: 'Many workers enjoy a drink now and then. Grain brewed at a brewery becomes beer, kept at a bar, where workers spend their wages. What they pay goes back into your treasury.',
       buttons: [
-        { label: 'Build a brewing station…', run: (b) => b.start({ what: 'fixture', fixture: 'brewery' }) },
+        { label: 'Build a brewery…', run: (b) => b.start({ what: 'fixture', fixture: 'brewery' }) },
         { label: 'Build a bar…', run: (b) => b.start({ what: 'fixture', fixture: 'bar' }) },
       ],
     },
@@ -781,16 +808,16 @@ function steps(s: SimState): Step[] {
             : 'The plans for Tower Level 2 are drafted. ';
         const rooms = 'Each new level of the tower is an empty room: your workers have to build everything in it, including the ladder up to it. ';
         const ladder =
-          s.floors === 0
-            ? 'Once the Tower Ground Level is finished, place a ladder in it, so workers can climb onto its roof to build Level 2 and carry its plans to the top.'
+          s.floors + s.projects.length === 0
+            ? 'Once the Tower Ground Level is under way, place a ladder in it, so workers can climb onto its roof to build Level 2 and carry its plans to the top. It waits until the level is finished.'
             : ladderPlaced(s)
-              ? 'The ladder up from the Tower Ground Level is planned; “build camp” work gets it built.'
-              : 'Right now there’s no way up onto the Tower Ground Level’s roof. Place a ladder on the Tower Ground Level, and post “build camp” work to get it built.';
+              ? 'The ladder up from the Tower Ground Level is planned; “build fixtures in tower” work gets it built.'
+              : 'Right now there’s no way up onto the Tower Ground Level’s roof. Place a ladder on the Tower Ground Level, and post “build fixtures in tower” work to get it built.';
         return plans + rooms + ladder;
       },
       buttons: (s) => [
         ...(blueprintsSoFar(s) < 2 ? [{ label: 'Draw a blueprint', run: (b: BuildUi) => b.drawBlueprint() }] : []),
-        ...(s.floors >= 1 && !ladderPlaced(s) ? [{ label: 'Place a ladder…', run: (b: BuildUi) => b.start({ what: 'fixture', fixture: 'ladder' }) }] : []),
+        ...(s.floors + s.projects.length >= 1 && !ladderPlaced(s) ? [{ label: 'Place a ladder…', run: (b: BuildUi) => b.start({ what: 'fixture', fixture: 'ladder' }) }] : []),
       ],
       done: (s) => blueprintsSoFar(s) >= 2 && (s.floors === 0 || ladderPlaced(s)),
     },
