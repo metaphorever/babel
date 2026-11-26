@@ -1,6 +1,6 @@
 # Handoff: where Babel stands, and what's next
 
-*Updated 2026-11-24 at the end of session 4. A new session should start here, then read [DESIGN.md](DESIGN.md) (§15 is P1, §15.10 how it was built) and [README.md](../README.md).*
+*Updated 2026-11-26 at the end of session 7. A new session should start here, then read [DESIGN.md](DESIGN.md) (§16.9 is the plan being built now; §15 is P1 and what's been built since) and [README.md](../README.md).*
 
 ## The project in one paragraph
 
@@ -17,7 +17,7 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
   - **Every push to `main` deploys:** `.github/workflows/pages.yml` runs the tests, builds, and publishes to GitHub Pages.
   - **Commit author:** "Clover <metaphorever@gmail.com>". The user chose to publish that as is.
 - **GitHub CLI:** on this machine it's at `C:\Program Files\GitHub CLI\gh.exe` and is logged in as `metaphorever`. Shells started before it was installed may need the full path.
-- **Tests:** keep them passing (`npm test`, 121 now). For tuning the social web and the economy over time, `npm run sim:month` runs 30-day colonies and prints how labels settle, what moved feelings (by cause), what changed labels, churn, drinking, work and remittances. Compare settings side by side on the same seeds: `npm run sim:month -- gossip.chance=0.6 vs job.help=0.0015` (options: `--seeds=`, `--days=`, `--size=`, `--rich`). See DESIGN.md §15.13 for the findings and the current drama tuning (help minimal, once-a-day events strong). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
+- **Tests:** keep them passing (`npm test`, 161 now; `npx tsc --noEmit -p .` for types; `npm run build` is what the deploy runs). For tuning the social web and the economy over time, `npm run sim:month` runs 30-day colonies and prints how labels settle, what moved feelings (by cause), what changed labels, churn, drinking, work and remittances. Compare settings side by side on the same seeds: `npm run sim:month -- gossip.chance=0.6 vs job.help=0.0015` (options: `--seeds=`, `--days=`, `--size=`, `--rich`). See DESIGN.md §15.13 for the findings and the current drama tuning (help minimal, once-a-day events strong). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
 - **Playtest feedback:** the user playtests on the live site and sends batches of notes. Fix bugs, record design decisions in DESIGN.md, and keep "provisional" notes up to date.
 
 ## Code rules that matter
@@ -30,11 +30,14 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
 - **Every balance number is in [`src/sim/tuning.ts`](../src/sim/tuning.ts).**
 - **The world is drawn 1-bit** (black ink, white paper, dither patterns) at native resolution and scaled by whole numbers. The camera moves in 4-pixel steps so patterns don't shimmer. Color is allowed only in the interface or overlays, with a reason.
 - **The interface** is DOM windows styled like System 7 (`src/ui/`).
-- **Debugging:** in the browser console, `babel.sim.state`, `babel.ui` and `babel.renderer` are available. `babel.sim.step()` advances one tick.
+- **Debugging:** in the browser console, `babel.sim.state`, `babel.ui` and `babel.renderer` are available. `babel.sim.step()` advances one tick. To test something that takes game time, change state and step in a loop from the console, e.g. push a `{kind, label, value: -30, until}` moodlet onto a worker and step to the next shift to trigger a notice. `?start=prebuilt`, `?seed=` and `?difficulty=` in the URL skip the opening or pick a game.
 
 ## Practical gotchas (learned the hard way)
 
-- **The browser pane in the Claude desktop app** throttles animation to a few frames a second, so the game crawls there. To test, step the simulation from the console, or play in a real browser.
+- **The browser pane in the Claude desktop app** throttles animation to a few frames a second, so the game crawls there. To test, step the simulation from the console, or play in a real browser. **Claude has standing permission** to open the pane, start `babel-dev` (port 5173), and take over or reset its tabs for testing; the user playtests in their own browser. Ask before installing new tooling. If the pane is hidden, the page doesn't run: ask the user to show it.
+- **Editing a source file reloads the dev page,** which starts a new game: finish a browser check before editing, or redo the setup after.
+- **The UI picks up new alerts on its next refresh,** a moment later, not the instant a dialog closes: wait a beat before screenshotting.
+- **Python isn't installed** on this machine; use node scripts or the Edit tool.
 - **Big multi-line edits:** write the script to a file with the Write tool and run it, rather than using shell heredocs. Heredocs have truncated scripts and swallowed lines. **Backticks in `node -e "…"` get eaten by bash** (template literals vanish): use the Edit tool or a script file for anything with backticks.
 - **JavaScript's `String.replace`** treats `$'`, `$&` and similar in the replacement text as special. Pass the replacement as a function: `t.replace(a, () => b)`.
 - **"File changed on disk" notices after git operations** are just Windows line-ending normalization. Check `git status` before assuming the user edited something.
@@ -81,25 +84,35 @@ Built and tested: the random map, the opening text and founding, placement mode 
 - **Session 6** (§15.16): the logic words are in: IF / OTHERWISE / NOT, store checks (has / fewer than / no), hungry / tired / carrying / night / dawn, UNTIL on work lines, WAIT. Checking a store costs a walk (`LOGIC.lookRange`, for the user to confirm). Scrolls hold 8 lines. The user's hauling-equipment notes are §16.8.
 - **Later in session 6** (§15.17): build orders by place (camp / buildings / fixtures in… / tower), fixtures and ladders planned on a level still being built, dawn/noon/dusk/midnight, Brewery and Shelves, the Orders window, a wider Scriptorium with the composer on top, explanations moved into hover tips and Help.
 - **Wheelbarrows and carts** (§15.18): movable stores, "haul cart 1 to …", "… using cart 1". Next for hauling (§16.8): the rope pulley and winches up the tower, then the wagon, beasts of burden and the stable.
-- **Keeping workers (§16.9), step 1 built:** fed up, notice at the end of the shift, deadlines by difficulty, complaints named in the notice alert, overwork and low wages as real causes, pay that scales. Next: the bonus letter, recruiting, the other alerts.
-- **Next in this thread:** flags and bells (§16.7): fixtures, RAISE / LOWER / RING, range circles, heraldic hatching. Then standing orders on boards.
+- **Portraits** (SPRITES.md): the worker window shows each worker's face, built from the PSD's parts by look seed, on a MacPaint pattern with a dithered white outline; bio children take after their parents.
+
+## Where session 7 left things (2026-11-26)
+
+- **The plan for keeping workers, alerts and a real start** (DESIGN.md §16.9) was agreed with the user, step by step. **Steps 1 and 2 are built, tested in the browser, and live:**
+  - **Quitting on shifts:** fed up at once below mood 30, notice at the end of the shift, a deadline on a shift boundary set by difficulty (easy 4 shifts, normal 2, hard 1), staying if mood is back at 30. `morale.ts`, `QUIT`.
+  - **Why:** a fading per-worker tally of real mood penalties (`tallyGrievances`) names the top two complaints. New real causes: overwork (`OVERWORK`, `workStreak`) and low wages (`PAY`, `judgeWage`). "Paid" now scales with the gold (`gotPaid`).
+  - **Alerts:** a dialog per alert (pauses the game), Acknowledge, mute this kind or all (localStorage), Show worker. Kinds so far: `notice`, `quit`.
+  - **The day number turns over at midnight** now, not 07:00.
+- **The user's decisions this session** (all in §16.9): the bonus is a letter, not a word; the win alert's text and score formula; the everyone-gone alert and its buttons; the only true end is no workers and no money (the patron at 0 just stops paying); "infinite" is 1,000 levels; overwork and low wages only as real causes, never narrative. Everything else Claude recommended in the plan was accepted.
+- **Watch in playtests:** the notice can repeat for a worker hovering at mood 30 (§16.9 step 1 has the options). Overwork and low wages are deliberately mild; the 30-day sim still averages mood 75.
 
 ## Next steps, in order
 
-1. **Playtest P1** (the user) and fix what comes up. Things to watch:
-   - **The tutorial text** is a draft; it needs the user's voice.
-   - **Bar takings returning to the treasury** (a change from P0): does gold get too easy?
-   - **The supplies** (20 stone, 30 wood, 24 bread): enough to found the camp and get to floor 1 inside the grace period?
-   - **Build-camp workflow:** placing, then writing "build camp" work. Does it feel like the game, or like a chore?
-2. **More art:** clouds built from parts (reference: `art-src/shots/cloud-reference.png`), the Babel Extras page, and the tower's deck and wall (with the portrait sprint). Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art to catch anything missed.
-3. **Social life, round two** (DESIGN.md §16.6, "Not built yet"), and tuning from playtests. Watch the log: too many label changes, or too few? A prebuilt colony left alone with no orders quits around day 3 (before and after the social changes alike): it's an unattended game starving, but worth a look when balancing.
-4. **Portraits are in** (SPRITES.md): the worker window shows each worker's face, built from the PSD's parts by look seed, on a MacPaint pattern with a dithered white outline; bio children take after their parents. Still to come from the user: more beards, and hats.
-5. **P0 leftovers:** mailboxes and upper job boards (then the first board can be demolished), the COPY order, and night changing behavior (workers preferring to sleep at night).
-6. **The roadmap** (DESIGN.md §16): the About window is the quickest win; alerts (§16.5); stairs; the trader and pilgrimages.
-7. **Later:** tables (mood when eating and drinking), typography (start with GNU Unifont, check its license), procedural sound effects and public-domain music, and acts of god at height.
+1. **§16.9, step 3: the bonus letter.** Then 4 recruiting, 5 the other alerts (including the win and everyone-gone alerts, the menu-bar list, and somewhere to unmute), 6 the Stores window, 7 saves, 8 the New Game screen and taller maps, 9 the title screen and Settings. Build in that order.
+2. **Flags and bells** (§16.7): fixtures, RAISE / LOWER / RING, range circles, heraldic hatching, and the word **report** (§16.9 step 6). Then standing orders on boards.
+3. **Hauling, the rest of §16.8:** the rope pulley and winches up the tower, then the wagon, beasts of burden and the stable.
+4. **Art from the user:** the "Babel To Do" sheet (wheelbarrow and cart boxes feed straight in), more beards and hats for portraits, clouds from parts. Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art.
+5. **Playtest notes** as they come: the tutorial text needs the user's voice; gold from bar takings; whether the starting supplies last the grace period; social tuning (§16.6) only from playtests.
+6. **P0 leftovers:** mailboxes and upper job boards, the COPY order, night changing behavior.
+7. **The rest of §16:** the About window (quick), stairs, the trader, pilgrimages.
+8. **Later:** tables, typography (GNU Unifont, check its license), procedural sound and public-domain music, acts of god at height.
+
+## Don't commit
+
+`IDEAS_BRAINDUMP.md` changes are the user's own edits (commit only when they say), `tools/_psd.ts` isn't ours, and `art-src/picker/` holds scratch preview pages. Stage files by name, never `git add -A`.
 
 ## Open questions
 
 These are DESIGN.md §14, plus:
 - **The right edge of the map:** decided in session 4: the road to far-away lands (DESIGN.md §16), now 12 tiles wide.
-- **Level tuning vs. copy:** with the ground counted as level 1, drift starts at Tower Level 4 and the cap is Level 31 against a "Level 30" goal. Ask the user whether to retune to rounder levels.
+- **Level tuning vs. copy:** with the ground counted as level 1, drift starts at Tower Level 4 and the cap is Level 31 against a "Level 30" goal. Ask the user whether to retune to rounder levels. *(Revisit with §16.9 step 8: the tower goals become 20 / 50 / 100 / 250 / 1,000, so drift's start and cap need to scale with the goal anyway.)*

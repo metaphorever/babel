@@ -13,8 +13,6 @@ const difficulty: Difficulty = diffParam === 'easy' || diffParam === 'hard' ? di
 // ?start=prebuilt skips the opening with a colony already laid out (handy for playtesting later stages)
 const start: StartMode = params.get('start') === 'prebuilt' ? 'prebuilt' : 'opening';
 const sim = new Sim(seed, difficulty, start);
-// for poking at the game from the browser console while developing (not in the built game)
-if (import.meta.env.DEV) (window as unknown as { babel: unknown }).babel = { sim };
 
 const canvas = document.getElementById('world') as HTMLCanvasElement;
 const renderer = new Renderer(canvas);
