@@ -678,8 +678,8 @@ export class Renderer {
     const ws = workerSprite(w.look, frame, w.facing, lying);
     const spr = ws.canvas;
     const sx = x - ws.anchorX;
-    // standing frames have two clear rows above the head; things drawn "above the head" use sy
-    const sy = y - spr.height + (lying ? 0 : 2);
+    // things drawn "above the head" (loads, the thought cloud, the pointer) sit on the topmost drawn row, hat or head
+    const sy = y - spr.height + ws.top;
     g.drawImage(spr, sx, y - spr.height);
     if (w.carrying && !lying) {
       const it = itemSprite(w.carrying);

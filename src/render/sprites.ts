@@ -75,7 +75,11 @@ export interface WorkerSprite {
   canvas: HTMLCanvasElement;
   /** The column to line up with the worker's position (their feet stay on the bottom row). */
   anchorX: number;
+  /** The topmost drawn row (head or hat): carried loads and thought clouds sit on it. */
+  top: number;
 }
+
+const workerTops = new Map<string, number>();
 
 export function workerSprite(look: number, frame: number, facing: 1 | -1, lying: boolean): WorkerSprite {
   const key = `w${look}:${frame}:${facing}:${lying ? 1 : 0}`;
@@ -86,9 +90,10 @@ export function workerSprite(look: number, frame: number, facing: 1 | -1, lying:
     if (facing < 0) g = mirror(g);
     canvas = toCanvas(g);
     cache.set(key, canvas);
+    workerTops.set(key, Math.max(0, g.findIndex((r) => /[01]/.test(r))));
   }
   const anchorX = lying ? Math.floor(canvas.width / 2) : facing > 0 ? BODY_CENTER_X : CELL - 1 - BODY_CENTER_X;
-  return { canvas, anchorX };
+  return { canvas, anchorX, top: workerTops.get(key) ?? 0 };
 }
 
 export function itemSprite(type: ItemType): HTMLCanvasElement {

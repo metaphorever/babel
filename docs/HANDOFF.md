@@ -17,7 +17,7 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
   - **Every push to `main` deploys:** `.github/workflows/pages.yml` runs the tests, builds, and publishes to GitHub Pages.
   - **Commit author:** "Clover <metaphorever@gmail.com>". The user chose to publish that as is.
 - **GitHub CLI:** on this machine it's at `C:\Program Files\GitHub CLI\gh.exe` and is logged in as `metaphorever`. Shells started before it was installed may need the full path.
-- **Tests:** keep them passing (`npm test`, 161 now; `npx tsc --noEmit -p .` for types; `npm run build` is what the deploy runs). For tuning the social web and the economy over time, `npm run sim:month` runs 30-day colonies and prints how labels settle, what moved feelings (by cause), what changed labels, churn, drinking, work and remittances. Compare settings side by side on the same seeds: `npm run sim:month -- gossip.chance=0.6 vs job.help=0.0015` (options: `--seeds=`, `--days=`, `--size=`, `--rich`). See DESIGN.md §15.13 for the findings and the current drama tuning (help minimal, once-a-day events strong). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
+- **Tests:** keep them passing (`npm test`, 158 now; `npx tsc --noEmit -p .` for types; `npm run build` is what the deploy runs). For tuning the social web and the economy over time, `npm run sim:month` runs 30-day colonies and prints how labels settle, what moved feelings (by cause), what changed labels, churn, drinking, work and remittances. Compare settings side by side on the same seeds: `npm run sim:month -- gossip.chance=0.6 vs job.help=0.0015` (options: `--seeds=`, `--days=`, `--size=`, `--rich`). See DESIGN.md §15.13 for the findings and the current drama tuning (help minimal, once-a-day events strong). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
 - **Playtest feedback:** the user playtests on the live site and sends batches of notes. Fix bugs, record design decisions in DESIGN.md, and keep "provisional" notes up to date.
 
 ## Code rules that matter
@@ -51,7 +51,7 @@ All of this is playable now:
 - **The tower:** built from blueprints, with hauling from and to places. *(Since session 4, floors are empty rooms: see DESIGN.md §15.12.)*
 - **Language drift:** French (from 3 floors) and Greek (from 5), drift from floor 3 up; misreads, confusion, TEACH/LEARN, your lexicon, and writing in other languages.
 - **The patron and workers:** patience, a stipend paid at dawn, difficulty; quitting and newcomers.
-- **Time and art:** a day/night cycle with a night sky; MacPaint art sheets with a converter.
+- **Time and art:** a day/night cycle with a night sky; art sheets read from screenshots.
 
 The README's checklist has the same list. DESIGN.md §13 records how P0 works, including its provisional shortcuts.
 
@@ -96,12 +96,17 @@ Built and tested: the random map, the opening text and founding, placement mode 
 - **The user's decisions this session** (all in §16.9): the bonus is a letter, not a word; the win alert's text and score formula; the everyone-gone alert and its buttons; the only true end is no workers and no money (the patron at 0 just stops paying); "infinite" is 1,000 levels; overwork and low wages only as real causes, never narrative. Everything else Claude recommended in the plan was accepted.
 - **Watch in playtests:** the notice can repeat for a worker hovering at mood 30 (§16.9 step 1 has the options). Overwork and low wages are deliberately mild; the 30-day sim still averages mood 75.
 
+## Session 8 (2026-11-26)
+
+- **The Workers sheet is in:** all new art for bodies, heads, beards, hats, items, props and thought symbols (`art-src/shots/workers-clover.png`). Loads and thought clouds now sit on each worker's real top row, since hats reach the top of the box.
+- **The MacPaint `.bin`/`.pntg` tooling is gone** at the user's request: sheets are PNGs (`npm run art:export`), art comes back as screenshots. Don't make MacPaint-format files again.
+
 ## Next steps, in order
 
 1. **§16.9, step 3: the bonus letter.** Then 4 recruiting, 5 the other alerts (including the win and everyone-gone alerts, the menu-bar list, and somewhere to unmute), 6 the Stores window, 7 saves, 8 the New Game screen and taller maps, 9 the title screen and Settings. Build in that order.
 2. **Flags and bells** (§16.7): fixtures, RAISE / LOWER / RING, range circles, heraldic hatching, and the word **report** (§16.9 step 6). Then standing orders on boards.
 3. **Hauling, the rest of §16.8:** the rope pulley and winches up the tower, then the wagon, beasts of burden and the stable.
-4. **Art from the user:** the "Babel To Do" sheet (wheelbarrow and cart boxes feed straight in), more beards and hats for portraits, clouds from parts. Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art.
+4. **Art from the user:** the "Babel To Do" sheet (wheelbarrow and cart boxes feed straight in), more beards and hats for portraits, clouds from parts. Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art. Sheets go to the user as PNGs only.
 5. **Playtest notes** as they come: the tutorial text needs the user's voice; gold from bar takings; whether the starting supplies last the grace period; social tuning (§16.6) only from playtests.
 6. **P0 leftovers:** mailboxes and upper job boards, the COPY order, night changing behavior.
 7. **The rest of §16:** the About window (quick), stairs, the trader, pilgrimages.

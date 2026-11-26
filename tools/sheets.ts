@@ -54,7 +54,9 @@ function siteMarker(part: 'left' | 'middle' | 'right'): Grid {
 
 /** An empty box to draw something new in. */
 const todo = (key: string, label: string, w: number, h: number, grid: Grid | null = null): Slot => ({ key: `todo.${key}`, label, w, h, grid });
-import { PAINT_H, PAINT_W } from './macpaint';
+/** A sheet is one MacPaint page: 576 x 720 pixels. */
+export const PAINT_W = 576;
+export const PAINT_H = 720;
 
 export interface Slot {
   key: string;

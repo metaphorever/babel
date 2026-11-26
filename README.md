@@ -42,15 +42,15 @@ To build it yourself, the command above writes a static site to `dist/`: an `ind
 
 ## Drawing art
 
-Art is drawn in MacPaint (in the Infinite Mac emulator) and arrives as PNG screenshots in `art-src/shots/`, which get cut up into the game's PNGs in `public/art/`. The MacPaint working sheets in `art-src/` (with `npm run art:import`) still work and hold the box sizes. `npm run art:reference` writes reference pictures to draw over: the forest as it is now, and the worker portrait template. The full guide is [docs/SPRITES.md](docs/SPRITES.md).
+Art is drawn in MacPaint (in the Infinite Mac emulator) and arrives as PNG screenshots in `art-src/shots/`, which get cut up into the game's PNGs in `public/art/`. The sheets in `art-src/` (PNGs from `npm run art:export`) hold the box sizes to draw in; `npm run art:import` reads the screenshots. `npm run art:reference` writes reference pictures to draw over: the forest as it is now, and the worker portrait template. The full guide is [docs/SPRITES.md](docs/SPRITES.md).
 ## Layout
 
 - `src/sim/`: the simulation. Pure TypeScript, deterministic, no browser APIs. All balance numbers are in `tuning.ts`.
 - `src/render/`: the 1-bit canvas renderer and the procedural placeholder sprites.
 - `src/ui/`: the System 7 style windows.
 - `tests/`: Vitest tests for the simulation and the art pipeline.
-- `tools/`: the MacPaint codec and the art export/import commands.
-- `art-src/`: the MacPaint working sheets (the source of the art).
+- `tools/`: the art export/import commands and the simulation tools.
+- `art-src/`: the sheets to draw on, and `shots/`, the user's art as delivered (the source of the art).
 - `public/art/`: generated PNG sprite sheets the game loads.
 - `docs/`: the design doc, the art guide, and the handoff notes.
 

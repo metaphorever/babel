@@ -3,7 +3,7 @@
 //
 // Two kinds of screenshot:
 //  - A screenshot of a whole working sheet (or its top-left part). It's lined
-//    up against the sheet by its title, then read box by box like a .bin page.
+//    up against the sheet by its title, then read box by box.
 //  - Loose pieces drawn outside the boxes, or set pieces on their own. Each is
 //    a rectangle in a screenshot, with its mask either a second rectangle
 //    (offset to the right) or worked out: white touching the edge of the
@@ -14,14 +14,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Grid } from '../src/render/spriteData';
-import { PAINT_H, PAINT_W } from './macpaint';
 import { decodePngBits } from './png';
-import { type Page, renderPage } from './sheets';
+import { PAINT_H, PAINT_W, type Page, renderPage } from './sheets';
 
 const SHOTS = join(process.cwd(), 'art-src', 'shots');
 
 /** Screenshots of whole sheets, by page name. */
 export const SHEET_SHOTS: Record<string, string> = {
+  'Babel Workers': 'workers-clover.png',
   'Babel World': 'world-clover-horse-ladder.png',
   'Babel Buildings': 'clover-buildings-final.png',
 };

@@ -13,14 +13,14 @@ Moving MacPaint files in and out of the emulator turned out to be a pain, so **a
 ### How a delivery is cut up (since 2026-11-23)
 
 [`tools/shots.ts`](../tools/shots.ts) lists what's in each screenshot, and `npm run art:import` does the rest:
-- **Sheet screenshots** (`world-clover.png`, `clover-buildings.png`) are lined up against their sheet by the title text, then read box by box, exactly like a `.bin` page. A box the screenshot doesn't reach reads as "not drawn" and keeps the built-in art.
+- **Sheet screenshots** (`workers-clover.png`, `world-clover-horse-ladder.png`, `clover-buildings-final.png`) are lined up against their sheet by the title text, then read box by box. A box the screenshot doesn't reach reads as "not drawn" and keeps the built-in art.
 - **Loose pieces** (drawn outside any box, or set pieces in their own file) get a rectangle in the screenshot by hand, with their mask either a second drawing to the right or worked out (white touching the edge is see-through). Each delivery, Claude updates this list.
 - The result is `public/art/world.png` (one atlas) and the manifest, which the game loads.
 
 **What the first delivery taught (2026-11-23):**
 - **Inside the boxes is best,** but anything else is fine if the commit says what it is. The new dirt top was drawn just right of its box; it was found by comparing every box with the old art.
 - **The forest PNG had 19 grey pixels** (a smoothing step somewhere, or a scaled copy). They're rounded to black or white, which is harmless, but a straight 1:1 screenshot avoids it.
-- **New boxes go on a new page, Babel Extras,** so the boxes on the pages already drawn never move. `art-src/Babel Extras.bin` has storage shelves (blank, as asked; the game draws stone, wood and grain on planks at rows 5, 10 and 15), stairs (24×32, a placeholder for the roadmap) and a deck for two-story houses (a copy of the tower deck, to redraw if houses should look different). Screenshot it like the others, and add it to `SHEET_SHOTS` in `tools/shots.ts`.
+- **New boxes go on a new page, Babel Extras,** so the boxes on the pages already drawn never move. `art-src/Babel Extras.png` has storage shelves (blank, as asked; the game draws stone, wood and grain on planks at rows 5, 10 and 15), stairs (24×32, a placeholder for the roadmap) and a deck for two-story houses (a copy of the tower deck, to redraw if houses should look different). Screenshot it like the others, and add it to `SHEET_SHOTS` in `tools/shots.ts`.
 - **Answers from the user (2026-11-24):** the dirt top drawn beside its box is the new one (it just wasn't moved into place). The field's stubble-to-full-heads is variety, not growth stages: it stays static unless fields can run out one day. The quarry rock is a texture. The tower deck and wall were meant to be redrawn but didn't save; they'll come with the portrait sprint. The ladder is unchanged because there was nothing to change, and the house walls on purpose.
 
 - **Second delivery (2026-11-24):** updated screenshots of the World and Buildings sheets replaced the old ones in `art-src/shots/`. Changed: the tower's wall, deck and ladder; the tops of the building wall, door and window; the roofs; the stockpile. The house deck is still a copy of the tower deck.
@@ -38,6 +38,9 @@ Moving MacPaint files in and out of the emulator turned out to be a pain, so **a
   - **The outline** (the user's pick from the preview): the figure's silhouette grown by a ring of solid white, then rings dithered to ½, ¼ and ⅛ (a 4x4 Bayer pattern), growing up, down, left and right only, so corners come out rounded. `OUTLINE` in `portrait.ts`.
   - **Adding parts changes who looks like what:** parts are picked by number, so a new part (or one taken away) reshuffles everyone's face. Fine while the art is in progress.
 
+- **The Workers sheet (2026-11-26):** `art-src/shots/workers-clover.png`, a full-page screenshot, every box redrawn: 12 bodies (the 4 spare rows used), 4 heads, 4 beards, 6 hats, the items, props and thought symbols. Workers are about 13 pixels tall now: the head's top is row 3, and hats reach rows 0 to 2. The game used to assume 2 clear rows above every head; it now sits loads, thought clouds and the selection pointer on each worker's real top row (head or hat), so taller hats are fine. The thought symbols fill their 8x8 boxes, so the clouds are bigger than before (14x12).
+- **No more `.bin` / `.pntg` files (2026-11-26):** the MacPaint round trip never worked through Infinite Mac, and the user was converting the preview PNGs anyway. The sheets are plain PNGs now (`npm run art:export` writes them), and the MacPaint file code is gone.
+
 ### Reference pictures to draw over
 
 `npm run art:reference` writes these into `art-src/` (each also at 4x, as `…@4x.png`, for looking at on a modern screen):
@@ -49,11 +52,11 @@ Moving MacPaint files in and out of the emulator turned out to be a pain, so **a
 
 **Portraits** are built from layers, drawn back to front: **body, hair (behind the head), head (with neck, ears and face), beard, hat.** Each part is drawn in its own 64x64 frame, lined up on the same guides. White touching the edge of a part is see-through; anything with a see-through hole in the middle, like a hood around the face, needs a mask. Draw as many variants of each layer as you like: each worker's look is picked from them.
 
-The rest of this document describes the MacPaint sheets and the `.bin`/`.pntg` round trip. They still work and remain the reference for box sizes and layouts, but they're no longer the main route.
+The rest of this document describes the sheets: the reference for box sizes and layouts.
 
 ## The MacPaint sheets
 
-All of the game's art lives on three **MacPaint documents** in [`art-src/`](../art-src). Draw on them in MacPaint on a System 7 Mac (in the [Infinite Mac](https://infinitemac.org) emulator, or a real one), and a converter turns them into the PNGs the game uses. No Photoshop step is needed.
+The game's small art is laid out on **sheets**, one MacPaint-sized page (576x720) each, as PNGs in [`art-src/`](../art-src) (`Babel Workers.png` and so on). Draw on them in MacPaint (bring the PNG in with a converter), then screenshot the finished page into `art-src/shots/` (see "How art actually arrives" above).
 
 | Page | What's on it |
 |---|---|
@@ -61,15 +64,7 @@ All of the game's art lives on three **MacPaint documents** in [`art-src/`](../a
 | `Babel World` | Terrain and tower tiles, the tree, crops, quarry rock, well, old shack, road sign, supply wagon, sky (cloud, sun, moon) |
 | `Babel Buildings` | Generic building parts (walls, door, window, roof), the scriptorium, the job board, fixtures (bed, oven, broken oven, pantry, brewing station, bar, table, stockpile) |
 
-Items now include **beer** (a mug), next to stone, wood, grain and bread. Pages exported before 2026-11-23 don't have a box for it; `npm run art:export -- --force` adds one (and starts the page over).
-
-Each page comes in three files:
-
-| File | What it's for |
-|---|---|
-| `.bin` | The page wrapped in MacBinary, which carries the Mac file type ("MacPaint document") along with it. Use this one to get pages into the emulator. |
-| `.pntg` | The same page as a raw MacPaint file. |
-| `.preview.png` | A picture of the page, so you can look at it on a modern computer. |
+Each sheet comes from `npm run art:export`, filled with the game's built-in art (or empty boxes for things not drawn yet). `-- --page "Babel To Do"` writes just one.
 
 ## How a page works
 
@@ -98,39 +93,17 @@ Every worker part is drawn in the same **16×16 box**:
 
 Items, props and thought symbols are drawn in **8×8 boxes**, starting at the top-left. The empty space around them is trimmed. Thought symbols get a white cloud drawn around them automatically, so draw just the symbol.
 
-## The round trip
+## After drawing
 
-1. **Get a page into the emulator:** drag the `.bin` file onto the Infinite Mac window to upload it.
-2. **Open it in MacPaint and draw.** Save it under the same name.
-3. **Get it back out:** use the emulator's file transfer to download it, then put it in `art-src/` under the same name, ending in either `.bin` or `.pntg`. The importer uses whichever of the two is newer.
-4. **Convert it:** run
-
-   ```bash
-   npm run art:import
-   ```
-
-   This writes the game's PNGs and manifest into `public/art/` and refreshes the preview pictures.
-5. **Look:** with the dev server running (`npm run dev`), switch back to the game's window and the art reloads. Commit when you're happy; the live site updates on the next push.
-
-**Still to test: the round trip through Infinite Mac.** Two things aren't verified yet:
-- **Getting in:** that Infinite Mac turns the uploaded `.bin` into a proper MacPaint document. If MacPaint's Open dialog doesn't list the page, try the `.pntg` file, or set its type to `PNTG` with ResEdit.
-- **Getting out:** exactly how Infinite Mac hands files back. The importer accepts either a MacBinary file or a raw MacPaint file, so whichever comes out should work.
-
-Do the first round trip with a small change before drawing a lot.
-
-To regenerate pages from the game's built-in art:
-
-```bash
-npm run art:export
-```
-
-It won't overwrite a page that already exists. Add `-- --force` to start a page over (that throws away what's on it).
+1. Screenshot the whole page at 1:1 into `art-src/shots/`, and say which sheet it is.
+2. Claude adds it to `SHEET_SHOTS` in `tools/shots.ts` and runs `npm run art:import`, which writes the game's PNGs and manifest into `public/art/`.
+3. With the dev server running (`npm run dev`), reload the game to see it. Every push to `main` updates the live site.
 
 ## What the game uses so far
 
 | Art | In the game? |
 |---|---|
-| Workers, items, props, thought symbols | Yes, now |
+| Workers, items, props, thought symbols | Yes, the user's art (2026-11-26, the Workers sheet screenshot) |
 | Buildings and fixtures | Yes, the user's art (first delivery, 2026-11-23): generic buildings assembled from the wall, door, window and roof parts (one 8-pixel tile each, so any width works), the scriptorium, the job board, the old shack and every fixture. Storage shelves are still a placeholder. |
 | Terrain, nature, the tower's tiles, sun and moon | Yes, the user's art: dirt (top, middle, deep), the forest and field set pieces, the quarry's rock (a 16×16 texture tiled over the stepped rock face), the well, the road home sign, the supply wagon (two frames, rolling in at the start of a new game), the sun and the moon. The tower's deck, wall and ladder use their sheet boxes, which haven't been redrawn yet. Two-story houses have no deck art: their rooms stack straight on top of each other. |
 | Things the game draws over the art | The job board shows only as many of its four drawn notices as are posted; the pantry hides its loaves as it empties (each is a third of a full pantry); the bar gets a mug on the counter while there's beer. The supply wagon carries what's left of the patron's supplies piled in its bed (stone, wood, grain, bread from the back; one item drawn per 3 units, up to 10 each; the bed is `WAGON_BED` in `renderer.ts`). Trade items will get their own art later, from the user. The scriptorium stacks its writing queue between each pair of columns, bottom up: orders on the left, blueprints on the right, two rows a sheet, 11 a side (the gaps are `SCRIPTORIUM_GAPS` in `renderer.ts`; if the columns move, change those). |
@@ -138,4 +111,4 @@ It won't overwrite a page that already exists. Add `-- --force` to start a page 
 
 ## Changing the layout
 
-Box sizes and positions are set in [`tools/sheets.ts`](../tools/sheets.ts): sizes per slot, slots per row, and which page each sprite is on. To make something bigger, or to add a new kind of sprite, ask me to change the layout. Then export a fresh page and copy your drawings across in MacPaint.
+Box sizes and positions are set in [`tools/sheets.ts`](../tools/sheets.ts): sizes per slot, slots per row, and which page each sprite is on. To make something bigger, or to add a new kind of sprite, ask me to change the layout. Then export a fresh sheet and copy your drawings across. Moving boxes on a sheet the user has already drawn breaks reading their screenshot, so new boxes go on a new page.
