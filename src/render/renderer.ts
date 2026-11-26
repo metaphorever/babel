@@ -22,6 +22,12 @@ const WAGON_BED = { x: 1, w: 32, rail: 11, most: 10 };
  * shows, so the cart hides their legs. The look is just a fixed face.
  */
 const WAGON_DRIVER = { x: 37, railRow: 10, look: 11 };
+/**
+ * A sleeper in a bed lies face up with their head at the bed's left end,
+ * where the pillow is in its art, raised this many pixels off the floor.
+ * (On the ground they lie where they dropped, head the way they faced.)
+ */
+const IN_BED = { lift: 1 };
 /** The gaps between each pair of columns in the scriptorium's art (rows from its top), where the writing queue stacks up. */
 const SCRIPTORIUM_GAPS = [{ x: 6, top: 6, bottom: 27 }, { x: 37, top: 6, bottom: 27 }] as const;
 const SCRIPTORIUM_GAP_W = 5;
@@ -675,12 +681,15 @@ export class Renderer {
     const lying = w.activity.kind === 'sleep' && w.activity.stage >= 1;
     const moving = w.stepProgress > 0;
     const frame = moving ? (Math.floor(s.tick / 4) % 2) : 0;
-    const ws = workerSprite(w.look, frame, w.facing, lying);
+    // asleep in a bed: head on the pillow (the bed's left end), lying on the mattress
+    const bed = lying && w.activity.ref !== null && w.activity.ref >= 0 ? s.sites.find((b) => b.id === w.activity.ref && b.kind === 'bed') : undefined;
+    const ws = workerSprite(w.look, frame, bed ? -1 : w.facing, lying);
     const spr = ws.canvas;
-    const sx = x - ws.anchorX;
+    const sx = bed ? bed.x0 * TILE : x - ws.anchorX;
+    const bottom = bed ? (bed.y + 1) * TILE - IN_BED.lift : y;
     // things drawn "above the head" (loads, the thought cloud, the pointer) sit on the topmost drawn row, hat or head
-    const sy = y - spr.height + ws.top;
-    g.drawImage(spr, sx, y - spr.height);
+    const sy = bottom - spr.height + ws.top;
+    g.drawImage(spr, sx, bottom - spr.height);
     if (w.carrying && !lying) {
       const it = itemSprite(w.carrying);
       // an armload stacks up over their head

@@ -98,7 +98,8 @@ Built and tested: the random map, the opening text and founding, placement mode 
 
 ## Session 8 (2026-11-26)
 
-- **The Workers sheet is in:** all new art for bodies, heads, beards, hats, items, props and thought symbols (`art-src/shots/workers-clover.png`). Loads and thought clouds now sit on each worker's real top row, since hats reach the top of the box.
+- **The Workers sheet is in, final:** all new art for bodies, heads, beards, hats, items, props and thought symbols, after three revisions (`art-src/shots/workers-clover-4.png`). Loads and thought clouds now sit on each worker's real top row, since hats reach the top of the box. Sleepers lie face up, and in a bed with their head on the pillow, 1 pixel off the floor.
+- **Preview pages** for art in progress live in `art-src/picker/` (not committed): `workers.html` shows every worker part labeled, a crowd, walking and sleeping, using the game's own code; open it through the dev server.
 - **The MacPaint `.bin`/`.pntg` tooling is gone** at the user's request: sheets are PNGs (`npm run art:export`), art comes back as screenshots. Don't make MacPaint-format files again.
 
 ## Next steps, in order

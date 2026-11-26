@@ -86,7 +86,8 @@ export function workerSprite(look: number, frame: number, facing: 1 | -1, lying:
   let canvas = cache.get(key);
   if (!canvas) {
     let g = composeWorker(art, look, lying ? 0 : frame);
-    if (lying) g = trim(rotate(g));
+    // lying on their back: a quarter turn puts the head on the right, face down; flipping the rows turns them face up
+    if (lying) g = trim(rotate(g).reverse());
     if (facing < 0) g = mirror(g);
     canvas = toCanvas(g);
     cache.set(key, canvas);

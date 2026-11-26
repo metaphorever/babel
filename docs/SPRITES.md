@@ -39,6 +39,9 @@ Moving MacPaint files in and out of the emulator turned out to be a pain, so **a
   - **Adding parts changes who looks like what:** parts are picked by number, so a new part (or one taken away) reshuffles everyone's face. Fine while the art is in progress.
 
 - **The Workers sheet (2026-11-26):** `art-src/shots/workers-clover.png`, a full-page screenshot, every box redrawn: 12 bodies (the 4 spare rows used), 4 heads, 4 beards, 6 hats, the items, props and thought symbols. Workers are about 13 pixels tall now: the head's top is row 3, and hats reach rows 0 to 2. The game used to assume 2 clear rows above every head; it now sits loads, thought clouds and the selection pointer on each worker's real top row (head or hat), so taller hats are fine. The thought symbols fill their 8x8 boxes, so the clouds are bigger than before (14x12).
+  - **Three revisions followed the same day** (`workers-clover-2.png` to `-4.png`, the last is the one read), checked in a preview page (`art-src/picker/workers.html`, scratch, run with the dev server: every part labeled, a mixed crowd, workers walking, sleeping). Heads got necks and are 4 pixels wide; hats were re-centred on the neck column. The user called `-4` final for workers.
+  - **Masks as drawn:** the item and prop masks are filled rectangles, so corners the drawing leaves open are solid white (only visible against something dark). A few bodies have a white pixel at the top-left edge. Left as drawn.
+  - **Sleeping** (the user's call): face up. In a bed, the head goes on the pillow (the bed's left end) and the sleeper lies 1 pixel off the floor (`IN_BED` in `renderer.ts`). On the ground they lie where they dropped, head the way they faced.
 - **No more `.bin` / `.pntg` files (2026-11-26):** the MacPaint round trip never worked through Infinite Mac, and the user was converting the preview PNGs anyway. The sheets are plain PNGs now (`npm run art:export` writes them), and the MacPaint file code is gone.
 
 ### Reference pictures to draw over
@@ -83,7 +86,7 @@ So a white pixel in the sprite is opaque white only if the mask is black there. 
 ## Workers
 
 Every worker part is drawn in the same **16×16 box**:
-- The worker faces **right**. The game mirrors them to face left, and rotates them when they lie down.
+- The worker faces **right**. The game mirrors them to face left, and turns them onto their back when they lie down.
 - **Bodies** have their **feet on the bottom row** and are **centered on column 7** (counting from 0 at the left). The second box in each body row is the walking step.
 - **Heads** are drawn with the neck at **(7, 7)**: the face's bottom edge on row 7.
 - **Beards and hats** are drawn over the head, in that same frame. Hats can use white (with a black mask) to cover parts of the head, for hoods and brims.

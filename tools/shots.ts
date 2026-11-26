@@ -21,7 +21,7 @@ const SHOTS = join(process.cwd(), 'art-src', 'shots');
 
 /** Screenshots of whole sheets, by page name. */
 export const SHEET_SHOTS: Record<string, string> = {
-  'Babel Workers': 'workers-clover.png',
+  'Babel Workers': 'workers-clover-4.png',
   'Babel World': 'world-clover-horse-ladder.png',
   'Babel Buildings': 'clover-buildings-final.png',
 };
