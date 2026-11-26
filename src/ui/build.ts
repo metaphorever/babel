@@ -1,4 +1,4 @@
-import { ALL, BUILD, DRIFT, ECONOMY, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
+import { ALL, BUILD, DRIFT, ECONOMY, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type AlertKind, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
 import { fixtureWidth, footprint, houseCost, placeCost, towerSiteWaiting, worksFraction, type PlaceRequest } from '../sim/build';
 import { barMood } from '../sim/activities';
 import { deckRow } from '../sim/tower';
@@ -42,6 +42,34 @@ function placingName(p: Placing): string {
 
 export interface BuildHooks {
   centerOnTile(x: number, y: number): void;
+  /** Select a worker and open their window (from an alert). */
+  showWorker?(id: number): void;
+}
+
+/** How each kind of alert is named in its "mute" box. */
+const ALERT_KIND_TEXT: Record<AlertKind, string> = {
+  notice: 'a worker putting in notice',
+  quit: 'a worker quitting',
+};
+
+const MUTE_KEY = 'babel.alerts.muted';
+
+/** The player's muted alerts: all of them, or by kind. Kept in the browser, across games. */
+export function readMutes(): { all: boolean; kinds: string[] } {
+  try {
+    const m = JSON.parse(localStorage.getItem(MUTE_KEY) ?? '{}');
+    return { all: !!m.all, kinds: Array.isArray(m.kinds) ? m.kinds : [] };
+  } catch {
+    return { all: false, kinds: [] };
+  }
+}
+
+export function writeMutes(m: { all: boolean; kinds: string[] }): void {
+  try {
+    localStorage.setItem(MUTE_KEY, JSON.stringify(m));
+  } catch {
+    // private browsing: mutes last until the page closes
+  }
 }
 
 export class BuildUi {
@@ -602,6 +630,52 @@ export class BuildUi {
     return this.modalEl !== null;
   }
 
+  // ------------------------------------------------------------- alerts
+
+  /** Alerts already shown (or skipped because muted) this session. */
+  private alertsSeen = new Set<number>();
+
+  /**
+   * One alert at a time, oldest first, as a dialog (which pauses the game):
+   * Acknowledge, with boxes to mute this kind or every alert. Mutes are the
+   * player's own, kept in the browser.
+   */
+  private showNextAlert(): void {
+    if (this.modalEl) return;
+    const mutes = readMutes();
+    const next = this.s.alerts.find((a) => !this.alertsSeen.has(a.id));
+    if (!next) return;
+    this.alertsSeen.add(next.id);
+    if (mutes.all || mutes.kinds.includes(next.kind)) return this.showNextAlert();
+    const muteKind = h('input', { type: 'checkbox' });
+    const muteAll = h('input', { type: 'checkbox' });
+    const worker = next.workerId !== null ? this.s.workers.find((w) => w.id === next.workerId) : undefined;
+    this.modal(
+      next.title,
+      [
+        h('div', { class: 'dialog-title' }, next.title),
+        h('p', {}, next.text),
+        h('label', { class: 'alert-mute' }, muteKind, ` Mute future alerts like this (${ALERT_KIND_TEXT[next.kind]})`),
+        h('label', { class: 'alert-mute' }, muteAll, ' Mute all future alerts'),
+      ],
+      [
+        ...(worker && !worker.leaving ? [{ label: `Show ${worker.name}`, run: () => this.hooks.showWorker?.(worker.id) }] : []),
+        {
+          label: 'Acknowledge',
+          primary: true,
+          run: () => {
+            if (muteKind.checked || muteAll.checked) {
+              const m = readMutes();
+              if (muteAll.checked) m.all = true;
+              if (muteKind.checked && !m.kinds.includes(next.kind)) m.kinds.push(next.kind);
+              writeMutes(m);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   // ------------------------------------------------------------ the opening
 
   private needsOpening(): boolean {
@@ -655,6 +729,7 @@ export class BuildUi {
       this.sawCharter = true;
       if (this.s.start === 'opening') this.showFounded();
     }
+    this.showNextAlert();
     if (this.wm.get('build')!.open && !this.placing && !this.demolishing) this.renderPalette();
     this.refreshInfo();
     this.tutorial.refresh();

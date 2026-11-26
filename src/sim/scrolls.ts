@@ -1,4 +1,4 @@
-import { addMoodlet, letGo, log, moveTo, releaseReservations, settle } from './actions';
+import { addMoodlet, gotPaid, judgeWage, letGo, log, moveTo, releaseReservations, settle } from './actions';
 import { startActivity, train, workOrder, type Result } from './activities';
 import { carrierText, hasWriteLine, lineText, pinCarrier, writingCost } from './carriers';
 import { addConfusion, knows, knowsWord } from './drift';
@@ -236,13 +236,16 @@ export function scrollLineDone(s: SimState, w: Worker, units: number, finish = f
     if (s.gold - s.reserved >= pay) {
       s.gold -= pay;
       w.purse += pay;
-      addMoodlet(s, w, 'paid', `Paid ${pay} gold`, MOOD.gotPaid.value, MOOD.gotPaid.ticks);
+      gotPaid(s, w, pay);
     } else {
       addMoodlet(s, w, 'unpaid', 'Treasury was empty', -6, MOOD.missedJobTicks);
       log(s, `No gold to pay ${w.name} for "${lineText(c, c.pc)}".`, w.id);
     }
   }
-  if (units > 0) w.jobsDone++;
+  if (units > 0) {
+    w.jobsDone++;
+    judgeWage(s, w, c.wage);
+  }
   c.lineDone += units;
   // the next unit starts with a fresh look at any UNTIL
   if (units > 0) c.checked = false;

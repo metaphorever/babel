@@ -13,6 +13,8 @@ const difficulty: Difficulty = diffParam === 'easy' || diffParam === 'hard' ? di
 // ?start=prebuilt skips the opening with a colony already laid out (handy for playtesting later stages)
 const start: StartMode = params.get('start') === 'prebuilt' ? 'prebuilt' : 'opening';
 const sim = new Sim(seed, difficulty, start);
+// for poking at the game from the browser console while developing (not in the built game)
+if (import.meta.env.DEV) (window as unknown as { babel: unknown }).babel = { sim };
 
 const canvas = document.getElementById('world') as HTMLCanvasElement;
 const renderer = new Renderer(canvas);
@@ -45,6 +47,11 @@ const ui = new Ui(document.getElementById('ui')!, sim, {
 });
 const build = new BuildUi(document.getElementById('ui')!, ui.wm, sim, renderer, ui.scriptorium, {
   centerOnTile: (x, y) => renderer.centerOn(x * TILE, y * TILE),
+  showWorker: (id) => {
+    ui.select(id);
+    const w = sim.state.workers.find((x) => x.id === id);
+    if (w) renderer.centerOn(w.x * TILE, w.y * TILE);
+  },
 });
 
 // ------------------------------------------------------------------ input

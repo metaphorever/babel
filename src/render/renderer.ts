@@ -708,7 +708,7 @@ export class Renderer {
 
   private statusGlyph(s: SimState, w: Worker, lying: boolean): string | null {
     if (lying) return 'z';
-    if (w.leaving || w.noticeUntil !== null) return 'b';
+    if (w.leaving || w.noticeUntil !== null || (w.fedUpSince !== null && w.fedUpSince !== undefined)) return 'b';
     if (w.confusion > CONFUSION.moodAbove) return '?';
     for (const m of w.moodlets) {
       const age = s.tick - (m.until - (m.kind === 'missed' ? MOOD.missedJobTicks : MOOD.failedJob.ticks));

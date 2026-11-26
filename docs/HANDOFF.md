@@ -81,6 +81,7 @@ Built and tested: the random map, the opening text and founding, placement mode 
 - **Session 6** (§15.16): the logic words are in: IF / OTHERWISE / NOT, store checks (has / fewer than / no), hungry / tired / carrying / night / dawn, UNTIL on work lines, WAIT. Checking a store costs a walk (`LOGIC.lookRange`, for the user to confirm). Scrolls hold 8 lines. The user's hauling-equipment notes are §16.8.
 - **Later in session 6** (§15.17): build orders by place (camp / buildings / fixtures in… / tower), fixtures and ladders planned on a level still being built, dawn/noon/dusk/midnight, Brewery and Shelves, the Orders window, a wider Scriptorium with the composer on top, explanations moved into hover tips and Help.
 - **Wheelbarrows and carts** (§15.18): movable stores, "haul cart 1 to …", "… using cart 1". Next for hauling (§16.8): the rope pulley and winches up the tower, then the wagon, beasts of burden and the stable.
+- **Keeping workers (§16.9), step 1 built:** fed up, notice at the end of the shift, deadlines by difficulty, complaints named in the notice alert, overwork and low wages as real causes, pay that scales. Next: the bonus letter, recruiting, the other alerts.
 - **Next in this thread:** flags and bells (§16.7): fixtures, RAISE / LOWER / RING, range circles, heraldic hatching. Then standing orders on boards.
 
 ## Next steps, in order

@@ -265,15 +265,43 @@ export const PATRON = {
   otherBuildCap: 75,
 };
 
+/**
+ * Quitting (the user, 2026-11-26). Mood below the line and a worker is fed
+ * up: they show it at once. At the end of that shift (dawn, noon, dusk,
+ * midnight) it becomes notice, and they leave at the end of their notice
+ * unless their mood is back at the line.
+ */
 export const QUIT = {
-  /** Mood below this for long enough and a worker gives notice. */
+  /** The quit line: below it, fed up; back at it, they stay. */
   lowMood: 30,
-  sustainTicks: 1200,
-  /** Notice period before they walk home. */
-  noticeTicks: 2400,
-  /** During their notice, mood above this and they decide to stay. */
-  stayAbove: 40,
+  /** Fed up for less than this when a shift ends and it waits for the next one, so the bubble always comes first. */
+  minFedUpTicks: 300,
+  /** Notice, in shifts (a shift is a quarter of a day): easy a whole day, normal 2 shifts, hard 1. */
+  noticeShifts: { easy: 4, normal: 2, hard: 1 } as Record<Difficulty, number>,
 };
+
+/** What a worker thinks fair pay for a job is: this many gold a unit, times their greed. Less is "low wages". */
+export const PAY = {
+  fair: 1.2,
+  /** Mood lost per gold short of fair, up to lowMax, for lowTicks. */
+  perGoldShort: 3,
+  lowMax: 8,
+  lowTicks: 1500,
+};
+
+/** Working a long stretch without a real break (a meal, a drink, sleep, a wander) wears on them. */
+export const OVERWORK = {
+  /** Ticks of work before it starts to tell (2 shifts). */
+  after: 3000,
+  /** Each tick of a break takes this much off the stretch; sleep wipes it. */
+  restPerTick: 25,
+  /** Mood lost per tick past `after`, up to max. */
+  perTick: 1 / 150,
+  max: 15,
+};
+
+/** Complaints fade with a half-life of about a shift (1500 ticks): 0.5^(1/1500). */
+export const GRIEVANCE_DECAY = 0.99953802;
 
 export const ARRIVALS = {
   /** How often a newcomer may turn up on the road. */
@@ -346,7 +374,8 @@ export const MOOD = {
   sleptInBed: { value: 6, ticks: 3000 },
   sleptOnGround: { value: -8, ticks: 3000 },
   bar: { value: 12, ticks: 3600 },
-  gotPaid: { value: 2, ticks: 600 },
+  /** Getting paid: a little for any pay, more for more (perGold), up to max; it lasts longer too. */
+  gotPaid: { value: 2, ticks: 600, perGold: 0.5, max: 12, ticksPerGold: 20, maxTicks: 3000 },
   /** Missed job: penalty = base + wage * perWage, capped. */
   missedJobBase: 2,
   missedJobPerWage: 3,

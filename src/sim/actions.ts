@@ -1,6 +1,6 @@
 import { findPath } from './path';
-import { MOVE } from './tuning';
-import { Tile, isVehicleKind, type Pt, type SimState, type Site, type Worker } from './types';
+import { MOOD, MOVE, PAY } from './tuning';
+import { Tile, isVehicleKind, type AlertKind, type Pt, type SimState, type Site, type Worker } from './types';
 import { tileAt } from './world';
 
 export type MoveResult = 'arrived' | 'moving' | 'unreachable';
@@ -114,6 +114,26 @@ export function addMoodlet(
   // same kind refreshes instead of stacking
   w.moodlets = w.moodlets.filter((m) => m.kind !== kind);
   w.moodlets.push({ kind, label, value, until: s.tick + ticks });
+}
+
+/** Paid for work: a little lift for any pay, more (and longer) for more. */
+export function gotPaid(s: SimState, w: Worker, pay: number): void {
+  const p = MOOD.gotPaid;
+  addMoodlet(s, w, 'paid', `Paid ${pay} gold`, Math.min(p.max, Math.round(p.value + pay * p.perGold)), Math.min(p.maxTicks, p.ticks + pay * p.ticksPerGold));
+}
+
+/** A unit of work done at this wage: less than they think it's worth, and they feel it (greedier workers expect more). */
+export function judgeWage(s: SimState, w: Worker, wage: number): void {
+  const fair = PAY.fair * w.p.greed;
+  if (wage >= fair) return;
+  const value = -Math.min(PAY.lowMax, Math.round((fair - wage) * PAY.perGoldShort));
+  if (value < 0) addMoodlet(s, w, 'lowpay', wage === 0 ? 'Working for nothing' : `Only ${wage} gold for that`, value, PAY.lowTicks);
+}
+
+/** Something the player should know about now. The UI shows it once, unless they've muted its kind. */
+export function alert(s: SimState, kind: AlertKind, title: string, text: string, workerId: number | null = null): void {
+  s.alerts.push({ id: s.nextId++, tick: s.tick, kind, title, text, workerId });
+  if (s.alerts.length > 50) s.alerts.splice(0, s.alerts.length - 50);
 }
 
 export function log(s: SimState, text: string, workerId: number | null = null): void {

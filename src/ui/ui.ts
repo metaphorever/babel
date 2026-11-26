@@ -10,6 +10,8 @@ import {
   isNight,
   currentStipend,
   QUIT,
+  complaintsText,
+  whenText,
   langName,
   sayingFor,
   speakingLang,
@@ -358,8 +360,10 @@ export class Ui {
       w.leaving
         ? kv('Leaving', 'Walking home for good')
         : w.noticeUntil !== null
-          ? kv('Giving notice', `Leaves in ${formatTime(Math.max(0, w.noticeUntil - this.s.tick))} unless their mood rises above ${QUIT.stayAbove}`)
-          : '',
+          ? kv('Giving notice', `Fed up with ${complaintsText(w)}. Leaves at ${whenText(w.noticeUntil)} (in ${formatTime(Math.max(0, w.noticeUntil - this.s.tick))}) unless their mood rises to ${QUIT.lowMood}.`)
+          : w.fedUpSince !== null && w.fedUpSince !== undefined
+            ? kv('Fed up', `With ${complaintsText(w)}. Unless their mood is back to ${QUIT.lowMood} by the end of the shift, they'll put in notice.`)
+            : '',
       w.bag.length ? kv('Bag', `${w.bag.length} to deliver`) : '',
       w.held.length ? h('div', { class: 'section-label' }, 'In hand') : '',
       w.held.length ? inHand : '',
@@ -440,7 +444,7 @@ export class Ui {
         'tr',
         { class: w.id === this.selected ? 'sel' : '', onclick: () => this.select(w.id) },
         h('td', {}, w.name),
-        h('td', {}, w.leaving ? 'Going home' : w.noticeUntil !== null ? `Notice: ${formatTime(Math.max(0, w.noticeUntil - this.s.tick))}` : this.doingShort(w)),
+        h('td', {}, w.leaving ? 'Going home' : w.noticeUntil !== null ? `Notice: ${formatTime(Math.max(0, w.noticeUntil - this.s.tick))}` : w.fedUpSince !== null && w.fedUpSince !== undefined ? 'Fed up' : this.doingShort(w)),
         h('td', {}, bar(w.mood)),
       );
       t.append(row);

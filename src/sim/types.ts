@@ -319,10 +319,17 @@ export interface Worker {
   thought: string;
 
   jobsDone: number;
-  /** Ticks spent in a low mood (resets when mood recovers). */
-  lowMoodTicks: number;
-  /** When their notice runs out, if they've given notice. */
+  /**
+   * When their mood fell below the quit line (null: it hasn't). Fed up, they
+   * show it; at the end of the shift it becomes notice.
+   */
+  fedUpSince?: number | null;
+  /** When their notice runs out (a shift boundary), if they've given notice. */
   noticeUntil: number | null;
+  /** What's been getting them down lately: mood lost to each kind of complaint, fading over about a shift. */
+  grievances?: Partial<Record<Complaint, number>>;
+  /** Ticks of work without a real break. Past OVERWORK.after, it wears on their mood. */
+  workStreak?: number;
   /** On their way home for good. */
   leaving: boolean;
   /** Look seed: picks their sprite's parts and their portrait. */
@@ -373,6 +380,32 @@ export interface SocialMemory {
   heardFrom?: number;
   /** Badmouthing: who was badmouthed. If the rememberer gets to tell them, it can be the last straw. */
   target?: number;
+}
+
+/** What a worker can be fed up with: every kind of thing that lowers mood. */
+export type Complaint =
+  | 'hunger'
+  | 'thirst'
+  | 'tiredness'
+  | 'rough'
+  | 'confusion'
+  | 'wasted'
+  | 'unpaid'
+  | 'scrounging'
+  | 'others'
+  | 'overwork'
+  | 'lowpay'
+  | 'other';
+
+export type AlertKind = 'notice' | 'quit';
+
+export interface Alert {
+  id: number;
+  tick: number;
+  kind: AlertKind;
+  title: string;
+  text: string;
+  workerId: number | null;
 }
 
 /**
@@ -470,6 +503,8 @@ export interface SimState {
   reserved: number;
 
   events: GameEvent[];
+  /** Things the player should know about now (a worker giving notice...). The UI shows each once, unless muted. */
+  alerts: Alert[];
   /** Who feels what about whom: families, couples, friends and enemies. */
   social: SocialState;
   /** Gold workers have sent home to their families (gone from the colony for good). */

@@ -14,4 +14,5 @@ export { SKILL_IDS, SKILL_LABEL, skillLevel, carryCapacity, bonusChance } from '
 export { standable, tileAt, siteOf } from './world';
 export { findPath } from './path';
 export { branchError } from './logic';
+export { COMPLAINT_TEXT, complaintsText, topComplaints, whenText } from './morale';
 export { clockText, darkness, dayOf, hourOf, isNight } from './time';

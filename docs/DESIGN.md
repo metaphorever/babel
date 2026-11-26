@@ -664,6 +664,40 @@ A popup message when something needs the player's attention, with a little sound
   - **Pausing:** the game already pauses while a dialog is open, so an alert pauses it too. That's probably right for the serious ones; if it gets annoying, minor ones could become a line in the log instead.
   - **The sound** comes with the procedural sound effects on the "later" list: a short System 7 style beep would fit.
 
+### 16.9 Keeping workers, alerts, and a real start (planned 2026-11-26)
+
+*From the user's playtest notes and a friend's playtest. Agreed plan; built in this order.*
+
+1. **Quitting on shifts** *(built 2026-11-26: `morale.ts`; `QUIT` in tuning. A worker fed up for under 15 seconds when the shift ends waits for the next one, so the bubble always comes first)*.
+   - **Fed up:** a worker whose mood falls below the quit threshold (30) shows the quitting bubble at once. That's the early warning, with no countdown yet. If their mood is back at the threshold before the shift ends, it passes quietly.
+   - **Notice:** at the end of that shift (dawn, noon, dusk or midnight, the quarters the time words use), it's official, and an alert fires.
+   - **Deadline:** on a shift boundary. Easy gives a day (4 shifts, 5:00 at 1×), normal 2 shifts (2:30), hard 1 shift (1:15). A difficulty setting.
+   - **One threshold:** they stay if their mood reaches the threshold again (no separate, higher "stay" line).
+2. **Why they're fed up** *(built: the tally sums the real mood penalties, `tallyGrievances`; overwork is `OVERWORK`, low wages `PAY`, both mild until playtests say otherwise. "Paid" moodlets now scale with the amount. The notice and quit alerts are in, with Acknowledge, the two mute boxes, and a button to show the worker)*. Every bad mood source feeds a running tally per kind of complaint, fading over about a shift: hunger, thirst, tiredness, confusing orders, failed or wasted jobs, going unpaid, scrounging off the ground, trouble with others, and two new real causes:
+   - **Overworked:** working a long stretch without a break (eating, sleeping, a drink or a wander).
+   - **Low wages:** being paid less than they think the work is worth (greedier workers expect more).
+
+   Both are real mood sources, so the tally only ever names what actually moved their mood. The notice alert names the top two: "Arrun is fed up with hunger and confusing orders and has put in notice that they will quit and leave at noon on day 15 unless their mood rises to 30 or above. Address the issues that Arrun is complaining about or for a quick-fix assign them to light duty jobs for higher pay."
+3. **A bonus,** as a letter, not a word: "Send a bonus…" in the worker window. The scribe writes a pay packet and a courier hands it over. Its mood lift is immediate, sized by the gold against their purse and their traits. 100 gold should rescue anyone. "Paid" moodlets scale with the wage too (they're a flat +2 now, which is why a big wage didn't help in the playtest).
+4. **Recruiting:** "Recruit a worker (N gold)" in the Workers window, outside the order system. The fee scales with headcount (about 15 × workers²), cheap when few are left. The patron still sends workers too, at a rate set by difficulty.
+5. **Alerts** (§16.5):
+   - **Each alert:** Acknowledge, "mute this type", "mute all", and a list in the menu bar.
+   - **Types:** a worker gives notice; a worker quits; the patron's favour falls to 50%, 25% and 0; a supply runs out (per good, with an "alert below" setting in Stores, 1 by default); the treasury can't pay wages; a worker gives up on a scroll they can't read. A newcomer arriving and a level finished are info only, muted by default.
+   - **The goal reached:** "Congratulations! You reached the patron's goal of a tower [goal] levels tall. Your score is (tower height × 1000) / (in-game time elapsed) + gold in the treasury." [Quit] [Keep Playing].
+   - **Everyone gone:** "All of your workers have quit and you are unable to continue building." If the treasury can pay for one, it adds "You can recruit new workers from the Workers window" and a [Recruit New Worker] button. Then [Quit Game]. **The only true end is no workers and no money.** The patron at 0 just stops the stipend; a colony that keeps itself going can go on.
+6. **Stores window:** a total per good (stored, lying around) that expands to every store holding it. Alerts for one store aren't given for free: rig a flag rule and the new word **report** ("if red flag 1 is up → report «Bread low on Level 5»"): a worker carries the message to the scriptorium and it pops up as an alert. The message never drifts, like a name. It comes with flags and bells.
+7. **Saves:** the game state is plain data, so a save is a snapshot. Slots in the browser, plus download and upload as a file.
+8. **New Game screen:**
+   - **Difficulty:** Easy / Medium / Hard / Custom / Sandbox. The knobs are the patron's stipend, patience drain, the quit threshold, the notice period, starting supplies, how often the patron sends workers, the recruiting fee, drift speed, starting workers, and the seed.
+   - **Tower goal:** Small (20) / Medium (50) / Large (100) / Monumental (250) / Infinite (1,000 levels, revisit if anyone gets there). The map's height follows the goal.
+   - **Starting camp:** Nothing (today's opening) / Small (today's prebuilt camp) / Large.
+   - **Sandbox** adds stores that are always full and a tower already built to a chosen level.
+9. **Title screen:**
+   - **Background:** a zoomed-out showcase colony (camp, workers, a tower under way to about Level 10) running behind the menu, with no game controls.
+   - **Title:** "Welcome" scrambling through its translations above "to Babel", in the pixel font at 2× to 4× with the dithered white outline from the portraits.
+   - **Buttons:** New Game, Load Game, Settings, About.
+   - **Settings** are the player's, not the world's, kept in the browser: default writing language, sound levels, UI scale, reduce motion.
+
 ### 16.6 Social life: what moves feelings
 
 *The user: drinking together could build bonds; habits (whistling at work, singing or telling stories over a drink) that others nearby have opinions on; bad blood over a taken job, or gratitude for help; jealousy of others' coin, or being impressed by it. "Let's look at all of the things we can already measure or add in cheaply and see how they can be turned into story/character interactions."*

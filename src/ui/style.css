@@ -895,6 +895,12 @@ details > summary {
   margin: 0 0 10px;
 }
 
+.alert-mute {
+  display: block;
+  font-size: 11px;
+  margin: 2px 0;
+}
+
 .dialog-title {
   font: bold 14px var(--font-title);
   margin-bottom: 8px;

@@ -1,4 +1,4 @@
-import { addMoodlet, dropCarried, letGo, log, moveTo, pushed, settle, takeHold } from './actions';
+import { addMoodlet, dropCarried, gotPaid, judgeWage, letGo, log, moveTo, pushed, settle, takeHold } from './actions';
 import { ALL, FIXTURE_WORD_KIND, FOREVER, STORES_FOR, floorName, isSpecialCount, isWorkVerb, makeOrder, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
 import { carrierText } from './carriers';
 import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed, unreadableLine } from './scrolls';
@@ -1342,13 +1342,14 @@ function completeJob(s: SimState, w: Worker, units: number): Result {
   w.jobsDone++;
   const notice = s.notices.find((n) => n.id === mem.noticeId);
   if (notice && units > 0) sharedJob(s, w, mem.noticeId);
+  if (units > 0) judgeWage(s, w, mem.wage);
   if (notice && isSpecialCount(notice.remaining)) {
     // "all" and "forever" notices pay from the treasury as they go
     const pay = units * notice.wage;
     if (pay > 0 && s.gold - s.reserved >= pay) {
       s.gold -= pay;
       w.purse += pay;
-      addMoodlet(s, w, 'paid', `Paid ${pay} gold`, MOOD.gotPaid.value, MOOD.gotPaid.ticks);
+      gotPaid(s, w, pay);
     } else if (pay > 0) {
       addMoodlet(s, w, 'unpaid', 'Treasury was empty', -6, MOOD.missedJobTicks);
     }
@@ -1366,7 +1367,7 @@ function completeJob(s: SimState, w: Worker, units: number): Result {
     s.gold -= pay;
     s.reserved -= pay;
     w.purse += pay;
-    if (pay > 0) addMoodlet(s, w, 'paid', `Paid ${pay} gold`, MOOD.gotPaid.value, MOOD.gotPaid.ticks);
+    if (pay > 0) gotPaid(s, w, pay);
     const what = `${counted} ${mem.order[1].t.toLowerCase()}`;
     w.thought = pay > 0 ? `Done! ${what}, +${pay} gold.` : `Done: ${what}.`;
     if (notice.remaining === 0) {

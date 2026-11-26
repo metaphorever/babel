@@ -1,10 +1,11 @@
 import { releaseReservations } from './actions';
 import { cheapestBeer, boardOptions, breadAvailable, runActivity, startActivity } from './activities';
 import { rand } from './rng';
-import { AI, CONFUSION, ECONOMY, LESSON, MOOD, NEEDS, SCRIBE } from './tuning';
+import { AI, CONFUSION, ECONOMY, LESSON, MOOD, NEEDS, OVERWORK, SCRIBE } from './tuning';
+import { isWorkVerb } from './lang';
 import { levelOfRow, updateDrift } from './drift';
 import { lessonFor } from './scrolls';
-import { updateMorale, walkHome } from './morale';
+import { tallyGrievances, updateMorale, walkHome } from './morale';
 import type { ActivityKind, Score, SimState, Worker } from './types';
 
 // Utility AI. Each think, a worker scores everything they could be doing and
@@ -122,15 +123,38 @@ export function updateNeeds(s: SimState, w: Worker): void {
   if (w.avoid.length > 0) w.avoid = w.avoid.filter((av) => av.until > s.tick);
   let target = MOOD.base + w.p.moodBias;
   for (const m of w.moodlets) target += m.value;
-  if (w.hunger > 70) target -= MOOD.hungryPenalty;
-  if (w.thirst > 70) target -= MOOD.thirstyPenalty;
-  if (w.fatigue > 70) target -= MOOD.tiredPenalty;
-  if (w.hunger > 90) target -= MOOD.desperatePenalty.hunger;
-  if (w.thirst > 90) target -= MOOD.desperatePenalty.thirst;
-  if (w.fatigue > 90) target -= MOOD.desperatePenalty.fatigue;
-  if (w.confusion > CONFUSION.moodAbove) target -= CONFUSION.moodPenalty;
+  // what's weighing on them, by kind, so they can say why they're fed up
+  const hunger = (w.hunger > 70 ? MOOD.hungryPenalty : 0) + (w.hunger > 90 ? MOOD.desperatePenalty.hunger : 0);
+  const thirst = (w.thirst > 70 ? MOOD.thirstyPenalty : 0) + (w.thirst > 90 ? MOOD.desperatePenalty.thirst : 0);
+  const tiredness = (w.fatigue > 70 ? MOOD.tiredPenalty : 0) + (w.fatigue > 90 ? MOOD.desperatePenalty.fatigue : 0);
+  const confusion = w.confusion > CONFUSION.moodAbove ? CONFUSION.moodPenalty : 0;
+  const overwork = updateOverwork(w, asleep);
+  target -= hunger + thirst + tiredness + confusion + overwork;
+  tallyGrievances(w, { hunger, thirst, tiredness, confusion, overwork });
   target = Math.max(0, Math.min(100, target));
   w.mood += (target - w.mood) * MOOD.smoothing;
+}
+
+/**
+ * A long stretch of work with no real break wears on a worker. Work is a job
+ * or a working line of a scroll (not waiting or checking); a meal, a drink,
+ * a wander or a rest takes it down, and sleep wipes it. Returns the mood it
+ * costs them now.
+ */
+function updateOverwork(w: Worker, asleep: boolean): number {
+  const k = w.activity.kind;
+  let working = k === 'job';
+  if (k === 'scroll') {
+    const c = w.held[0];
+    const verb = c && c.pc < c.orders.length ? c.orders[c.pc][0].t : null;
+    working = verb !== null && (isWorkVerb(verb) || verb === 'WRITE' || verb === 'DELIVER' || verb === 'TEACH' || verb === 'LEARN');
+  }
+  let streak = w.workStreak ?? 0;
+  if (asleep) streak = 0;
+  else if (working) streak++;
+  else if (k === 'eat' || k === 'drink' || k === 'bar' || k === 'wander' || k === 'idle' || k === 'sleep') streak = Math.max(0, streak - OVERWORK.restPerTick);
+  w.workStreak = streak;
+  return Math.min(OVERWORK.max, Math.max(0, streak - OVERWORK.after) * OVERWORK.perTick);
 }
 
 /** Advance one worker. Returns true if they've walked off home for good. */

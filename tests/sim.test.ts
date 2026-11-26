@@ -16,7 +16,7 @@ import { deckRow, newProject, placeMaterial } from '../src/sim/tower';
 import { findJob, finishNow, type PlaceRequest } from '../src/sim/build';
 
 import type { Dest } from '../src/sim/types';
-import { ARRIVALS, PATRON, QUIT, SKILLS, TOWER, WORLD } from '../src/sim/tuning';
+import { ARRIVALS, PATRON, QUIT, SKILLS, TIME, TOWER, WORLD } from '../src/sim/tuning';
 import { currentStipend, patronFloorDone } from '../src/sim/patron';
 
 type State = ReturnType<typeof createState>;
@@ -584,16 +584,16 @@ describe('the patron and quitting', () => {
     const w = s.workers[3];
     w.moodlets.push({ kind: 'test', label: 'Miserable', value: -60, until: 1e9 });
     w.mood = 0;
-    expect(runUntil(s, () => w.noticeUntil !== null, QUIT.sustainTicks + 200)).toBe(true);
-    expect(runUntil(s, () => w.leaving, QUIT.noticeTicks + 200)).toBe(true);
+    expect(runUntil(s, () => w.noticeUntil !== null, TIME.dayTicks / 2)).toBe(true);
+    expect(runUntil(s, () => w.leaving, QUIT.noticeShifts.normal * (TIME.dayTicks / 4) + 200)).toBe(true);
     expect(runUntil(s, () => !s.workers.includes(w), 20 * 120)).toBe(true);
   });
 
   it('a worker on notice who cheers up decides to stay', () => {
     const s = createState(12);
     const w = s.workers[3];
-    w.noticeUntil = s.tick + QUIT.noticeTicks;
-    w.lowMoodTicks = QUIT.sustainTicks;
+    w.noticeUntil = s.tick + 3000;
+    w.fedUpSince = 0;
     w.moodlets.push({ kind: 'test', label: 'Delighted', value: 40, until: 1e9 });
     w.mood = 90;
     step(s);

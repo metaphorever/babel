@@ -5,7 +5,8 @@ import { TIME } from './tuning';
 // the sky darkens at night. Night doesn't (yet) change what workers do.
 
 export function dayOf(tick: number): number {
-  return Math.floor(tick / TIME.dayTicks) + 1;
+  // the day number turns over at midnight, like a clock (tick 0 is TIME.startHour on day 1)
+  return Math.floor((tick + (TIME.startHour * TIME.dayTicks) / 24) / TIME.dayTicks) + 1;
 }
 
 /** Hour of the day as a fraction, 0..24. */

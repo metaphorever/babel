@@ -58,6 +58,7 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
     takings: 0,
     reserved: 0,
     events: [],
+    alerts: [],
     social: newSocial(seed),
     sentHome: 0,
   };
@@ -185,7 +186,7 @@ export function addWorker(s: SimState): Worker {
     lastScores: [],
     thought: '',
     jobsDone: 0,
-    lowMoodTicks: 0,
+    fedUpSince: null,
     noticeUntil: null,
     leaving: false,
     look: nextU32(s.rng),
