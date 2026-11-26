@@ -182,8 +182,9 @@ export function buildPages(art: ArtSet = defaultArt(), worldArt?: { terrain: Wor
           title: 'HAULING EQUIPMENT (TO COME). THE GAME DRAWS THE LOAD ON TOP.',
           perRow: 4,
           slots: [
-            todo('wheelbarrow', 'WHEELBARROW', 16, 16),
-            todo('cart', 'CART', 32, 16),
+            // the real names, so a drawing here replaces the stand-in in the game
+            { key: 'fixture.wheelbarrow', label: 'WHEELBARROW', w: 16, h: 16, grid: null },
+            { key: 'fixture.cart', label: 'CART', w: 32, h: 16, grid: null },
             todo('pulley', 'ROPE PULLEY', 16, 32),
             todo('winch', 'WINCH (BY HAND)', 32, 32),
             todo('winch-beast', 'WINCH (BY A BEAST)', 48, 32),

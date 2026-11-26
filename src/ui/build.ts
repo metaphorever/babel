@@ -20,7 +20,7 @@ export type Placing =
   | { what: 'house'; width: number; stories: 1 | 2 }
   | { what: 'fixture'; fixture: FixtureKind };
 
-const FIXTURES: FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile', 'shelves', 'ladder'];
+const FIXTURES: FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile', 'shelves', 'ladder', 'wheelbarrow', 'cart'];
 
 function costText(c: { stone: number; wood: number }): string {
   const parts = [c.wood ? `${c.wood} wood` : '', c.stone ? `${c.stone} stone` : ''].filter(Boolean);

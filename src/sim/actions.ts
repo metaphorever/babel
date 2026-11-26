@@ -1,6 +1,6 @@
 import { findPath } from './path';
 import { MOVE } from './tuning';
-import { Tile, type Pt, type SimState, type Worker } from './types';
+import { Tile, isVehicleKind, type Pt, type SimState, type Site, type Worker } from './types';
 import { tileAt } from './world';
 
 export type MoveResult = 'arrived' | 'moving' | 'unreachable';
@@ -51,7 +51,11 @@ function advance(s: SimState, w: Worker): void {
   if (w.stepProgress === 0) {
     const climbing = next.x === w.x;
     let cost = climbing || tileAt(s, w.x, w.y) === Tile.Ladder ? MOVE.ladderTicksPerTile : MOVE.walkTicksPerTile;
-    if (w.carrying) cost += MOVE.carryingSlowdown;
+    const cart = pushed(s, w);
+    // a wheelbarrow or cart stays on the ground: one that would have to climb is let go of
+    if (cart && next.y !== w.y) letGo(w);
+    if (cart && next.y === w.y) cost += MOVE.pushSlowdown[cart.kind as keyof typeof MOVE.pushSlowdown];
+    else if (w.carrying) cost += MOVE.carryingSlowdown;
     w.stepCost = cost;
     if (next.x !== w.x) w.facing = next.x > w.x ? 1 : -1;
   }
@@ -61,7 +65,42 @@ function advance(s: SimState, w: Worker): void {
     w.y = next.y;
     w.path.shift();
     w.stepProgress = 0;
+    const cart = pushed(s, w);
+    if (cart) rollTo(s, w, cart);
   }
+}
+
+/** The wheelbarrow or cart this worker is pushing, if it's still there. */
+export function pushed(s: SimState, w: Worker): Site | null {
+  if (w.pushing === undefined || w.pushing === null) return null;
+  const c = s.sites.find((x) => x.id === w.pushing);
+  if (!c || !isVehicleKind(c.kind) || c.build || c.demolish) {
+    w.pushing = null;
+    return null;
+  }
+  return c;
+}
+
+/** Take hold of a wheelbarrow or cart: it rolls just ahead of them from now on. */
+export function takeHold(s: SimState, w: Worker, cart: Site): void {
+  w.pushing = cart.id;
+  w.facing = cart.x0 > w.x ? 1 : cart.x1 < w.x ? -1 : w.facing;
+  rollTo(s, w, cart);
+}
+
+/** Let go: it stays where it is, loaded or not, for anyone to use. */
+export function letGo(w: Worker): void {
+  w.pushing = null;
+}
+
+/** Put a pushed wheelbarrow or cart just ahead of whoever's pushing it, on the ground. */
+function rollTo(s: SimState, w: Worker, cart: Site): void {
+  const width = cart.x1 - cart.x0;
+  let x0 = w.facing > 0 ? w.x + 1 : w.x - 1 - width;
+  x0 = Math.max(0, Math.min(s.width - 1 - width, x0));
+  cart.x0 = x0;
+  cart.x1 = x0 + width;
+  cart.y = w.y;
 }
 
 export function addMoodlet(
@@ -91,6 +130,8 @@ export function dropCarried(s: SimState, w: Worker): void {
 }
 
 export function releaseReservations(s: SimState, w: Worker): void {
+  // anyone stopping for something else lets go of their cart: it stays put, never stuck to someone
+  letGo(w);
   for (const it of s.items) if (it.reservedBy === w.id) it.reservedBy = null;
   // a half-written design stays half-written for whoever picks it up next
   for (const d of s.designs) if (d.claimedBy === w.id) d.claimedBy = null;

@@ -874,6 +874,21 @@ A popup message when something needs the player's attention, with a little sound
   - **Build window:** a **The tower** section with "Draw a blueprint" (levels built and planned). Explanations moved into hover tips on the section headings. A "Write “build fixtures in tower”…" button sits beside "build camp".
   - **Help:** two folded sections, "Building" and "Conditions and waiting", hold the reference that used to sit in the windows.
 
+### 15.18 Wheelbarrows and carts (session 6, 2026-11-25)
+
+*The first part of §16.8: the ground equipment. The rope pulley, the winches, the wagon, beasts of burden and the stable come next.*
+
+- **Two new fixtures,** built on open ground (not in buildings or the tower): a **wheelbarrow** (3 wood, one block wide, holds 8) and a **cart** (6 wood, two blocks wide, holds 20). Like stockpiles they hold any goods, and they have permanent numbers. Words: *wheelbarrow* (*brouette*, *καρότσι*), *cart* (*charrette*, *κάρο*).
+- **They're stores, but only when named.** "Haul stone to cart 1", "haul wood from wheelbarrow 2", "if cart 1 has 20 stone" all work. A haul with no TO never puts goods in one, and one never counts as "the nearest store".
+- **Moving one:** "haul cart 1 to stockpile 2" (HAUL with the cart where the goods would go). The worker takes the handles and pushes it beside any fixture on the ground, or into a building by name, then leaves it. A count of times, not "all" or "forever".
+- **USING** (*avec*, *με*), the user's USE: "haul all stone from stockpile 1 to stockpile 4 using cart 1". The worker fetches the cart, pushes it to the goods (a store, or whatever's lying around), loads it up (4 ticks a unit), pushes it to where they go, and unloads. *The word is a clause after the line, "using", like UNTIL, so every line still starts with its verb; it reads naturally and keeps the user's word.* "Haul anything using cart 1" takes whatever's already in the cart first.
+- **Pushing is slow:** +3 ticks a tile for a wheelbarrow, +5 for a cart (walking is 4, carrying by hand +2). A cart moves 20 for the time of a few armloads. In the test, one cart trip moved 12 stone at once.
+- **Carts stay on the ground.** One that would have to climb is let go of; a load or a destination up the tower is refused ("can't go up the tower"). That's the pulley's and the winches' job.
+- **No soft-lock (the user's worry):** a worker who stops for anything else (food, sleep, a new order, the end of the line) lets go, and the cart stays where it stands, loaded or not. It's a store, so anyone can haul from it; nobody holds on to it while away. Only one worker pushes a cart at a time; others wait.
+- **Drift:** an unreadable USING is dropped, so they haul by hand. A cart to move that they can't read can't be guessed: they can't do the line.
+- **Composer:** the haul line's "what" menu has "Move a wheelbarrow or cart"; its second row has the from / to slots and a "by hand / using …" menu.
+- **Art:** Claude's stand-ins (`vehicleArt` in `worldArt.ts`) until the user draws them; the To Do page's wheelbarrow and cart boxes feed straight in. The load is drawn piled above the bed.
+
 ### 16.8 Hauling equipment and USE (the user's notes, 2026-11-25)
 
 *From IDEAS_BRAINDUMP.md. Decided: carts and the like get a streamlined USE, and can also be hauled directly, as things to haul and as somewhere to haul from and to. Hitch/unhitch is skipped for now.*

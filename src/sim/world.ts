@@ -1,7 +1,7 @@
 import { FIXTURE_WORD_KIND, STORES_FOR, levelName, type Place } from './lang';
 import { randInt } from './rng';
 import { BUILD, FIXTURE_LABEL, MAP, WORLD } from './tuning';
-import { FIXTURE_KINDS, Tile, type Building, type FixtureKind, type ItemType, type NatureKind, type Pt, type SimState, type Site, type SiteKind } from './types';
+import { FIXTURE_KINDS, Tile, isVehicleKind, type Building, type FixtureKind, type ItemType, type NatureKind, type Pt, type SimState, type Site, type SiteKind } from './types';
 
 export function tileAt(s: SimState, x: number, y: number): number {
   if (x < 0 || y < 0 || x >= s.width || y >= s.height) return Tile.Dirt;
@@ -303,11 +303,27 @@ export function inTowerSpan(s: SimState, x: { x0: number; x1: number }): boolean
 
 /** The stores of this good that an order's place means (null = all of them). Finished ones only. */
 export function storesAt(s: SimState, place: Place | null, type: ItemType): Site[] {
-  const all = storesFor(s, type);
+  const named = storesFor(s, type);
+  // a wheelbarrow or cart only counts when it's named: goods never go into one (or come out of one) by default
+  const all = named.filter((x) => !isVehicleKind(x.kind));
   if (place === null) return all;
   if (typeof place === 'number') return all.filter((x) => x.level === place);
   if (place === 'tower') return all.filter((x) => x.level > 0);
   if (place === 'camp') return all.filter((x) => !inTowerSpan(s, x));
+  return storesNamed(named, place);
+}
+
+function storesNamed(all: Site[], place: Place): Site[] {
+  if (typeof place !== 'object') return [];
+  if ('fixture' in place) return all.filter((x) => x.kind === FIXTURE_WORD_KIND[place.fixture] && x.num === place.n);
+  const name = place.name.toLowerCase();
+  return all.filter((x) => x.named && x.label.toLowerCase() === name);
+}
+
+/** The wheelbarrows or carts an order's place names (by number or name). */
+export function vehiclesAt(s: SimState, place: Place | null): Site[] {
+  if (place === null || typeof place !== 'object') return [];
+  const all = s.sites.filter((x) => isVehicleKind(x.kind));
   if ('fixture' in place) return all.filter((x) => x.kind === FIXTURE_WORD_KIND[place.fixture] && x.num === place.n);
   const name = place.name.toLowerCase();
   return all.filter((x) => x.named && x.label.toLowerCase() === name);

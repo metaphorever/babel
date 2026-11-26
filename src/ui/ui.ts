@@ -525,6 +525,7 @@ export class Ui {
           h('li', {}, h('b', {}, 'build fixtures'), ': beds, ovens, stores, ladders… Add “in camp”, “in tower”, a level or a building to narrow it.'),
           h('li', {}, h('b', {}, 'build tower'), ': the level under way. Draw a blueprint first (Build or Tower window); a courier carries it to the top.'),
           h('li', {}, 'Fixtures can be planned before their building or tower level is finished. They wait until it’s up.'),
+          h('li', {}, h('b', {}, 'Wheelbarrows and carts'), ' are built on open ground. They’re stores you can name (“haul stone to cart 1”), you can move one (“haul cart 1 to stockpile 2”), and a haul can go by cart (“… using cart 1”): far more per trip, but pushing is slow, and carts stay on the ground. A cart left mid-job stays where it is, loaded, for anyone to haul from.'),
         ),
       ),
       h(

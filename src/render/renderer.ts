@@ -427,6 +427,23 @@ export class Renderer {
         });
         break;
       }
+      case 'wheelbarrow':
+      case 'cart': {
+        // a store on wheels: its load piled above the bed, a column per good
+        const spr = worldSprite(`fixture.${site.kind}`);
+        const bed = site.kind === 'cart' ? 5 : 7;
+        withProgress(spr.height, () => {
+          const goods = (['stone', 'wood', 'grain', 'bread', 'beer'] as const).filter((t) => site.store[t] > 0);
+          const col = Math.max(3, Math.floor((width - 4) / Math.max(1, goods.length)));
+          goods.forEach((type, ci) => {
+            const item = itemSprite(type);
+            const n = Math.min(site.kind === 'cart' ? 8 : 4, Math.ceil(site.store[type] / 2));
+            for (let i = 0; i < n; i++) this.g.drawImage(item, left + 3 + ci * col + (i % 2) * 3, base - spr.height + bed - item.height - Math.floor(i / 2) * 3);
+          });
+          this.g.drawImage(spr, left, base - spr.height);
+        });
+        break;
+      }
       case 'bed':
       case 'oven':
       case 'brewery': {

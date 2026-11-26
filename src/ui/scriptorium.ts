@@ -23,6 +23,7 @@ import {
   FIXTURE_WORD,
   takesTarget,
   takesWithin,
+  movesThing,
   condRule,
   makeOrder,
   orderLineText,
@@ -77,6 +78,8 @@ export interface DraftLine {
   cond?: Condition | null;
   /** "build fixtures in …": where (null: anywhere). */
   within?: Place | null;
+  /** Hauling: a wheelbarrow or cart to haul with (null: by hand). */
+  using?: Place | null;
   count: number;
 }
 
@@ -438,7 +441,58 @@ export class ScriptoriumPanel {
       .filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves' || x.kind === 'pantry' || x.kind === 'bar') && x.num > 0)
       .map((x) => `${x.id}:${x.label}:${x.build ? 0 : 1}`)
       .join('|');
-    return `${stores}#${this.buildTargets().map((o) => o.key + o.text).join('|')}#${this.withinOptions().map((o) => o.key).join('|')}`;
+    return `${stores}#${this.buildTargets().map((o) => o.key + o.text).join('|')}#${this.withinOptions().map((o) => o.key).join('|')}#${this.vehicles().map((o) => o.key + o.text).join('|')}`;
+  }
+
+  /** Every wheelbarrow and cart, by number or name. */
+  private vehicles(): { key: string; place: Place; text: string; words: TokenId[] }[] {
+    return this.s.sites
+      .filter((x) => (x.kind === 'wheelbarrow' || x.kind === 'cart') && x.num > 0)
+      .map((x) => {
+        const fw = FIXTURE_WORD[x.kind as FixtureKind];
+        const place: Place = x.named ? { name: x.label } : { fixture: fw, n: x.num };
+        return { key: placeKey(place), place, text: `${siteTitle(this.s, x)}${x.build ? ', being built' : ''}`, words: x.named ? [] : [fw] };
+      });
+  }
+
+  /** Hauling by hand, or using a wheelbarrow or cart. */
+  private usingSelect(i: number, line: DraftLine): HTMLSelectElement {
+    const opts = this.vehicles();
+    const current = line.using ?? null;
+    if (current !== null && !opts.some((o) => o.key === placeKey(current))) opts.push({ key: placeKey(current), place: current, text: `${placeName(current)} (not there now)`, words: [] });
+    const sel = h('select', { 'aria-label': `Line ${i + 1} using`, title: 'A wheelbarrow or cart carries far more per trip, but pushing it is slow, and it stays on the ground.' });
+    sel.append(h('option', { value: '' }, 'by hand'));
+    for (const o of opts) sel.append(h('option', { value: o.key, disabled: (!this.canWrite('USING') || o.words.some((t) => !this.canWrite(t))) && o.key !== placeKey(current) }, `using ${o.text}`));
+    sel.value = placeKey(current);
+    sel.addEventListener('change', () => {
+      line.using = opts.find((o) => o.key === sel.value)?.place ?? null;
+      this.updateSummary();
+    });
+    return sel;
+  }
+
+  /** Where a wheelbarrow or cart can be pushed to: beside any fixture on the ground, or into a building. */
+  private moveToSelect(i: number, line: DraftLine): HTMLSelectElement {
+    const s = this.s;
+    const opts: { key: string; place: Place; text: string; words: TokenId[] }[] = [];
+    for (const x of s.sites) {
+      if (x.num === 0 || x.level !== 0 || !(x.kind in FIXTURE_WORD) || (line.target && placeKey(line.target) === placeKey(x.named ? { name: x.label } : { fixture: FIXTURE_WORD[x.kind as FixtureKind], n: x.num }))) continue;
+      const fw = FIXTURE_WORD[x.kind as FixtureKind];
+      const place: Place = x.named ? { name: x.label } : { fixture: fw, n: x.num };
+      opts.push({ key: placeKey(place), place, text: `to ${siteTitle(s, x)}`, words: x.named ? [] : [fw] });
+    }
+    for (const b of s.buildings) if (b.kind === 'house') opts.push({ key: placeKey({ name: b.name }), place: { name: b.name }, text: `to ${b.name}`, words: [] });
+    const current = line.to;
+    if (current !== null && !opts.some((o) => o.key === placeKey(current))) opts.push({ key: placeKey(current), place: current, text: `to ${placeName(current)} (not there now)`, words: [] });
+    const sel = h('select', { 'aria-label': `Line ${i + 1} to` });
+    sel.append(h('option', { value: '' }, 'push it where?'));
+    for (const o of opts) sel.append(h('option', { value: o.key, disabled: o.words.some((t) => !this.canWrite(t)) && o.key !== placeKey(current) }, o.text));
+    sel.value = placeKey(current);
+    sel.addEventListener('change', () => {
+      line.to = opts.find((o) => o.key === sel.value)?.place ?? null;
+      this.updateSummary();
+    });
+    return sel;
   }
 
   /** Where "build fixtures" can be narrowed to: the camp, the tower, a tower level or a building with fixtures planned in it. */
@@ -622,9 +676,29 @@ export class ScriptoriumPanel {
       } else if (nouns.length > 1) {
         const nounSel = h('select', { 'aria-label': `Line ${i + 1} what` });
         for (const n of nouns) nounSel.append(h('option', { value: n, disabled: !this.canWrite(n) && n !== line.noun }, this.label(wordIn(n, 'en'), n)));
-        nounSel.value = line.noun ?? nouns[0];
+        // hauling can move a wheelbarrow or cart itself
+        const carts = movesThing(line.verb) ? this.vehicles() : [];
+        if (carts.length) {
+          const group = h('optgroup', { label: 'Move a wheelbarrow or cart' });
+          for (const o of carts) group.append(h('option', { value: `T:${o.key}`, disabled: o.words.some((t) => !this.canWrite(t)) }, o.text));
+          nounSel.append(group);
+        }
+        const moving = movesThing(line.verb) && line.target ? line.target : null;
+        nounSel.value = moving ? `T:${placeKey(moving)}` : line.noun ?? nouns[0];
         nounSel.addEventListener('change', () => {
+          if (nounSel.value.startsWith('T:')) {
+            line.noun = null;
+            line.target = carts.find((o) => `T:${o.key}` === nounSel.value)?.place ?? null;
+            line.from = null;
+            line.using = null;
+            if (isSpecialCount(line.count)) line.count = 1;
+            this.renderLines();
+            return;
+          }
+          const wasMoving = line.target != null;
+          line.target = null;
           line.noun = nounSel.value as Noun;
+          if (wasMoving) line.to = null;
           // a particular store may not keep the new good (bread doesn't go on a stockpile): start those over
           const keeps = (p: Place | null) => p === null || typeof p !== 'object' || this.storesFor(line.noun).some((x) => placeKey(x.named ? { name: x.label } : { fixture: STORE_WORD[x.kind as keyof typeof STORE_WORD], n: x.num }) === placeKey(p));
           if (!keeps(line.from)) line.from = null;
@@ -646,7 +720,12 @@ export class ScriptoriumPanel {
         placeEls.push(whoSel);
       }
       // where from and where to sit on their own indented row: they're still the same line of the order
-      const placeRow = takesPlaces(line.verb) ? h('div', { class: 'row compose-line compose-sub' }, this.placeSelect(i, 'from', line), this.placeSelect(i, 'to', line)) : null;
+      const movingCart = movesThing(line.verb) && !!line.target;
+      const placeRow = !takesPlaces(line.verb)
+        ? null
+        : movingCart
+          ? h('div', { class: 'row compose-line compose-sub' }, this.moveToSelect(i, line))
+          : h('div', { class: 'row compose-line compose-sub' }, this.placeSelect(i, 'from', line), this.placeSelect(i, 'to', line), ...(this.vehicles().length || line.using ? [this.usingSelect(i, line)] : []));
       if (takesWithin(line.verb, line.noun)) placeEls.push(this.withinSelect(i, line));
       // conditions: IF's, WAIT's "until", and an UNTIL under a work line
       // (a store check's which / how many / of what goes on a row of its own underneath)
@@ -675,8 +754,9 @@ export class ScriptoriumPanel {
         inp.style.display = special ? 'none' : '';
         inp.addEventListener('input', () => ((line.count = Math.floor(Number(inp.value)) || 1), this.updateSummary()));
         const mode = h('select', { 'aria-label': `Line ${i + 1} how many`, class: 'count-mode' }, h('option', { value: 'n' }, '×'));
-        if (allowsAll(line.verb)) mode.append(h('option', { value: 'all', title: 'Until there is nothing left to do' }, 'all'));
-        if (allowsForever(line.verb)) mode.append(h('option', { value: 'forever', title: 'Forever' }, '∞'));
+        const movingIt = movesThing(line.verb) && !!line.target;
+        if (allowsAll(line.verb) && !movingIt) mode.append(h('option', { value: 'all', title: 'Until there is nothing left to do' }, 'all'));
+        if (allowsForever(line.verb) && !movingIt) mode.append(h('option', { value: 'forever', title: 'Forever' }, '∞'));
         mode.value = line.count === ALL ? 'all' : line.count === FOREVER ? 'forever' : 'n';
         mode.addEventListener('change', () => {
           line.count = mode.value === 'all' ? ALL : mode.value === 'forever' ? FOREVER : Math.floor(Number(inp.value)) || 1;
@@ -795,9 +875,10 @@ export class ScriptoriumPanel {
           who,
           from: takesPlaces(l.verb) ? l.from : null,
           to: takesPlaces(l.verb) ? l.to : null,
-          target: takesTarget(l.verb) ? l.target ?? null : null,
+          target: takesTarget(l.verb) || movesThing(l.verb) ? l.target ?? null : null,
           cond: condRule(l.verb) === 'never' ? null : l.cond ?? null,
           within: takesWithin(l.verb, l.noun) ? l.within ?? null : null,
+          using: l.verb === 'HAUL' && !l.target ? l.using ?? null : null,
         },
         this.lang,
       );
@@ -816,9 +897,10 @@ export class ScriptoriumPanel {
         who: takesWho(l.verb) ? l.who ?? null : null,
         from: takesPlaces(l.verb) ? l.from : null,
         to: takesPlaces(l.verb) ? l.to : null,
-        target: takesTarget(l.verb) ? l.target ?? null : null,
+        target: takesTarget(l.verb) || movesThing(l.verb) ? l.target ?? null : null,
         cond: condRule(l.verb) === 'never' ? null : l.cond ?? null,
         within: takesWithin(l.verb, l.noun) ? l.within ?? null : null,
+        using: l.verb === 'HAUL' && !l.target ? l.using ?? null : null,
         count: l.count,
       })),
       lang: this.lang,

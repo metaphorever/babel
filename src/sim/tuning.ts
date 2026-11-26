@@ -93,9 +93,12 @@ export const BUILD = {
     shelves: { cost: { stone: 0, wood: 3 } },
     /** A ladder: tower rooms only, a full block (two tiles) wide like every fixture, from its room up through the deck above. */
     ladder: { cost: { stone: 0, wood: 2 } },
-  } as Record<'bed' | 'oven' | 'pantry' | 'brewery' | 'bar' | 'stockpile' | 'shelves' | 'ladder', FixtureSpec>,
+    /** Hauling equipment: built on open ground, then pushed about it. A store that moves. */
+    wheelbarrow: { cost: { stone: 0, wood: 3 } },
+    cart: { cost: { stone: 0, wood: 6 }, width: 4 },
+  } as Record<'bed' | 'oven' | 'pantry' | 'brewery' | 'bar' | 'stockpile' | 'shelves' | 'ladder' | 'wheelbarrow' | 'cart', FixtureSpec>,
   /** How much a fixture holds. A stockpile holds the same anywhere; shelves hold twice as much. */
-  capacity: { pantry: 20, bar: 12, stockpile: 24, shelves: 48 },
+  capacity: { pantry: 20, bar: 12, stockpile: 24, shelves: 48, wheelbarrow: 8, cart: 20 },
   /** Work ticks to set one unit of material in place, or take one apart. */
   unitTicks: 30,
   /** Demolishing gives back this share of what went in (rounded down). */
@@ -114,12 +117,18 @@ export const FIXTURE_LABEL = {
   stockpile: 'Stockpile',
   shelves: 'Shelves',
   ladder: 'Ladder',
+  wheelbarrow: 'Wheelbarrow',
+  cart: 'Cart',
 } as const;
 
 export const MOVE = {
   walkTicksPerTile: 4,
   ladderTicksPerTile: 9,
   carryingSlowdown: 2, // extra ticks per tile while carrying something
+  /** Extra ticks per tile pushing a wheelbarrow or cart (instead of the carrying slowdown): slower than walking, but it holds far more. */
+  pushSlowdown: { wheelbarrow: 3, cart: 5 },
+  /** Loading or unloading a wheelbarrow or cart: ticks per unit of goods. */
+  loadTicksPerUnit: 4,
 };
 
 /** Needs run 0 (fine) .. 100 (desperate). Rates are per tick. */

@@ -1,6 +1,6 @@
 import { log } from './actions';
 import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCarrier, queueDesign } from './carriers';
-import { ALL, FOREVER, GOODS, STATE_WORDS, allowsAll, allowsForever, condRule, isSpecialCount, isStoreWord, isWorkVerb, takesWithin, isValidLine, type Condition, langName, makeOrder, placeKey, placeName, FIXTURE_WORDS, FIXTURE_WORD_KIND, STORES_FOR, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
+import { ALL, FOREVER, GOODS, STATE_WORDS, allowsAll, allowsForever, condRule, isSpecialCount, isStoreWord, isVehicleWord, isWorkVerb, takesWithin, isValidLine, type Condition, langName, makeOrder, placeKey, placeName, FIXTURE_WORDS, FIXTURE_WORD_KIND, STORES_FOR, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
 
 function cap(t: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
@@ -30,6 +30,8 @@ export interface ComposeLine {
   target?: Place | null;
   /** "build fixtures in …": the camp, the tower, a level, or a building by name. */
   within?: Place | null;
+  /** "… using cart 1": a wheelbarrow or cart to haul with (by number or name). */
+  using?: Place | null;
   /** IF's condition (required), WAIT's "until" (instead of a count of hours), or a work line's UNTIL clause. */
   cond?: Condition | null;
   /** Units to finish before moving to the next line (the notice count, for a notice; hours, for WAIT). */
@@ -101,7 +103,7 @@ function buildCarrier(s: SimState, cmd: Extract<Command, { type: 'compose' }>, d
     const who = l.who !== undefined && l.who !== null ? { id: l.who, name: s.workers.find((w) => w.id === l.who)?.name ?? '?' } : null;
     // a WAIT UNTIL has no count of hours
     const count = countless(l.verb) || (l.verb === 'WAIT' && l.cond) ? 1 : l.count;
-    return { order: makeOrder(l.verb, l.noun, { from: l.from, to: l.to, who, target: l.target, cond: l.cond ?? null, within: l.within ?? null }, cmd.lang ?? 'en'), count };
+    return { order: makeOrder(l.verb, l.noun, { from: l.from, to: l.to, who, target: l.target, cond: l.cond ?? null, within: l.within ?? null, using: l.using ?? null }, cmd.lang ?? 'en'), count };
   });
   if (dryRun) {
     // a throwaway carrier for checking words; don't use up an id
@@ -142,12 +144,23 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
         if (l.count === ALL && !allowsAll(l.verb)) return { ok: false, error: `"All" doesn't work for ${l.verb.toLowerCase()}: it never runs out.` };
         if (l.count === FOREVER && !allowsForever(l.verb)) return { ok: false, error: `"Forever" doesn't work for ${l.verb.toLowerCase()}.` };
         if (!countless(l.verb) && !isSpecialCount(l.count) && (!Number.isInteger(l.count) || l.count < 1 || l.count > 999)) return { ok: false, error: 'Counts must be 1 to 999, all, or forever.' };
+        // moving a cart: it needs somewhere on the ground to go, and it happens once at a time
+        const moving = l.verb === 'HAUL' && target !== null;
+        if (moving && (l.to === undefined || l.to === null || typeof l.to !== 'object')) return { ok: false, error: 'Push it where? Name a store, a fixture or a building.' };
+        if (moving && isSpecialCount(l.count)) return { ok: false, error: 'Give a number of times to move it.' };
+        const using = l.using ?? null;
+        if (using !== null) {
+          if (l.verb !== 'HAUL' || moving || l.noun === null) return { ok: false, error: 'Only hauling goods can use a wheelbarrow or cart.' };
+          if (typeof using !== 'object' || ('fixture' in using && !isVehicleWord(using.fixture))) return { ok: false, error: 'Haul using a wheelbarrow or cart.' };
+          const badUsing = placeError(using);
+          if (badUsing) return { ok: false, error: badUsing };
+        }
         const places = [l.from, l.to].filter((p): p is Place => p !== undefined && p !== null);
         if (places.length > 0 && !takesPlaces(l.verb)) return { ok: false, error: `"${l.verb.toLowerCase()}" doesn't take a from or to.` };
         const bad = places.map(placeError).find((e) => e !== null);
         if (bad) return { ok: false, error: bad };
         // a fixture by number has to be a store, and the kind that keeps this good
-        const notStore = places.find((p) => typeof p === 'object' && 'fixture' in p && !isStoreWord(p.fixture));
+        const notStore = moving ? undefined : places.find((p) => typeof p === 'object' && 'fixture' in p && !isStoreWord(p.fixture));
         if (notStore) return { ok: false, error: `${cap(placeName(notStore))} doesn't keep goods.` };
         const wrong = places.find((p) => typeof p === 'object' && 'fixture' in p && l.noun && l.noun in STORES_FOR && !(STORES_FOR[l.noun as keyof typeof STORES_FOR] as readonly string[]).includes(FIXTURE_WORD_KIND[p.fixture]));
         if (wrong && l.noun) return { ok: false, error: `${placeName(wrong)} doesn't keep ${l.noun.toLowerCase()}.` };

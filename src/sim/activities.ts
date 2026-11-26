@@ -1,14 +1,14 @@
-import { addMoodlet, dropCarried, log, moveTo, settle } from './actions';
-import { ALL, FOREVER, STORES_FOR, floorName, isSpecialCount, isWorkVerb, makeOrder, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
+import { addMoodlet, dropCarried, letGo, log, moveTo, pushed, settle, takeHold } from './actions';
+import { ALL, FIXTURE_WORD_KIND, FOREVER, STORES_FOR, floorName, isSpecialCount, isWorkVerb, makeOrder, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
 import { carrierText } from './carriers';
 import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed, unreadableLine } from './scrolls';
 import { addConfusion, knows, readOrder } from './drift';
 import { rand, randInt } from './rng';
 import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_OF_VERB, skillLevel } from './skills';
-import { BUILD, ECONOMY, MOOD, NEEDS, SCRIBE, SKILLS, SOCIAL, TOWER, WORK } from './tuning';
+import { BUILD, ECONOMY, MOOD, MOVE, NEEDS, SCRIBE, SKILLS, SOCIAL, TOWER, WORK } from './tuning';
 import { beatenTo, sharedJob, together, tookNotice, wokeBeside, workedBeside } from './social';
-import type { ActivityKind, BuildMaterial, Carrier, FixtureKind, Item, ItemType, Notice, SimState, Site, SiteKind, SkillId, Worker } from './types';
-import { depotFor, findSite, nearest, siteOf, siteRef, sitesOf, sourceFor, spotFor, standable, stockpiles, storesAt, usable } from './world';
+import type { ActivityKind, BuildMaterial, Carrier, FixtureKind, Item, ItemType, Notice, Pt, SimState, Site, SiteKind, SkillId, Worker } from './types';
+import { depotFor, findSite, groundRow, nearest, roomIn, siteOf, siteRef, sitesOf, sourceFor, spotFor, standable, stockpiles, storesAt, usable, vehiclesAt } from './world';
 import { activeProject, buildSpot, placeMaterial } from './tower';
 import { accepts, buildScope, campJobs, jobsFor, jobSpot, placeUnit, scopeText, stillNeeded, undoUnit, type BuildScope, type Job } from './build';
 
@@ -257,6 +257,7 @@ export function eligibleNotices(s: SimState, w: Worker) {
 function allDone(s: SimState, n: Notice): boolean {
   if (s.workers.some((w) => w.memory?.noticeId === n.id)) return false;
   const o = parseOrder(n.order);
+  if (o.verb === 'HAUL' && o.target !== null) return false;
   if (o.verb === 'HAUL' && o.noun === 'ANY') return !anythingToHaul(s, o.from, o.to, false);
   if (o.verb === 'HAUL' && o.from === null) return !s.items.some((it) => it.type === nounItem(o.noun as Noun));
   return nothingToHaul(s, n);
@@ -264,6 +265,8 @@ function allDone(s: SimState, n: Notice): boolean {
 
 export function nothingToHaul(s: SimState, n: Notice): boolean {
   const o = parseOrder(n.order);
+  // moving a cart isn't something that runs out
+  if (o.verb === 'HAUL' && o.target !== null) return false;
   // the tower and the camp are in plain sight: nothing planned, nothing to build
   if (o.verb === 'BUILD') return o.noun === 'TOWER' ? activeProject(s) === null : jobsFor(s, buildScope(o.noun, o.target, o.within)).length === 0;
   if (o.verb === 'COOK' || o.verb === 'BREW') return !canProcess(s, PROCESS[o.verb]);
@@ -396,17 +399,20 @@ export function workOrder(s: SimState, w: Worker, order: Order): Result {
     if (reading.guesses > 0 && orderText(reading.order) !== orderText(order)) log(s, `${w.name} read «${orderText(order)}» as "${orderText(reading.order)}".`, w.id);
     a.read = reading.order;
   }
-  const { verb, noun, from, to, target, within } = parseOrder(a.read);
+  const { verb, noun, from, to, target, within, using } = parseOrder(a.read);
   const prod = PRODUCE[verb];
   if (prod) return produceJob(s, w, verb as WorkVerb, prod.site, prod.ticks, prod.doing, nounItem(noun as Noun));
   if (verb === 'HAUL') {
+    // "haul cart 1 to stockpile 2": push it there
+    if (target !== null) return pushCartJob(s, w, target, to);
     if (noun === 'ANY') {
-      // "haul anything": settle on one good for this trip, then it's an ordinary haul
-      const type = haulAnyType(s, w, from, to);
+      // "haul anything": settle on one good for this trip (whatever's already in the cart first), then it's an ordinary haul
+      const type = (using !== null ? cartGood(s, using) : null) ?? haulAnyType(s, w, from, to);
       if (!type) return failWork(s, w, from === null ? 'Nothing lying around to haul.' : `Nothing at ${placeName(from)} to haul.`, true);
-      a.read = makeOrder('HAUL', type.toUpperCase() as Noun, { from, to });
+      a.read = makeOrder('HAUL', type.toUpperCase() as Noun, { from, to, using });
       return workOrder(s, w, order);
     }
+    if (using !== null) return cartHaul(s, w, nounItem(noun as Noun), from, to, using);
     if (from !== null) return haulBetween(s, w, nounItem(noun as Noun), from, to);
     return haulJob(s, w, nounItem(noun as Noun), to);
   }
@@ -416,6 +422,201 @@ export function workOrder(s: SimState, w: Worker, order: Order): Result {
 }
 
 const GOODS: readonly ItemType[] = ['stone', 'wood', 'grain', 'bread', 'beer'];
+
+// ------------------------------------------------- wheelbarrows and carts
+
+/** The first good already in the named cart, if any. */
+function cartGood(s: SimState, using: Place): ItemType | null {
+  const cart = vehiclesAt(s, using)[0];
+  return cart ? GOODS.find((t) => cart.store[t] > 0) ?? null : null;
+}
+
+/** Someone else has hold of it. */
+function cartInUse(s: SimState, w: Worker, cart: Site): Worker | null {
+  return s.workers.find((o) => o !== w && o.pushing === cart.id) ?? null;
+}
+
+/**
+ * Get hold of a wheelbarrow or cart: walk to its nearer end and take the
+ * handles. 'held' once they have it.
+ */
+function getCart(s: SimState, w: Worker, cart: Site): Result | 'held' {
+  if (pushed(s, w) === cart) return 'held';
+  const other = cartInUse(s, w, cart);
+  if (other) return failWork(s, w, `${other.name} has ${siteRef(cart)}.`, 'wait');
+  if (cart.y !== groundRow()) return failWork(s, w, `${cap(siteRef(cart))} isn't on the ground.`);
+  w.thought = `Fetching ${siteRef(cart)}.`;
+  const left = w.x < cart.x0 || (w.x <= cart.x1 && w.x - cart.x0 < cart.x1 - w.x);
+  const end = { x: Math.max(0, Math.min(s.width - 1, left ? cart.x0 - 1 : cart.x1 + 1)), y: cart.y };
+  const m = moveTo(s, w, end);
+  if (m === 'moving') return 'running';
+  if (m === 'unreachable') return failWork(s, w, `Can't get to ${siteRef(cart)}.`);
+  if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
+  takeHold(s, w, cart);
+  return 'held';
+}
+
+/** Where a cart can be pushed to: beside a fixture (by number or name) or into a building by name, on the ground. */
+function cartDestination(s: SimState, place: Place | null, w: Worker): Pt | null {
+  if (place === null || typeof place !== 'object') return null;
+  if ('fixture' in place) {
+    const site = s.sites.find((x) => x.kind === FIXTURE_WORD_KIND[place.fixture] && x.num === place.n);
+    return site ? spotFor(site, w.id) : null;
+  }
+  const name = place.name.toLowerCase();
+  const site = s.sites.find((x) => x.named && x.label.toLowerCase() === name);
+  if (site) return spotFor(site, w.id);
+  const b = s.buildings.find((x) => x.name.toLowerCase() === name);
+  return b ? { x: Math.floor((b.x0 + b.x1) / 2), y: groundRow() } : null;
+}
+
+/** "Haul cart 1 to stockpile 2": push it there and leave it. One unit of work. */
+function pushCartJob(s: SimState, w: Worker, target: Place, to: Place | null): Result {
+  const cart = vehiclesAt(s, target).find((x) => x.build === null);
+  if (!cart) return failWork(s, w, `There's no ${placeName(target)} to move.`);
+  const dest = cartDestination(s, to, w);
+  if (!dest) return failWork(s, w, to === null ? 'Push it where?' : `There's no ${placeName(to)} to push it to.`);
+  if (dest.y !== groundRow()) return failWork(s, w, `${cap(siteRef(cart))} can't go up the tower.`);
+  const held = getCart(s, w, cart);
+  if (held !== 'held') return held;
+  w.thought = `Pushing ${siteRef(cart)} to ${placeName(to!)}.`;
+  const m = moveTo(s, w, dest);
+  if (m === 'moving') return 'running';
+  letGo(w);
+  if (m === 'unreachable') return failWork(s, w, `Can't push ${siteRef(cart)} there.`);
+  train(s, w, 'hauling');
+  return finishWork(s, w, 1);
+}
+
+/**
+ * Hauling with a wheelbarrow or cart: get hold of it, push it to the goods
+ * (a store, or whatever's lying around), load it up, push it to where they
+ * go, unload. One trip moves far more than an armload, but pushing is slow.
+ * Stopping for anything else leaves the cart where it stands, loaded or
+ * not: it's a store, so anyone can haul from it, and nobody holds on to it.
+ * activity.stage: 0 get the cart, 1 load, 2 deliver, 3 loading or unloading.
+ */
+function cartHaul(s: SimState, w: Worker, type: ItemType, from: Place | null, to: Place | null, using: Place): Result {
+  const a = w.activity;
+  const cart = vehiclesAt(s, using).find((x) => x.build === null);
+  if (!cart) return failWork(s, w, `There's no ${placeName(using)} to haul with.`);
+  if (a.stage === 0) {
+    const held = getCart(s, w, cart);
+    if (held !== 'held') return held;
+    a.ref = 0;
+    a.stage = roomIn(cart) > 0 && moreToLoad(s, cart, type, from) ? 1 : 2;
+    if (a.stage === 2 && cart.store[type] === 0) {
+      letGo(w);
+      return failWork(s, w, from === null ? `No ${type} lying around to haul.` : `No ${type} left at ${placeName(from)}.`, true);
+    }
+  }
+  if (pushed(s, w) !== cart) {
+    // let go of it somehow (a ladder in the way): start over
+    a.stage = 0;
+    return 'running';
+  }
+  if (a.stage === 1) {
+    // to the goods
+    let spot: Pt | null = null;
+    let src: Site | null = null;
+    if (from !== null) {
+      src = nearest(storesAt(s, from, type).filter((x) => x !== cart && x.store[type] > 0), w);
+      if (src) spot = spotFor(src, w.id);
+    } else {
+      let best: Item | null = null;
+      for (const it of s.items) {
+        if (it.type !== type || it.reservedBy !== null || it.y !== cart.y) continue;
+        if (!best || Math.abs(it.x - w.x) < Math.abs(best.x - w.x)) best = it;
+      }
+      if (best) spot = { x: best.x, y: best.y };
+    }
+    if (!spot) {
+      a.stage = cart.store[type] > 0 ? 2 : 0;
+      if (a.stage === 0) {
+        letGo(w);
+        return failWork(s, w, `No more ${type} to load.`, true);
+      }
+      return 'running';
+    }
+    if (spot.y !== groundRow()) {
+      a.stage = cart.store[type] > 0 ? 2 : 0;
+      if (a.stage === 0) {
+        letGo(w);
+        return failWork(s, w, `${cap(siteRef(cart))} can't go up the tower to load.`);
+      }
+      return 'running';
+    }
+    w.thought = `Pushing ${siteRef(cart)} to the ${type}.`;
+    const m = moveTo(s, w, spot);
+    if (m === 'moving') return 'running';
+    if (m === 'unreachable') {
+      letGo(w);
+      return failWork(s, w, `Can't push ${siteRef(cart)} there.`);
+    }
+    // load up
+    let n = 0;
+    const room = roomIn(cart);
+    if (src) {
+      n = Math.min(src.store[type], room);
+      src.store[type] -= n;
+    } else {
+      for (const it of [...s.items]) {
+        if (n >= room) break;
+        if (it.type !== type || it.reservedBy !== null || it.y !== w.y || Math.abs(it.x - w.x) > SKILLS.gatherRange) continue;
+        s.items.splice(s.items.indexOf(it), 1);
+        n++;
+      }
+    }
+    cart.store[type] += n;
+    w.thought = `Loading ${n} ${type} into ${siteRef(cart)}.`;
+    a.timer = Math.max(1, n * MOVE.loadTicksPerUnit);
+    // full, or nothing more to fetch: off to deliver; else fetch more
+    a.aim = roomIn(cart) > 0 && moreToLoad(s, cart, type, from) ? 1 : 2;
+    a.stage = 3;
+    return 'running';
+  }
+  if (a.stage === 2) {
+    const dst = depotFor(s, to, type, w, [cart]);
+    if (!dst) {
+      letGo(w);
+      return failWork(s, w, noDepot(s, to, type));
+    }
+    if (dst.y !== groundRow()) {
+      letGo(w);
+      return failWork(s, w, `${cap(siteRef(cart))} can't go up the tower: ${siteRef(dst)} is up there.`);
+    }
+    w.thought = `Pushing ${cart.store[type]} ${type} to ${siteRef(dst)}.`;
+    const m = moveTo(s, w, spotFor(dst, w.id));
+    if (m === 'moving') return 'running';
+    if (m === 'unreachable') {
+      letGo(w);
+      return failWork(s, w, `Can't push ${siteRef(cart)} to ${siteRef(dst)}.`);
+    }
+    const n = Math.min(cart.store[type], roomIn(dst));
+    cart.store[type] -= n;
+    dst.store[type] += n;
+    a.ref = (a.ref ?? 0) + n;
+    w.thought = `Unloading ${n} ${type} at ${siteRef(dst)}.`;
+    a.timer = Math.max(1, n * MOVE.loadTicksPerUnit);
+    a.aim = -1;
+    a.stage = 3;
+    return 'running';
+  }
+  // stage 3: loading or unloading takes a moment
+  if (--a.timer > 0) return 'running';
+  if (a.aim === 1 || a.aim === 2) {
+    a.stage = a.aim;
+    return 'running';
+  }
+  train(s, w, 'hauling');
+  return finishWork(s, w, a.ref ?? 0);
+}
+
+/** Is there more of this good to load into the cart from where it's coming from? */
+function moreToLoad(s: SimState, cart: Site, type: ItemType, from: Place | null): boolean {
+  if (from !== null) return storesAt(s, from, type).some((x) => x !== cart && x.store[type] > 0);
+  return s.items.some((it) => it.type === type && it.reservedBy === null && it.y === cart.y);
+}
 
 /**
  * Which good a "haul anything" trip moves. Whatever's already in hand comes

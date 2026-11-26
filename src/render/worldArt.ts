@@ -139,6 +139,25 @@ export function fixtureArt(): WorldSprite[] {
 }
 
 /**
+ * Hauling equipment, Claude's stand-ins until the user draws them (their
+ * boxes are on the Babel To Do page). Drawn facing right; the game piles the
+ * load above the bed (rows WHEELBARROW_BED / CART_BED from the top).
+ */
+export function vehicleArt(): WorldSprite[] {
+  const wheel = ['.111.', '1.1.1', '11111', '1.1.1', '.111.'];
+  return [
+    art('fixture.wheelbarrow', 'WHEELBARROW', 16, 16, (b) => {
+      b.box(4, 7, 11, 4, PAPER).rect(0, 6, 5, 1).rect(5, 11, 1, 5);
+      b.stamp(10, 11, wheel);
+    }),
+    art('fixture.cart', 'CART', 32, 16, (b) => {
+      b.box(2, 5, 28, 5, 'light').rect(0, 7, 3, 1);
+      b.stamp(5, 10, ['..111..', '.1.1.1.', '1..1..1', '1111111', '1..1..1', '.1.1.1.']).stamp(21, 10, ['..111..', '.1.1.1.', '1..1..1', '1111111', '1..1..1', '.1.1.1.']);
+    }),
+  ];
+}
+
+/**
  * Pieces added after the first art delivery. They go on their own page
  * (Babel Extras), so the boxes on the pages already drawn never move.
  */
@@ -208,5 +227,5 @@ export function extraWorldArt(): WorldSprite[] {
 }
 
 export function allWorldArt(): WorldSprite[] {
-  return [...terrainArt(), ...natureArt(), ...buildingArt(), ...fixtureArt(), ...skyArt(), ...extrasArt()];
+  return [...terrainArt(), ...natureArt(), ...buildingArt(), ...fixtureArt(), ...skyArt(), ...extrasArt(), ...vehicleArt()];
 }

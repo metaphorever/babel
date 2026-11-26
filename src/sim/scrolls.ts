@@ -1,4 +1,4 @@
-import { addMoodlet, log, moveTo, releaseReservations, settle } from './actions';
+import { addMoodlet, letGo, log, moveTo, releaseReservations, settle } from './actions';
 import { startActivity, train, workOrder, type Result } from './activities';
 import { carrierText, hasWriteLine, lineText, pinCarrier, writingCost } from './carriers';
 import { addConfusion, knows, knowsWord } from './drift';
@@ -100,6 +100,7 @@ function resetLine(c: Carrier): void {
 /** Carry on from line `pc` (or finish, past the end). */
 function jumpTo(s: SimState, w: Worker, c: Carrier, pc: number): Result {
   c.pc = pc;
+  letGo(w);
   resetLine(c);
   if (c.pc >= c.orders.length) return endCarrier(s, w, c);
   startActivity(w, 'scroll');
@@ -249,6 +250,8 @@ export function scrollLineDone(s: SimState, w: Worker, units: number, finish = f
   if (finish || (!isSpecialCount(target) && c.lineDone >= target)) {
     c.pc++;
     resetLine(c);
+    // a cart is let go of at the end of the line that used it
+    letGo(w);
   }
   if (c.pc >= c.orders.length) return endCarrier(s, w, c);
   startActivity(w, 'scroll');
@@ -263,6 +266,7 @@ export function scrollLineFailed(s: SimState, w: Worker, why: string): Result {
   addMoodlet(s, w, 'failed', "Couldn't do a line on my scroll", MOOD.failedJob.value, MOOD.failedJob.ticks);
   c.pc++;
   resetLine(c);
+  letGo(w);
   c.waitUntil = s.tick + SCRIBE.lineRetryTicks;
   if (c.pc >= c.orders.length) return endCarrier(s, w, c);
   return 'failed';

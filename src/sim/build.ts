@@ -5,7 +5,7 @@ import { giveCarrier } from './scrolls';
 import { BUILD, FIXTURE_LABEL, MAP, PATRON, TOWER, type FixtureSpec } from './tuning';
 import { ladderRows, standRow } from './tower';
 import { findPath } from './path';
-import { FIXTURE_KINDS, Tile, type BuildMaterial, type Building, type FixtureKind, type ItemType, type Pt, type SimState, type Site, type Works } from './types';
+import { FIXTURE_KINDS, Tile, isVehicleKind, type BuildMaterial, type Building, type FixtureKind, type ItemType, type Pt, type SimState, type Site, type Works } from './types';
 import { buildingOf, groundRow, houseDeckRow, inTowerSpan, newBuilding, newSite, setTile, siteCenter, spotFor, storedTotal, storyRow, tileAt } from './world';
 
 // Building on the ground (P1). The player places things; workers build them.
@@ -130,6 +130,14 @@ export function footprint(s: SimState, req: PlaceRequest): Footprint {
   const off = (x: number) => x < 0 || x >= s.width;
 
   if (req.what === 'fixture') {
+    // a wheelbarrow or cart is built on open ground (it's pushed about the ground afterwards)
+    if (isVehicleKind(req.fixture)) {
+      fp.y = groundRow();
+      for (let i = 0; i < width; i++) if (off(x0 + i)) fp.blocked[i] = true;
+      const g = groundFootprint(s, fp);
+      if (g.error) g.error = `${g.error} A ${FIXTURE_LABEL[req.fixture].toLowerCase()} is built on open ground.`;
+      return g;
+    }
     const story = Math.max(0, Math.floor(req.story));
     fp.y = storyRow(story);
     // inside the tower's walls: a tower room
@@ -293,6 +301,8 @@ export function capacityOf(kind: FixtureKind): number | null {
   if (kind === 'bar') return BUILD.capacity.bar;
   if (kind === 'stockpile') return BUILD.capacity.stockpile;
   if (kind === 'shelves') return BUILD.capacity.shelves;
+  if (kind === 'wheelbarrow') return BUILD.capacity.wheelbarrow;
+  if (kind === 'cart') return BUILD.capacity.cart;
   return null;
 }
 

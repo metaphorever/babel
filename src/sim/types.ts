@@ -30,8 +30,15 @@ export type NatureKind = 'home' | 'forest' | 'field' | 'well' | 'quarry';
  * can also stand outside). Ladders go only in the tower: each one climbs
  * from its room up to the floor above.
  */
-export type FixtureKind = 'bed' | 'oven' | 'pantry' | 'brewery' | 'bar' | 'stockpile' | 'shelves' | 'ladder';
-export const FIXTURE_KINDS: readonly FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile', 'shelves', 'ladder'];
+export type FixtureKind = 'bed' | 'oven' | 'pantry' | 'brewery' | 'bar' | 'stockpile' | 'shelves' | 'ladder' | VehicleKind;
+/** Hauling equipment that rolls: a store that can be pushed about on the ground. */
+export type VehicleKind = 'wheelbarrow' | 'cart';
+export const VEHICLE_KINDS: readonly VehicleKind[] = ['wheelbarrow', 'cart'];
+export const FIXTURE_KINDS: readonly FixtureKind[] = ['bed', 'oven', 'pantry', 'brewery', 'bar', 'stockpile', 'shelves', 'ladder', ...VEHICLE_KINDS];
+
+export function isVehicleKind(kind: string): kind is VehicleKind {
+  return kind === 'wheelbarrow' || kind === 'cart';
+}
 /** Fixtures that store stone, wood and grain. */
 export const STORAGE_KINDS: readonly FixtureKind[] = ['stockpile', 'shelves'];
 
@@ -322,6 +329,8 @@ export interface Worker {
   look: number;
   /** A child by birth: their parents' look seeds, kept so the family likeness survives a parent leaving. */
   parentLooks?: number[];
+  /** The wheelbarrow or cart they're pushing (a site id). Let go of when they stop for anything else; it stays where it is. */
+  pushing?: number | null;
   /** How this worker feels about each other worker, by id: 0..1 (see SOCIAL in tuning). Hidden; the labels show. */
   feel: Record<number, number>;
   /** How they first felt about each (their natural chemistry): feelings drift back toward it. */

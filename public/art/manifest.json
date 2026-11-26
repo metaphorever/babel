@@ -295,6 +295,18 @@
           24,
           32
         ],
+        "fixture.wheelbarrow": [
+          180,
+          66,
+          16,
+          16
+        ],
+        "fixture.cart": [
+          197,
+          66,
+          32,
+          16
+        ],
         "nature.forest": [
           0,
           112,

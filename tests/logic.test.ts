@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createState, step } from '../src/sim/sim';
 import { applyCommand, validateCommand, type ComposeLine } from '../src/sim/commands';
-import { jobsFor } from '../src/sim/build';
+import { groundUse, jobsFor } from '../src/sim/build';
+import { releaseReservations } from '../src/sim/actions';
+import { storesAt } from '../src/sim/world';
 import { evalCondition } from '../src/sim/logic';
 import { newProject, placeMaterial } from '../src/sim/tower';
 import { isNoticeCard, lineText, newCarrier } from '../src/sim/carriers';
 import { giveCarrier } from '../src/sim/scrolls';
-import { FOREVER, makeOrder, orderText, parseCondition, parseOrder, type Condition, type Order, type TokenId } from '../src/sim/lang';
+import { ALL, FOREVER, makeOrder, orderText, parseCondition, parseOrder, type Condition, type Order, type TokenId } from '../src/sim/lang';
 import { hourOf } from '../src/sim/time';
 import { TIME } from '../src/sim/tuning';
 import type { Carrier, SimState, Worker } from '../src/sim/types';
@@ -288,5 +290,91 @@ describe('session 6: build orders by place, planning ahead in the tower', () => 
     at(2);
     expect(holds('MIDNIGHT')).toBe(true);
     expect(orderText(makeOrder('WAIT', null, { cond: { kind: 'state', state: 'NOON', not: false } }, 'el'))).toBe('περίμενε μέχρι μεσημέρι');
+  });
+});
+
+describe('session 6: wheelbarrows and carts', () => {
+  /** A quiet colony with a cart built on open ground, and an empty stockpile with no limit. */
+  function withCart(kind: 'cart' | 'wheelbarrow' = 'cart') {
+    const s = quiet();
+    const use = groundUse(s);
+    let x0 = -1;
+    for (let x = 20; x < s.width - 10 && x0 < 0; x++) if ([0, 1, 2, 3, 4, 5].every((d) => use[x + d] === null)) x0 = x;
+    const r = applyCommand(s, { type: 'place', playerId: 0, place: { what: 'fixture', fixture: kind, x0, story: 0 } });
+    expect(r.ok).toBe(true);
+    const cart = s.sites[s.sites.length - 1];
+    cart.build = null;
+    return { s, cart };
+  }
+
+  it('reads and writes the cart words', () => {
+    expect(orderText(makeOrder('HAUL', null, { target: { fixture: 'CART', n: 1 }, to: { fixture: 'STOCKPILE', n: 2 } }))).toBe('haul cart 1 to stockpile 2');
+    const using = makeOrder('HAUL', 'STONE', { from: { fixture: 'STOCKPILE', n: 1 }, to: { fixture: 'STOCKPILE', n: 4 }, using: { fixture: 'WHEELBARROW', n: 2 } });
+    expect(orderText(using)).toBe('haul stone from stockpile 1 to stockpile 4 using wheelbarrow 2');
+    expect(parseOrder(using).using).toEqual({ fixture: 'WHEELBARROW', n: 2 });
+    expect(orderText(makeOrder('HAUL', 'ANY', { using: { fixture: 'CART', n: 1 } }, 'fr'))).toBe('porter tout avec charrette 1');
+  });
+
+  it('checks cart lines', () => {
+    const s = quiet();
+    const ok = (l: Partial<ComposeLine>) => validateCommand(s, { type: 'compose', playerId: 0, lines: [{ verb: 'HAUL', noun: null, count: 1, ...l } as ComposeLine], wage: 0, dest: { kind: 'board', addressee: null } }).ok;
+    expect(ok({ target: { fixture: 'CART', n: 1 }, to: { fixture: 'STOCKPILE', n: 2 } })).toBe(true);
+    expect(ok({ target: { fixture: 'CART', n: 1 } })).toBe(false); // where to?
+    expect(ok({ target: { fixture: 'BED', n: 1 }, to: { fixture: 'STOCKPILE', n: 2 } })).toBe(false); // beds don't roll
+    expect(ok({ noun: 'STONE', using: { fixture: 'CART', n: 1 } })).toBe(true);
+    expect(ok({ noun: 'STONE', using: { fixture: 'STOCKPILE', n: 1 } })).toBe(false);
+    expect(ok({ noun: 'STONE', to: { fixture: 'CART', n: 1 } })).toBe(true); // a cart is a store when named
+    expect(validateCommand(s, { type: 'compose', playerId: 0, lines: [{ verb: 'MINE', noun: 'STONE', count: 1, using: { fixture: 'CART', n: 1 } }], wage: 0, dest: { kind: 'board', addressee: null } }).ok).toBe(false);
+  });
+
+  it('a cart is built on open ground, and goods never go into it by default', () => {
+    const { s, cart } = withCart();
+    expect(cart.kind).toBe('cart');
+    expect(cart.x1 - cart.x0 + 1).toBe(4);
+    expect(cart.capacity).toBe(20);
+    expect(storesAt(s, null, 'stone')).not.toContain(cart);
+    expect(storesAt(s, { fixture: 'CART', n: cart.num }, 'stone')).toContain(cart);
+  });
+
+  it('"haul cart 1 to stockpile 2" pushes it there and leaves it', () => {
+    const { s, cart } = withCart();
+    const pile = emptyPile(s);
+    const w = s.workers[0];
+    const c = hand(s, w, [{ order: makeOrder('HAUL', null, { target: { fixture: 'CART', n: cart.num }, to: { fixture: 'STOCKPILE', n: pile.num } }) }]);
+    expect(runUntil(s, () => !w.held.includes(c), 8000)).toBe(true);
+    // it's beside the stockpile now, and nobody's holding it
+    expect(Math.min(Math.abs(cart.x0 - pile.x1), Math.abs(cart.x1 - pile.x0), Math.abs(cart.x0 - pile.x0))).toBeLessThan(8);
+    expect(s.workers.some((o) => o.pushing === cart.id)).toBe(false);
+  });
+
+  it('"haul … using cart" moves far more per trip than by hand', () => {
+    const { s, cart } = withCart();
+    const pile = emptyPile(s);
+    const gy = groundRow();
+    // twelve stone lying together, a way off from the stockpile
+    const at = pile.x1 + 30 < s.width - 20 ? pile.x1 + 30 : pile.x0 - 40;
+    for (let i = 0; i < 12; i++) s.items.push({ id: s.nextId++, type: 'stone', x: at + (i % 4), y: gy, reservedBy: null });
+    const w = s.workers[0];
+    const c = hand(s, w, [{ order: makeOrder('HAUL', 'STONE', { to: { fixture: 'STOCKPILE', n: pile.num }, using: { fixture: 'CART', n: cart.num } }), count: 1 }, { order: makeOrder('WAIT'), count: 5 }]);
+    expect(runUntil(s, () => c.pc === 1, 12000)).toBe(true);
+    // one trip: all twelve at once
+    expect(pile.store.stone).toBe(12);
+    expect(cart.store.stone).toBe(0);
+    expect(s.items.filter((x) => x.type === 'stone').length).toBe(0);
+  });
+
+  it('a worker who stops lets go: the cart stays put, loaded, and anyone can haul from it', () => {
+    const { s, cart } = withCart('wheelbarrow');
+    cart.store.wood = 5;
+    const w = s.workers[0];
+    w.pushing = cart.id;
+    releaseReservations(s, w);
+    expect(w.pushing).toBe(null);
+    const pile = emptyPile(s);
+    const o = s.workers[1];
+    const c = hand(s, o, [{ order: makeOrder('HAUL', 'WOOD', { from: { fixture: 'WHEELBARROW', n: cart.num }, to: { fixture: 'STOCKPILE', n: pile.num } }), count: ALL }]);
+    expect(runUntil(s, () => !o.held.includes(c), 20000)).toBe(true);
+    expect(cart.store.wood).toBe(0);
+    expect(pile.store.wood).toBe(5);
   });
 });

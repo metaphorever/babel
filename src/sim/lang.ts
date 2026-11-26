@@ -44,8 +44,8 @@ export type Verb = WorkVerb | FlowVerb;
  * there are, each to where it's kept.
  */
 export type Noun = 'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER' | 'ANY' | 'BOARD' | 'TOWER' | 'CAMP' | 'BUILDINGS' | 'FIXTURES';
-/** Little words that introduce details: where from, where to, and where in (which fixtures to build). */
-export type Prep = 'FROM' | 'TO' | 'IN';
+/** Little words that introduce details: where from, where to, where in (which fixtures to build), and using which cart. */
+export type Prep = 'FROM' | 'TO' | 'IN' | 'USING';
 /**
  * Places. FLOOR (the word "level") carries its level index on the token; it
  * reads one higher, since the ground counts as the first level. TOWER (a
@@ -57,33 +57,44 @@ export type PlaceWord = 'BASE' | 'FLOOR';
  * ("stockpile 3", "bed 2"). The stores (stockpile, shelves, pantry, bar) are
  * places goods can be hauled from and to; any fixture can be built by number.
  */
-export type FixtureWord = 'STOCKPILE' | 'SHELVES' | 'PANTRY' | 'BAR' | 'BED' | 'OVEN' | 'BREWERY' | 'LADDER';
-export type StoreKind = 'stockpile' | 'shelves' | 'pantry' | 'bar';
+export type FixtureWord = 'STOCKPILE' | 'SHELVES' | 'PANTRY' | 'BAR' | 'BED' | 'OVEN' | 'BREWERY' | 'LADDER' | 'WHEELBARROW' | 'CART';
+export type StoreKind = 'stockpile' | 'shelves' | 'pantry' | 'bar' | 'wheelbarrow' | 'cart';
 /** Which fixture kind each fixture word names. */
 export const FIXTURE_WORD_KIND: Record<FixtureWord, FixtureKind> = {
   STOCKPILE: 'stockpile', SHELVES: 'shelves', PANTRY: 'pantry', BAR: 'bar',
   BED: 'bed', OVEN: 'oven', BREWERY: 'brewery', LADDER: 'ladder',
+  WHEELBARROW: 'wheelbarrow', CART: 'cart',
 };
-export const FIXTURE_WORDS: readonly FixtureWord[] = ['STOCKPILE', 'SHELVES', 'PANTRY', 'BAR', 'BED', 'OVEN', 'BREWERY', 'LADDER'];
+export const FIXTURE_WORDS: readonly FixtureWord[] = ['STOCKPILE', 'SHELVES', 'PANTRY', 'BAR', 'BED', 'OVEN', 'BREWERY', 'LADDER', 'WHEELBARROW', 'CART'];
 /** The word for each kind of fixture. */
 export const FIXTURE_WORD: Record<FixtureKind, FixtureWord> = {
   stockpile: 'STOCKPILE', shelves: 'SHELVES', pantry: 'PANTRY', bar: 'BAR',
   bed: 'BED', oven: 'OVEN', brewery: 'BREWERY', ladder: 'LADDER',
+  wheelbarrow: 'WHEELBARROW', cart: 'CART',
 };
 /** Does this fixture word name a store (somewhere goods are kept)? */
 export function isStoreWord(f: FixtureWord): boolean {
-  return f === 'STOCKPILE' || f === 'SHELVES' || f === 'PANTRY' || f === 'BAR';
+  return f === 'STOCKPILE' || f === 'SHELVES' || f === 'PANTRY' || f === 'BAR' || isVehicleWord(f);
+}
+/** A wheelbarrow or cart: a store that can be pushed about. */
+export function isVehicleWord(f: FixtureWord): boolean {
+  return f === 'WHEELBARROW' || f === 'CART';
 }
 /** The word for a kind of store. */
-export const STORE_WORD: Record<StoreKind, FixtureWord> = { stockpile: 'STOCKPILE', shelves: 'SHELVES', pantry: 'PANTRY', bar: 'BAR' };
-/** Where each good that can be hauled is kept: materials and grain in stockpiles and on shelves, bread in pantries, beer in bars. Anything goes in any store that keeps it. */
+export const STORE_WORD: Record<StoreKind, FixtureWord> = { stockpile: 'STOCKPILE', shelves: 'SHELVES', pantry: 'PANTRY', bar: 'BAR', wheelbarrow: 'WHEELBARROW', cart: 'CART' };
+/**
+ * Where each good that can be hauled is kept: materials and grain in
+ * stockpiles and on shelves, bread in pantries, beer in bars. A wheelbarrow
+ * or cart carries anything, but only when an order names it: goods never
+ * go into one by default.
+ */
 export const STORES_FOR: Record<'STONE' | 'WOOD' | 'GRAIN' | 'BREAD' | 'BEER' | 'ANY', readonly StoreKind[]> = {
-  STONE: ['stockpile', 'shelves'],
-  WOOD: ['stockpile', 'shelves'],
-  GRAIN: ['stockpile', 'shelves'],
-  BREAD: ['pantry'],
-  BEER: ['bar'],
-  ANY: ['stockpile', 'shelves', 'pantry', 'bar'],
+  STONE: ['stockpile', 'shelves', 'wheelbarrow', 'cart'],
+  WOOD: ['stockpile', 'shelves', 'wheelbarrow', 'cart'],
+  GRAIN: ['stockpile', 'shelves', 'wheelbarrow', 'cart'],
+  BREAD: ['pantry', 'wheelbarrow', 'cart'],
+  BEER: ['bar', 'wheelbarrow', 'cart'],
+  ANY: ['stockpile', 'shelves', 'pantry', 'bar', 'wheelbarrow', 'cart'],
 };
 /**
  * The little words of a condition. UNTIL ends a work line early once its
@@ -137,6 +148,7 @@ export const DRIFTABLE: readonly Exclude<TokenId, NameWord>[] = [
   'IF', 'OTHERWISE', 'WAIT', 'UNTIL', 'NOT', 'HAS', 'FEWER', 'NO',
   'HUNGRY', 'TIRED', 'CARRYING', 'DAWN', 'NOON', 'DUSK', 'MIDNIGHT',
   'BUILDINGS', 'FIXTURES', 'IN',
+  'WHEELBARROW', 'CART', 'USING',
 ];
 
 const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
@@ -150,6 +162,7 @@ const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
     IF: 'if', OTHERWISE: 'otherwise', WAIT: 'wait', UNTIL: 'until', NOT: 'not', HAS: 'has', FEWER: 'fewer than', NO: 'no',
     HUNGRY: 'hungry', TIRED: 'tired', CARRYING: 'carrying', DAWN: 'dawn', NOON: 'noon', DUSK: 'dusk', MIDNIGHT: 'midnight',
     BUILDINGS: 'buildings', FIXTURES: 'fixtures', IN: 'in',
+    WHEELBARROW: 'wheelbarrow', CART: 'cart', USING: 'using',
   },
   fr: {
     MINE: 'creuser', CHOP: 'couper', HARVEST: 'récolter', COOK: 'cuire', BREW: 'brasser', HAUL: 'porter', BUILD: 'bâtir',
@@ -161,6 +174,7 @@ const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
     IF: 'si', OTHERWISE: 'sinon', WAIT: 'attendre', UNTIL: 'jusqu’à', NOT: 'pas', HAS: 'contient', FEWER: 'moins de', NO: 'aucun',
     HUNGRY: 'affamé', TIRED: 'fatigué', CARRYING: 'chargé', DAWN: 'aube', NOON: 'midi', DUSK: 'crépuscule', MIDNIGHT: 'minuit',
     BUILDINGS: 'bâtiments', FIXTURES: 'installations', IN: 'dans',
+    WHEELBARROW: 'brouette', CART: 'charrette', USING: 'avec',
   },
   el: {
     MINE: 'σκάψε', CHOP: 'κόψε', HARVEST: 'θέρισε', COOK: 'ψήσε', BREW: 'ζύμωσε', HAUL: 'κουβάλα', BUILD: 'χτίσε',
@@ -172,6 +186,7 @@ const WORDS: Record<LangId, Record<Exclude<TokenId, NameWord>, string>> = {
     IF: 'αν', OTHERWISE: 'αλλιώς', WAIT: 'περίμενε', UNTIL: 'μέχρι', NOT: 'όχι', HAS: 'έχει', FEWER: 'λιγότερα από', NO: 'καθόλου',
     HUNGRY: 'πεινασμένος', TIRED: 'κουρασμένος', CARRYING: 'φορτωμένος', DAWN: 'αυγή', NOON: 'μεσημέρι', DUSK: 'σούρουπο', MIDNIGHT: 'μεσάνυχτα',
     BUILDINGS: 'κτίρια', FIXTURES: 'εγκαταστάσεις', IN: 'εντός',
+    WHEELBARROW: 'καρότσι', CART: 'κάρο', USING: 'με',
   },
 };
 
@@ -275,6 +290,8 @@ export interface ParsedOrder {
   cond: Condition | null;
   /** "build fixtures in …": where (null: anywhere). */
   within: Place | null;
+  /** "… using cart 1": the wheelbarrow or cart to haul with. */
+  using: Place | null;
 }
 
 // ---------------------------------------------------------------- conditions
@@ -364,7 +381,7 @@ export function isLogicVerb(v: TokenId): v is LogicVerb {
 }
 
 export function parseOrder(order: Order): ParsedOrder {
-  const out: ParsedOrder = { verb: order[0].t as Verb, noun: null, who: null, from: null, to: null, target: null, cond: null, within: null };
+  const out: ParsedOrder = { verb: order[0].t as Verb, noun: null, who: null, from: null, to: null, target: null, cond: null, within: null, using: null };
   if (out.verb === 'IF') {
     out.cond = parseCondition(order.slice(1));
     return out;
@@ -393,6 +410,7 @@ export function parseOrder(order: Order): ParsedOrder {
     if (where === null) break;
     if (prep === 'FROM') out.from = where;
     else if (prep === 'IN') out.within = where;
+    else if (prep === 'USING') out.using = where;
     else out.to = where;
     i += 2;
   }
@@ -400,7 +418,7 @@ export function parseOrder(order: Order): ParsedOrder {
 }
 
 export function isPrep(t: TokenId): t is Prep {
-  return t === 'FROM' || t === 'TO' || t === 'IN';
+  return t === 'FROM' || t === 'TO' || t === 'IN' || t === 'USING';
 }
 
 export function orderText(order: Order): string {
@@ -418,6 +436,8 @@ export interface OrderExtras {
   cond?: Condition | null;
   /** "build fixtures in …": where. */
   within?: Place | null;
+  /** "… using cart 1": a wheelbarrow or cart to haul with. */
+  using?: Place | null;
 }
 
 export function makeOrder(verb: Verb, noun: Noun | null = null, extras: OrderExtras = {}, lang: LangId = 'en'): Order {
@@ -432,6 +452,7 @@ export function makeOrder(verb: Verb, noun: Noun | null = null, extras: OrderExt
   if (extras.from !== undefined && extras.from !== null) o.push({ t: 'FROM', lang }, ...placeTokens(extras.from, lang));
   if (extras.to !== undefined && extras.to !== null) o.push({ t: 'TO', lang }, ...placeTokens(extras.to, lang));
   if (extras.within !== undefined && extras.within !== null) o.push({ t: 'IN', lang }, ...placeTokens(extras.within, lang));
+  if (extras.using !== undefined && extras.using !== null) o.push({ t: 'USING', lang }, ...placeTokens(extras.using, lang));
   if (cond) o.push({ t: 'UNTIL', lang }, ...condTokens(cond, lang));
   return o;
 }
@@ -471,6 +492,11 @@ export function takesTarget(verb: Verb): boolean {
   return verb === 'BUILD';
 }
 
+/** Hauling can name a wheelbarrow or cart instead of goods: "haul cart 1 to stockpile 2" pushes it there. */
+export function movesThing(verb: Verb): boolean {
+  return verb === 'HAUL';
+}
+
 export function isValidJob(verb: Verb, noun: Noun): boolean {
   return isWorkVerb(verb) && VALID_JOBS[verb].includes(noun);
 }
@@ -495,7 +521,11 @@ export const SCROLL_LINES: readonly LineOption[] = [
 ];
 
 export function isValidLine(verb: Verb, noun: Noun | null, target: Place | null = null): boolean {
-  if (target !== null) return takesTarget(verb) && noun === null && target !== 'tower' && target !== 'camp';
+  if (target !== null) {
+    if (noun !== null || target === 'tower' || target === 'camp') return false;
+    if (movesThing(verb)) return typeof target === 'object' && ('name' in target || isVehicleWord(target.fixture));
+    return takesTarget(verb);
+  }
   return SCROLL_LINES.some((l) => l.verb === verb && l.noun === noun);
 }
 

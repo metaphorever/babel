@@ -120,6 +120,7 @@ export function readOrder(s: SimState, w: Worker, order: Order): Reading {
   let from = parsed.from;
   let to = parsed.to;
   let within = parsed.within;
+  let using = parsed.using;
   for (let i = 1; i < order.length - 1; i++) {
     const tok = order[i];
     if (!isPrep(tok.t)) continue;
@@ -128,18 +129,21 @@ export function readOrder(s: SimState, w: Worker, order: Order): Reading {
       guesses++;
       if (tok.t === 'FROM') from = null;
       else if (tok.t === 'IN') within = null;
+      else if (tok.t === 'USING') using = null;
       else to = null;
     }
   }
   // what to build: a planned build they can't make out means building whatever's planned
   let target = parsed.target;
   if (target !== null && order[1] && !knows(w, order[1])) {
+    // hauling something they can't make out: they can't guess which cart is meant
+    if (parsed.verb === 'HAUL') return { order: null, guesses: 0 };
     guesses++;
     target = null;
     noun = 'CAMP';
   }
   const who = parsed.who !== null ? { id: parsed.who, name: order.find((t) => t.t === 'WHO')?.name ?? '?' } : null;
-  return { order: makeOrder(parsed.verb as Verb, noun, { from, to, who, target, within }), guesses };
+  return { order: makeOrder(parsed.verb as Verb, noun, { from, to, who, target, within, using }), guesses };
 }
 
 /** Reading something unreadable, or guessing at words, is confusing. */
