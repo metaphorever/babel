@@ -16,12 +16,15 @@ import { buildPages, renderPage } from './sheets';
 
 const OUT = join(process.cwd(), 'art-src');
 const force = process.argv.includes('--force');
+// --page "Babel To Do": write just that page (over the old one), leaving every other page alone
+const only = process.argv.flatMap((a, i) => (process.argv[i - 1] === '--page' ? [a] : []));
 mkdirSync(OUT, { recursive: true });
 console.log(`MacPaint sheets in ${OUT}`);
 
 for (const page of buildPages()) {
+  if (only.length && !only.includes(page.name)) continue;
   const pntg = join(OUT, `${page.name}.pntg`);
-  if (existsSync(pntg) && !force) {
+  if (existsSync(pntg) && !force && !only.length) {
     console.log(`  kept     ${page.name} (already exists; --force to start it over)`);
     continue;
   }

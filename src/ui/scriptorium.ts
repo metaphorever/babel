@@ -49,9 +49,9 @@ import type { WindowManager } from './windows';
 type Mode = 'anyone' | 'named' | 'hand';
 
 /** 16x16 1-bit icons: a job board on legs, and an open hand. */
-const BOARD_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="M1 2h14v1H1zM1 10h14v1H1zM1 3h1v7H1zM14 3h1v7h-1zM3 4h4v4H3zM9 4h4v2H9zM9 7h3v2H9zM3 11h1v4H3zM12 11h1v4h-1z" fill="currentColor"/></svg>';
-const NAMED_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="M1 2h14v1H1zM1 10h14v1H1zM1 3h1v7H1zM14 3h1v7h-1zM3 11h1v4H3zM12 11h1v4h-1zM6 4h4v1H6zM5 5h1v2H5zM10 5h1v2h-1zM6 7h4v1H6zM7 8h2v1H7z" fill="currentColor"/></svg>';
-const HAND_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="M5 2h1v6H5zM7 1h1v7H7zM9 2h1v6H9zM11 3h1v6h-1zM2 7h1v2H2zM3 8h1v2H3zM4 7h1v6H4zM12 8h1v4h-1zM5 13h7v1H5zM5 8h7v5H5z" fill="currentColor"/></svg>';
+export const BOARD_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="M1 2h14v1H1zM1 10h14v1H1zM1 3h1v7H1zM14 3h1v7h-1zM3 4h4v4H3zM9 4h4v2H9zM9 7h3v2H9zM3 11h1v4H3zM12 11h1v4h-1z" fill="currentColor"/></svg>';
+export const NAMED_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="M1 2h14v1H1zM1 10h14v1H1zM1 3h1v7H1zM14 3h1v7h-1zM3 11h1v4H3zM12 11h1v4h-1zM6 4h4v1H6zM5 5h1v2H5zM10 5h1v2h-1zM6 7h4v1H6zM7 8h2v1H7z" fill="currentColor"/></svg>';
+export const HAND_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges"><path d="M5 2h1v6H5zM7 1h1v7H7zM9 2h1v6H9zM11 3h1v6h-1zM2 7h1v2H2zM3 8h1v2H3zM4 7h1v6H4zM12 8h1v4h-1zM5 13h7v1H5zM5 8h7v5H5z" fill="currentColor"/></svg>';
 
 const MODES: { id: Mode; label: string; hint: string; icon: string }[] = [
   { id: 'anyone', label: 'Board · Anyone', hint: 'Post it on the job board for whoever is free.', icon: BOARD_ICON },

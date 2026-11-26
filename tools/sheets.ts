@@ -24,6 +24,36 @@ import {
 } from '../src/render/spriteData';
 import { allWorldArt, buildingArt, extrasArt, fixtureArt, natureArt, skyArt, terrainArt, type WorldSprite } from '../src/render/worldArt';
 import { drawText, textWidth } from './font';
+import { BOARD_ICON, HAND_ICON, NAMED_ICON } from '../src/ui/scriptorium';
+
+/** A 16x16 icon drawn as SVG rectangles ("M1 2h14v1H1z" ...) as a grid, so it can go on a sheet. */
+function svgIcon(svg: string): Grid {
+  const rows = Array.from({ length: 16 }, () => '0'.repeat(16).split(''));
+  const d = /d="([^"]+)"/.exec(svg)?.[1] ?? '';
+  for (const m of d.matchAll(/M(\d+) (\d+)h(\d+)v(\d+)H\d+z/g)) {
+    const [x, y, w, h] = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) rows[yy][xx] = '1';
+  }
+  return rows.map((r) => r.join(''));
+}
+
+/** The tower site's marker as drawn in code now: dashes along the ground, a post with a cap at each end. */
+function siteMarker(part: 'left' | 'middle' | 'right'): Grid {
+  const rows = Array.from({ length: 8 }, () => '.'.repeat(8).split(''));
+  for (let x = 0; x < 8; x++) if (x % 3 !== 2) rows[7][x] = '1';
+  if (part === 'left') {
+    for (let y = 2; y < 8; y++) rows[y][0] = '1';
+    for (let x = 0; x < 3; x++) rows[2][x] = '1';
+  }
+  if (part === 'right') {
+    for (let y = 2; y < 8; y++) rows[y][7] = '1';
+    for (let x = 5; x < 8; x++) rows[2][x] = '1';
+  }
+  return rows.map((r) => r.join(''));
+}
+
+/** An empty box to draw something new in. */
+const todo = (key: string, label: string, w: number, h: number, grid: Grid | null = null): Slot => ({ key: `todo.${key}`, label, w, h, grid });
 import { PAINT_H, PAINT_W } from './macpaint';
 
 export interface Slot {
@@ -121,6 +151,45 @@ export function buildPages(art: ArtSet = defaultArt(), worldArt?: { terrain: Wor
         { title: 'GENERIC BUILDING PARTS: ONE TILE WIDE, ONE STORY TALL, ROOF ON TOP', perRow: 5, slots: world(wa.buildings.slice(0, 8)) },
         { title: 'SPECIAL BUILDINGS', perRow: 2, slots: world(wa.buildings.slice(8)) },
         { title: 'FIXTURES (MOSTLY PLACEHOLDERS FOR P1)', perRow: 4, slots: world(wa.fixtures) },
+      ],
+    },
+    {
+      // what's still Claude's placeholder (filled in) or not drawn at all yet (empty), outside the Workers page
+      name: 'Babel To Do',
+      title: 'BABEL TO DO',
+      groups: [
+        {
+          title: 'CLOUD PARTS: OVERLAPPING BLOBS, FLAT BOTTOMS, FLUFFY TOPS (SEE CLOUD-REFERENCE.PNG)',
+          perRow: 6,
+          slots: Array.from({ length: 6 }, (_, i) => todo(`cloud.${i}`, `CLOUD PART ${i + 1}`, 32, 16)),
+        },
+        {
+          title: 'FIXTURES: WHOLE BLOCKS (A BLOCK IS 16 PX)',
+          perRow: 3,
+          slots: [todo('shelves', 'SHELVES (2 BLOCKS TALL)', 16, 32), todo('stairs', 'STAIRS (ONE LEVEL)', 32, 32)],
+        },
+        {
+          title: 'TOWER SITE MARKER, BEFORE ANYTHING IS BUILT (NOW DRAWN IN CODE). THE MIDDLE REPEATS.',
+          perRow: 3,
+          slots: [todo('site.left', 'LEFT END', 8, 8, siteMarker('left')), todo('site.middle', 'MIDDLE', 8, 8, siteMarker('middle')), todo('site.right', 'RIGHT END', 8, 8, siteMarker('right'))],
+        },
+        {
+          title: 'SCRIPTORIUM BUTTON ICONS (16X16, PLACEHOLDERS NOW)',
+          perRow: 3,
+          slots: [todo('icon.anyone', 'BOARD: ANYONE', 16, 16, svgIcon(BOARD_ICON)), todo('icon.named', 'BOARD: BY NAME', 16, 16, svgIcon(NAMED_ICON)), todo('icon.hand', 'HAND TO', 16, 16, svgIcon(HAND_ICON))],
+        },
+        {
+          title: 'HAULING EQUIPMENT (TO COME). THE GAME DRAWS THE LOAD ON TOP.',
+          perRow: 4,
+          slots: [
+            todo('wheelbarrow', 'WHEELBARROW', 16, 16),
+            todo('cart', 'CART', 32, 16),
+            todo('pulley', 'ROPE PULLEY', 16, 32),
+            todo('winch', 'WINCH (BY HAND)', 32, 32),
+            todo('winch-beast', 'WINCH (BY A BEAST)', 48, 32),
+            todo('stable', 'STABLE STALL', 32, 32),
+          ],
+        },
       ],
     },
     {
