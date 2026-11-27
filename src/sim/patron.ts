@@ -1,4 +1,5 @@
-import { log } from './actions';
+import { alert, log } from './actions';
+import { levelAlert, patienceAlert } from './alerts';
 import { hasWriteLine, scribeLoop } from './carriers';
 import { knows, knowsWord } from './drift';
 import { LANGS, floorName, langName, type LangId } from './lang';
@@ -94,6 +95,7 @@ export function updatePatron(s: SimState): void {
   if (inGrace(s)) {
     if (s.tick === s.graceUntil - 1) log(s, "The patron's grace period is over. Their patience will start to wear thin.");
   } else s.patience = Math.max(0, s.patience - PATRON.patienceDrain[s.difficulty]);
+  patienceAlert(s, before);
   if (before > 0 && s.patience === 0) log(s, 'The patron has run out of patience. No more stipend until the tower grows again.');
   else if (before >= 25 && s.patience < 25) log(s, 'The patron is growing impatient. Finish a level of the tower soon.');
 
@@ -115,6 +117,7 @@ export function updatePatron(s: SimState): void {
     if (s.patience >= PATRON.recruitAbove && headcount(s) < target) {
       const w = arriveOnRoad(s);
       log(s, `${w.name} arrived on the road, sent by the patron to work on the tower.`, w.id);
+      alert(s, 'newcomer', `${w.name} has arrived`, `${w.name} arrived on the road, sent by the patron to work on the tower.`, w.id);
     }
   }
 }
@@ -126,6 +129,7 @@ export function patronFloorDone(s: SimState, level: number): void {
   s.gold += bonus;
   s.income += bonus;
   log(s, `The patron is pleased with ${floorName(level)} and sends ${bonus} gold.`);
+  levelAlert(s, level, bonus);
 }
 
 /** The patron gives the colony a few days to get started (until floor 1 is finished). */

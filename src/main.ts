@@ -46,6 +46,13 @@ const ui = new Ui(document.getElementById('ui')!, sim, {
   recruit: () => build.recruitDialog(),
 });
 const build = new BuildUi(document.getElementById('ui')!, ui.wm, sim, renderer, ui.scriptorium, {
+  // until the title screen (§16.9 step 9): a fresh game, same difficulty and start, new seed
+  quitGame: () => {
+    const q = new URLSearchParams(location.search);
+    q.delete('seed');
+    const rest = q.toString();
+    location.assign(location.pathname + (rest ? `?${rest}` : ''));
+  },
   centerOnTile: (x, y) => renderer.centerOn(x * TILE, y * TILE),
   showWorker: (id) => {
     ui.select(id);

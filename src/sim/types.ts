@@ -400,7 +400,25 @@ export type Complaint =
   | 'lowpay'
   | 'other';
 
-export type AlertKind = 'notice' | 'quit';
+export type AlertKind =
+  | 'notice'
+  | 'quit'
+  /** The patron's patience falls to 50%, 25% or 0. */
+  | 'patron'
+  /** A good falls under its alert line (all gone, by default). */
+  | 'supply'
+  /** The treasury couldn't pay a worker's wage. */
+  | 'wages'
+  /** A worker gave up on a scroll they can no longer read. */
+  | 'scroll'
+  /** The patron sent a newcomer (info, muted by default). */
+  | 'newcomer'
+  /** A tower level finished (info, muted by default). */
+  | 'level'
+  /** The patron's goal reached. Can't be muted. */
+  | 'goal'
+  /** Nobody is left. Can't be muted. */
+  | 'gone';
 
 export interface Alert {
   id: number;
@@ -508,6 +526,18 @@ export interface SimState {
   events: GameEvent[];
   /** Things the player should know about now (a worker giving notice...). The UI shows each once, unless muted. */
   alerts: Alert[];
+  /** The tower's height the patron asked for, in levels (§16.9: 30 until the New Game screen offers others). */
+  goal: number;
+  /** The goal alert has been raised (once a game; you can keep playing). */
+  won: boolean;
+  /** Alert when a good falls under this many in the colony (0 = never). The Stores window will set it; 1 means "all gone". */
+  alertBelow: Record<ItemType, number>;
+  /** Goods already alerted as out (or out from the start), until they're back above the line. */
+  supplyOut: ItemType[];
+  /** No "can't pay wages" alert again until this tick. */
+  wagesQuietUntil: number;
+  /** With nobody left: what the "everyone gone" alert last said (recruit / wait / end), or null while anyone is staying. */
+  gone: 'recruit' | 'wait' | 'end' | null;
   /** Who feels what about whom: families, couples, friends and enemies. */
   social: SocialState;
   /** Gold workers have sent home to their families (gone from the colony for good). */

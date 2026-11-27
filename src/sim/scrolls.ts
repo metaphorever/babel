@@ -1,4 +1,4 @@
-import { addMoodlet, gotPaid, judgeWage, letGo, log, moveTo, releaseReservations, settle } from './actions';
+import { addMoodlet, alert, unpaidAlert, gotPaid, judgeWage, letGo, log, moveTo, releaseReservations, settle } from './actions';
 import { startActivity, train, workOrder, type Result } from './activities';
 import { carrierText, hasWriteLine, lineText, pinCarrier, workerName, writingCost } from './carriers';
 import { addConfusion, knows, knowsWord } from './drift';
@@ -241,6 +241,7 @@ export function scrollLineDone(s: SimState, w: Worker, units: number, finish = f
     } else {
       addMoodlet(s, w, 'unpaid', 'Treasury was empty', -6, MOOD.missedJobTicks);
       log(s, `No gold to pay ${w.name} for "${lineText(c, c.pc)}".`, w.id);
+      unpaidAlert(s, w, `«${lineText(c, c.pc)}»`);
     }
   }
   if (units > 0) {
@@ -563,6 +564,7 @@ export function unreadableLine(s: SimState, w: Worker, c: Carrier, line: Order):
     }
     w.thought = "I can't make sense of this anymore.";
     log(s, `${w.name} gave up on their ${c.kind}: they can't read «${orderText(line)}» anymore.`, w.id);
+    alert(s, 'scroll', `${w.name} gave up on their ${c.kind}`, `${w.name} can't read «${orderText(line)}» anymore, so they've set their ${c.kind} aside and gone back to the board. Their words have drifted: write it again in a language they know, or teach them the words.`, w.id);
     return 'failed';
   }
   return scrollLineFailed(s, w, `Can't read this line: «${orderText(line)}».`);

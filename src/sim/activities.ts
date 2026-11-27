@@ -1,4 +1,4 @@
-import { addMoodlet, dropCarried, gotPaid, judgeWage, letGo, log, moveTo, pushed, settle, takeHold } from './actions';
+import { addMoodlet, unpaidAlert, dropCarried, gotPaid, judgeWage, letGo, log, moveTo, pushed, settle, takeHold } from './actions';
 import { ALL, FIXTURE_WORD_KIND, FOREVER, STORES_FOR, floorName, isSpecialCount, isWorkVerb, makeOrder, orderText, parseOrder, placeName, type Noun, type Order, type Place, type Verb, type WorkVerb } from './lang';
 import { carrierText } from './carriers';
 import { attendLesson, giveCarrier, runScroll, scrollLineDone, scrollLineFailed, unreadableLine } from './scrolls';
@@ -1352,6 +1352,7 @@ function completeJob(s: SimState, w: Worker, units: number): Result {
       gotPaid(s, w, pay);
     } else if (pay > 0) {
       addMoodlet(s, w, 'unpaid', 'Treasury was empty', -6, MOOD.missedJobTicks);
+      unpaidAlert(s, w, `«${orderText(mem.order)}»`);
     }
     w.thought = `Done: ${units} ${mem.order[1]?.t.toLowerCase() ?? ''}.`;
     // "all" is finished once there's nothing left to do

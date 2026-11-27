@@ -44,6 +44,7 @@ import { bar, clear, h } from './dom';
 import { ScriptoriumPanel } from './scriptorium';
 import { TowerPanel } from './tower';
 import { LanguagesPanel } from './languages';
+import { AlertsPanel } from './alerts';
 import { WindowManager } from './windows';
 
 const DOING: Record<ActivityKind, string> = {
@@ -100,6 +101,7 @@ export class Ui {
   scriptorium!: ScriptoriumPanel;
   tower!: TowerPanel;
   languages!: LanguagesPanel;
+  alertsPanel!: AlertsPanel;
 
   private gold!: HTMLElement;
   private patron!: HTMLElement;
@@ -125,6 +127,10 @@ export class Ui {
     this.scriptorium = new ScriptoriumPanel(this.wm, this.sim);
     this.tower = new TowerPanel(this.wm, this.sim, (x, y) => this.hooks.centerOnTile(x, y));
     this.languages = new LanguagesPanel(this.wm, this.sim);
+    this.alertsPanel = new AlertsPanel(this.wm, this.sim, (id) => {
+      this.select(id);
+      this.hooks.centerOnWorker(id);
+    });
     this.wm.create('inspector', 'Worker', -336, 34, 320);
     this.wm.create('roster', 'Workers', -656, 34, 300);
     this.wm.create('stores', 'Stores', 390, 34, 220);
@@ -171,6 +177,7 @@ export class Ui {
       menu('Workers', 'roster'),
       menu('Stores', 'stores'),
       menu('Log', 'log'),
+      menu('Alerts', 'alerts'),
       menu('Help', 'help'),
       h('span', { class: 'menu-spacer' }),
       this.alerts,
@@ -576,9 +583,11 @@ export class Ui {
     const free = availableGold(s);
     this.gold.textContent = `Gold ${free}${s.reserved ? ` (+${s.reserved} promised)` : ''}`;
     this.patron.textContent = `Patron ${Math.round(s.patience)}% · +${currentStipend(s)}g/day`;
-    const notice = s.workers.filter((w) => w.noticeUntil !== null || w.leaving).length;
-    this.alerts.textContent = s.workers.length === 0 ? 'Everyone has gone home' : notice ? `${notice} giving notice` : '';
-    this.alerts.style.display = notice || s.workers.length === 0 ? '' : 'none';
+    // workers already walking home aren't giving notice: they've gone
+    const notice = s.workers.filter((w) => w.noticeUntil !== null && !w.leaving).length;
+    const nobody = headcount(s) === 0;
+    this.alerts.textContent = nobody ? 'Everyone has gone' : notice ? `${notice} giving notice` : '';
+    this.alerts.style.display = notice || nobody ? '' : 'none';
     this.clock.textContent = `${isNight(s.tick) ? '☾' : '☼'} ${clockText(s.tick)}`;
     const speed = this.hooks.getSpeed();
     this.speedBtns.forEach((b, i) => b.classList.toggle('on', i === speed));
@@ -587,6 +596,7 @@ export class Ui {
     if (this.wm.get('scriptorium')!.open) this.scriptorium.refresh();
     if (this.wm.get('tower')!.open) this.tower.refresh();
     if (this.wm.get('languages')!.open) this.languages.refresh();
+    if (this.wm.get('alerts')!.open) this.alertsPanel.refresh();
     this.refreshInspector();
     this.refreshRoster();
     this.refreshStores();

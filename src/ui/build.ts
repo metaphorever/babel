@@ -1,4 +1,4 @@
-import { goldText, headcount, recruitError, recruitFee, ALL, BONUS, BUILD, DRIFT, ECONOMY, QUIT, availableGold, bonusLift, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type AlertKind, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
+import { goneState, goldText, headcount, recruitError, recruitFee, ALL, BONUS, BUILD, DRIFT, ECONOMY, QUIT, availableGold, bonusLift, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
 import { fixtureWidth, footprint, houseCost, placeCost, towerSiteWaiting, worksFraction, type PlaceRequest } from '../sim/build';
 import { barMood } from '../sim/activities';
 import { deckRow } from '../sim/tower';
@@ -8,6 +8,7 @@ import { clear, h } from './dom';
 import { flavor, type FlavorWord } from './flavor';
 import type { DraftLine, ScriptoriumPanel } from './scriptorium';
 import type { WindowManager } from './windows';
+import { ALERT_KIND_TEXT, isMuted, readMutes, writeMutes } from './alerts';
 
 // Building, from the player's side: the Build window, placement mode (a
 // shaded preview that follows the mouse, with an X on every tile in the
@@ -44,32 +45,8 @@ export interface BuildHooks {
   centerOnTile(x: number, y: number): void;
   /** Select a worker and open their window (from an alert). */
   showWorker?(id: number): void;
-}
-
-/** How each kind of alert is named in its "mute" box. */
-const ALERT_KIND_TEXT: Record<AlertKind, string> = {
-  notice: 'a worker putting in notice',
-  quit: 'a worker quitting',
-};
-
-const MUTE_KEY = 'babel.alerts.muted';
-
-/** The player's muted alerts: all of them, or by kind. Kept in the browser, across games. */
-export function readMutes(): { all: boolean; kinds: string[] } {
-  try {
-    const m = JSON.parse(localStorage.getItem(MUTE_KEY) ?? '{}');
-    return { all: !!m.all, kinds: Array.isArray(m.kinds) ? m.kinds : [] };
-  } catch {
-    return { all: false, kinds: [] };
-  }
-}
-
-export function writeMutes(m: { all: boolean; kinds: string[] }): void {
-  try {
-    localStorage.setItem(MUTE_KEY, JSON.stringify(m));
-  } catch {
-    // private browsing: mutes last until the page closes
-  }
+  /** Leave this game for a new one (until the title screen, step 9, exists). */
+  quitGame?(): void;
 }
 
 export class BuildUi {
@@ -737,11 +714,28 @@ export class BuildUi {
    */
   private showNextAlert(): void {
     if (this.modalEl) return;
-    const mutes = readMutes();
     const next = this.s.alerts.find((a) => !this.alertsSeen.has(a.id));
     if (!next) return;
     this.alertsSeen.add(next.id);
-    if (mutes.all || mutes.kinds.includes(next.kind)) return this.showNextAlert();
+    if (isMuted(next.kind)) return this.showNextAlert();
+    const quit = { label: 'Quit Game', run: () => this.hooks.quitGame?.() };
+    // the end of a game, or of the work: no mute boxes, and their own buttons
+    if (next.kind === 'goal') {
+      this.modal(next.title, [h('div', { class: 'dialog-title' }, next.title), h('p', {}, next.text)], [{ label: 'Quit', run: () => this.hooks.quitGame?.() }, { label: 'Keep Playing', primary: true, run: () => undefined }]);
+      return;
+    }
+    if (next.kind === 'gone') {
+      // what it offers depends on now, not on when it was raised
+      const now = goneState(this.s);
+      const buttons =
+        now === 'recruit'
+          ? [quit, { label: 'Recruit New Worker', primary: true, run: () => this.recruitNow() }]
+          : now === 'wait'
+            ? [quit, { label: 'Wait', primary: true, run: () => undefined }]
+            : [{ ...quit, primary: true }];
+      this.modal(next.title, [h('div', { class: 'dialog-title' }, next.title), h('p', {}, next.text)], buttons);
+      return;
+    }
     const muteKind = h('input', { type: 'checkbox' });
     const muteAll = h('input', { type: 'checkbox' });
     const worker = next.workerId !== null ? this.s.workers.find((w) => w.id === next.workerId) : undefined;
@@ -750,7 +744,10 @@ export class BuildUi {
       if (!muteKind.checked && !muteAll.checked) return;
       const m = readMutes();
       if (muteAll.checked) m.all = true;
-      if (muteKind.checked && !m.kinds.includes(next.kind)) m.kinds.push(next.kind);
+      if (muteKind.checked) {
+        m.on = m.on.filter((k) => k !== next.kind);
+        if (!m.kinds.includes(next.kind)) m.kinds.push(next.kind);
+      }
       writeMutes(m);
     };
     this.modal(
@@ -760,6 +757,7 @@ export class BuildUi {
         h('p', {}, next.text),
         h('label', { class: 'alert-mute' }, muteKind, ` Mute future alerts like this (${ALERT_KIND_TEXT[next.kind]})`),
         h('label', { class: 'alert-mute' }, muteAll, ' Mute all future alerts'),
+        h('div', { class: 'hint' }, 'The Alerts menu lists them all and turns them back on.'),
       ],
       [
         ...(worker && !worker.leaving ? [{ label: `Show ${worker.name}`, run: () => (keepMutes(), this.hooks.showWorker?.(worker.id)) }] : []),
@@ -768,6 +766,13 @@ export class BuildUi {
         { label: 'Acknowledge', primary: true, run: keepMutes },
       ],
     );
+  }
+
+  /** The everyone-gone alert's button: hire one at once (it's the cheapest a recruit ever is) and open the Workers window for more. */
+  private recruitNow(): void {
+    const r = this.sim.enqueue({ type: 'recruit', playerId: 0 });
+    if (!r.ok) this.modal('Recruit a worker', [h('p', {}, r.error)], [{ label: 'OK', primary: true, run: () => undefined }]);
+    else this.wm.show('roster');
   }
 
   // ------------------------------------------------------------ the opening

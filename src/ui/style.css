@@ -899,6 +899,28 @@ details > summary {
   margin: 0 0 10px;
 }
 
+.alert-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--ink);
+  padding: 2px 4px;
+  margin-bottom: 6px;
+}
+
+.alert-entry {
+  font-size: 11px;
+  padding: 3px 0;
+  border-bottom: 1px dotted var(--ink);
+}
+
+.alert-entry:last-child {
+  border-bottom: none;
+}
+
+.alert-entry .btn {
+  margin-top: 2px;
+}
+
 .alert-mute {
   display: block;
   font-size: 11px;

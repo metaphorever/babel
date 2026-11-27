@@ -11,7 +11,8 @@ import { makeName } from './names';
 import { nextU32, pick, rand, seedRng } from './rng';
 import { emptySkills, SKILL_IDS } from './skills';
 import { rollPersonality } from './traits';
-import { AI, ARRIVALS, ECONOMY, PATRON, POPULATION, SKILLS, TIME, type Difficulty } from './tuning';
+import { checkAlerts, goodsOut } from './alerts';
+import { AI, ALERTS, TOWER, ARRIVALS, ECONOMY, PATRON, POPULATION, SKILLS, TIME, type Difficulty } from './tuning';
 import type { FixtureKind, SimState, StartMode, Worker } from './types';
 import { fixedMap, generateMap, groundRow, sitesOf } from './world';
 import { applyPlace, campJobs, finishNow, type PlaceRequest } from './build';
@@ -59,6 +60,12 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
     reserved: 0,
     events: [],
     alerts: [],
+    goal: TOWER.goal,
+    won: false,
+    alertBelow: { stone: ALERTS.supplyBelow, wood: ALERTS.supplyBelow, grain: ALERTS.supplyBelow, bread: ALERTS.supplyBelow, beer: ALERTS.supplyBelow },
+    supplyOut: [],
+    wagesQuietUntil: 0,
+    gone: null,
     social: newSocial(seed),
     sentHome: 0,
   };
@@ -71,6 +78,7 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
     scribe.knack = 'writing';
     scribe.skills = emptySkills();
     scribe.skills.writing = SKILLS.knackStartXp;
+    s.supplyOut = goodsOut(s);
     s.events = [];
     log(s, 'Your workers have arrived. Choose where to build the scriptorium.');
     return s;
@@ -100,6 +108,7 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
   scribe.skills.writing = SKILLS.knackStartXp;
   const charter = scribeLoop(s, { kind: 'worker', workerId: scribe.id }, true);
   scribe.held.push(charter);
+  s.supplyOut = goodsOut(s);
   s.events = [];
   log(s, `The patron's charter names ${scribe.name} your scribe. Their loop: write, deliver, repeat.`, scribe.id);
   return s;
@@ -220,6 +229,7 @@ export function step(s: SimState, cmds: readonly Command[] = []): CommandResult[
   const departed: Worker[] = [];
   for (const w of s.workers) if (updateWorker(s, w)) departed.push(w);
   removeDeparted(s, departed);
+  checkAlerts(s);
   s.tick++;
   return results;
 }

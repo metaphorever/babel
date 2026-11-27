@@ -22,6 +22,8 @@ export const WORLD = {
 
 export const TOWER = {
   maxFloors: MAX_FLOORS,
+  /** The patron's goal, in levels (the New Game screen will offer 20 / 50 / 100 / 250 / 1,000). */
+  goal: MAX_FLOORS,
   floorHeight: FLOOR_HEIGHT,
   /** Width of every floor, in tiles. The player picks where it stands. */
   width: 16,
@@ -325,6 +327,20 @@ export const OVERWORK = {
 
 /** Complaints fade with a half-life of about a shift (1500 ticks): 0.5^(1/1500). */
 export const GRIEVANCE_DECAY = 0.99953802;
+
+/** Alerts (§16.9 step 5). */
+export const ALERTS = {
+  /** The patron's patience falling to each of these raises one. */
+  patienceAt: [50, 25, 0],
+  /** How often supplies are counted. */
+  supplyCheckTicks: 100,
+  /** The default alert line per good: under 1 means all gone. */
+  supplyBelow: 1,
+  /** Back this far above the line before the same good can raise another (so a pantry hovering at 0 doesn't nag). */
+  supplyRearm: 5,
+  /** After a "can't pay wages" alert, none again for this long (half a day). */
+  wagesQuietTicks: TIME.dayTicks / 2,
+};
 
 export const ARRIVALS = {
   /** How often the patron may send a newcomer up the road, by difficulty (2400 is 0.4 of a day). */

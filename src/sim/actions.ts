@@ -1,5 +1,5 @@
 import { findPath } from './path';
-import { MOOD, MOVE, PAY } from './tuning';
+import { ALERTS, MOOD, MOVE, PAY } from './tuning';
 import { Tile, isVehicleKind, type AlertKind, type Pt, type SimState, type Site, type Worker } from './types';
 import { tileAt } from './world';
 
@@ -134,6 +134,13 @@ export function judgeWage(s: SimState, w: Worker, wage: number): void {
 export function alert(s: SimState, kind: AlertKind, title: string, text: string, workerId: number | null = null): void {
   s.alerts.push({ id: s.nextId++, tick: s.tick, kind, title, text, workerId });
   if (s.alerts.length > 50) s.alerts.splice(0, s.alerts.length - 50);
+}
+
+/** The treasury couldn't pay a wage. Once, then quiet for ALERTS.wagesQuietTicks, so a run of failed payments is one alert. */
+export function unpaidAlert(s: SimState, w: Worker, what: string): void {
+  if (s.tick < s.wagesQuietUntil) return;
+  s.wagesQuietUntil = s.tick + ALERTS.wagesQuietTicks;
+  alert(s, 'wages', 'The treasury can’t pay wages', `There wasn't the gold to pay ${w.name} for ${what}. Workers who go unpaid soon grow fed up. Take down notices that pay from the treasury as they go, or finish a level of the tower for the patron's bonus.`, w.id);
 }
 
 export function log(s: SimState, text: string, workerId: number | null = null): void {
