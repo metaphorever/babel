@@ -51,6 +51,7 @@ describe('session 7: quitting on shifts', () => {
     expect(a).toBeTruthy();
     expect(a.text).toContain(`unless their mood rises to ${QUIT.lowMood} or above`);
     expect(a.text).toContain(whenText(w.noticeUntil!));
+    expect(a.text).toContain(`Address the issues that ${w.name} is complaining about or if all else fails send them a bonus.`);
   });
 
   it('notice lasts a day on easy, two shifts on normal, one on hard', () => {

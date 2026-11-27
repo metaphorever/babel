@@ -711,6 +711,14 @@ export class BuildUi {
     const muteKind = h('input', { type: 'checkbox' });
     const muteAll = h('input', { type: 'checkbox' });
     const worker = next.workerId !== null ? this.s.workers.find((w) => w.id === next.workerId) : undefined;
+    // every button counts as acknowledging it, so the mute boxes hold whichever is clicked
+    const keepMutes = () => {
+      if (!muteKind.checked && !muteAll.checked) return;
+      const m = readMutes();
+      if (muteAll.checked) m.all = true;
+      if (muteKind.checked && !m.kinds.includes(next.kind)) m.kinds.push(next.kind);
+      writeMutes(m);
+    };
     this.modal(
       next.title,
       [
@@ -720,19 +728,10 @@ export class BuildUi {
         h('label', { class: 'alert-mute' }, muteAll, ' Mute all future alerts'),
       ],
       [
-        ...(worker && !worker.leaving ? [{ label: `Show ${worker.name}`, run: () => this.hooks.showWorker?.(worker.id) }] : []),
-        {
-          label: 'Acknowledge',
-          primary: true,
-          run: () => {
-            if (muteKind.checked || muteAll.checked) {
-              const m = readMutes();
-              if (muteAll.checked) m.all = true;
-              if (muteKind.checked && !m.kinds.includes(next.kind)) m.kinds.push(next.kind);
-              writeMutes(m);
-            }
-          },
-        },
+        ...(worker && !worker.leaving ? [{ label: `Show ${worker.name}`, run: () => (keepMutes(), this.hooks.showWorker?.(worker.id)) }] : []),
+        // a notice: the quick way out, straight to the bonus dialog
+        ...(worker && !worker.leaving && next.kind === 'notice' ? [{ label: 'Send a bonus…', run: () => (keepMutes(), this.bonusDialog(worker.id)) }] : []),
+        { label: 'Acknowledge', primary: true, run: keepMutes },
       ],
     );
   }

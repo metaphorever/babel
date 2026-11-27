@@ -121,7 +121,7 @@ function giveNotice(s: SimState, w: Worker): void {
     s,
     'notice',
     `${w.name} has put in notice`,
-    `${w.name} is fed up with ${why} and has put in notice that they will quit and leave at ${when} unless their mood rises to ${QUIT.lowMood} or above. Address the issues that ${w.name} is complaining about or for a quick-fix assign them to light duty jobs for higher pay.`,
+    `${w.name} is fed up with ${why} and has put in notice that they will quit and leave at ${when} unless their mood rises to ${QUIT.lowMood} or above. Address the issues that ${w.name} is complaining about or if all else fails send them a bonus.`,
     w.id,
   );
 }
