@@ -14,6 +14,7 @@ import {
 } from './spriteData';
 import { allWorldArt, extraWorldArt } from './worldArt';
 import { composePortrait, emptyPortraitArt, hasPortraitArt, portraitRecipe, type PortraitArt } from './portrait';
+import { assembleCloud, paintCloud, type CloudSheet } from './clouds';
 
 // Turns art (grids) into canvases, cached. The art starts as the built-in
 // placeholder set; loadArt() swaps in PNG sheets from public/art/ if they
@@ -167,6 +168,46 @@ export function nightSky(stage: number): { picture: HTMLCanvasElement; black: HT
   if (!nightStages || stage < 1) return null;
   const k = Math.min(NIGHT_STAGES, stage) - 1;
   return { picture: nightStages[k], black: nightBlack[k] };
+}
+
+let cloudSheet: CloudSheet | null = null;
+const clouds = new Map<string, HTMLCanvasElement | null>();
+
+/** Swap in the cloud parts loaded from public/art/clouds.png. */
+export function setCloudSheet(next: CloudSheet): void {
+  cloudSheet = next;
+  clouds.clear();
+}
+
+/**
+ * Cloud number i of a game's sky, built from the parts with the game's
+ * settings (CLOUD_DEFAULTS), the same every time for the same game. Null
+ * until the parts load (the sky then draws its stand-in clouds).
+ */
+export function cloudSprite(gameSeed: number, i: number): HTMLCanvasElement | null {
+  if (!cloudSheet) return null;
+  const key = `${gameSeed}:${i}`;
+  if (clouds.has(key)) return clouds.get(key)!;
+  let made: HTMLCanvasElement | null = null;
+  for (let k = 0; k < 5 && !made; k++) {
+    const cloud = assembleCloud(cloudSheet, (Math.imul(gameSeed ^ 0x9e3779b9, 0x85ebca6b) + i * 7919 + k * 104729) >>> 0);
+    if (!cloud.ok) continue;
+    const pic = paintCloud(cloud, 'rand');
+    const c = document.createElement('canvas');
+    c.width = pic.w;
+    c.height = pic.h;
+    const g = c.getContext('2d')!;
+    const img = g.createImageData(pic.w, pic.h);
+    for (let p = 0; p < pic.w * pic.h; p++) {
+      if (!pic.px[p]) continue;
+      const v = pic.px[p] === 1 ? 0 : 255;
+      img.data.set([v, v, v, 255], p * 4);
+    }
+    g.putImageData(img, 0, 0);
+    made = c;
+  }
+  clouds.set(key, made);
+  return made;
 }
 
 /** Swap in world art loaded from public/art/world.png. */

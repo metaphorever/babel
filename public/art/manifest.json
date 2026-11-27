@@ -671,5 +671,397 @@
         "11111000"
       ]
     ]
+  },
+  "clouds": {
+    "file": "clouds.png",
+    "sets": 2,
+    "parts": [
+      {
+        "name": "T4",
+        "kind": "top",
+        "edges": {
+          "bottom": "...oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo.."
+        },
+        "rect": [
+          0,
+          0,
+          69,
+          35
+        ]
+      },
+      {
+        "name": "T3",
+        "kind": "top",
+        "edges": {
+          "bottom": "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo"
+        },
+        "rect": [
+          70,
+          0,
+          60,
+          20
+        ]
+      },
+      {
+        "name": "T2",
+        "kind": "top",
+        "edges": {
+          "bottom": "ooooooooooooooooooooooooooooooo"
+        },
+        "rect": [
+          131,
+          0,
+          31,
+          17
+        ]
+      },
+      {
+        "name": "T1",
+        "kind": "top",
+        "edges": {
+          "bottom": "oooooooooooooooo"
+        },
+        "rect": [
+          163,
+          0,
+          16,
+          10
+        ]
+      },
+      {
+        "name": "MC2",
+        "kind": "midCenter",
+        "edges": {
+          "bottom": "......yyyyyyyyyyyyyyy......."
+        },
+        "rect": [
+          180,
+          0,
+          28,
+          25
+        ]
+      },
+      {
+        "name": "MC1",
+        "kind": "midCenter",
+        "edges": {
+          "bottom": ".yyyyyyyyyyyyyyyyyyyyyyyyy.."
+        },
+        "rect": [
+          209,
+          0,
+          28,
+          21
+        ]
+      },
+      {
+        "name": "MC4",
+        "kind": "midCenter",
+        "edges": {
+          "bottom": ".........yyyyyyyyyyyyyyyyyyyyyyy..........."
+        },
+        "rect": [
+          0,
+          36,
+          43,
+          36
+        ]
+      },
+      {
+        "name": "MC3",
+        "kind": "midCenter",
+        "edges": {
+          "bottom": "..yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy..."
+        },
+        "rect": [
+          44,
+          36,
+          43,
+          30
+        ]
+      },
+      {
+        "name": "MR1",
+        "kind": "midCap",
+        "side": "R",
+        "edges": {
+          "bottom": "yyyyyyyyyyyyyyyyyyyyy......",
+          "left": "....oooooooooooooooooooo"
+        },
+        "rect": [
+          88,
+          36,
+          27,
+          24
+        ]
+      },
+      {
+        "name": "MR2",
+        "kind": "midCap",
+        "side": "R",
+        "edges": {
+          "bottom": "yyyyyyyyyyyyyyyyyy....",
+          "left": ".ooooooooooooooooooooo"
+        },
+        "rect": [
+          116,
+          36,
+          22,
+          22
+        ]
+      },
+      {
+        "name": "ML1",
+        "kind": "midCap",
+        "side": "L",
+        "edges": {
+          "bottom": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+          "right": "..oooooooooooooooooo"
+        },
+        "rect": [
+          139,
+          36,
+          37,
+          20
+        ]
+      },
+      {
+        "name": "ML2",
+        "kind": "midCap",
+        "side": "L",
+        "edges": {
+          "bottom": "yyyyyyyyyyyyyyyyyyyy",
+          "right": "....oooooooooooooooo"
+        },
+        "rect": [
+          177,
+          36,
+          20,
+          20
+        ]
+      },
+      {
+        "name": "1L1",
+        "kind": "botCap",
+        "set": 1,
+        "side": "L",
+        "rect": [
+          198,
+          36,
+          16,
+          7
+        ]
+      },
+      {
+        "name": "1L2",
+        "kind": "botCap",
+        "set": 1,
+        "side": "L",
+        "rect": [
+          215,
+          36,
+          16,
+          7
+        ]
+      },
+      {
+        "name": "1m1",
+        "kind": "botMid",
+        "set": 1,
+        "rect": [
+          232,
+          36,
+          16,
+          8
+        ]
+      },
+      {
+        "name": "1m2",
+        "kind": "botMid",
+        "set": 1,
+        "rect": [
+          0,
+          73,
+          16,
+          8
+        ]
+      },
+      {
+        "name": "1m3",
+        "kind": "botMid",
+        "set": 1,
+        "rect": [
+          17,
+          73,
+          16,
+          8
+        ]
+      },
+      {
+        "name": "1m4",
+        "kind": "botMid",
+        "set": 1,
+        "rect": [
+          34,
+          73,
+          16,
+          8
+        ]
+      },
+      {
+        "name": "1m5",
+        "kind": "botMid",
+        "set": 1,
+        "rect": [
+          51,
+          73,
+          16,
+          8
+        ]
+      },
+      {
+        "name": "1R1",
+        "kind": "botCap",
+        "set": 1,
+        "side": "R",
+        "rect": [
+          68,
+          73,
+          16,
+          8
+        ]
+      },
+      {
+        "name": "1R2",
+        "kind": "botCap",
+        "set": 1,
+        "side": "R",
+        "rect": [
+          85,
+          73,
+          16,
+          8
+        ]
+      },
+      {
+        "name": "C1",
+        "kind": "combo",
+        "set": 2,
+        "side": "R",
+        "band": 11,
+        "edges": {
+          "left": ".......ooooooooooooooooooooooooooooo...."
+        },
+        "rect": [
+          102,
+          73,
+          42,
+          40
+        ]
+      },
+      {
+        "name": "2L1",
+        "kind": "botCap",
+        "set": 2,
+        "side": "L",
+        "rect": [
+          145,
+          73,
+          16,
+          11
+        ]
+      },
+      {
+        "name": "2L2",
+        "kind": "botCap",
+        "set": 2,
+        "side": "L",
+        "rect": [
+          162,
+          73,
+          16,
+          11
+        ]
+      },
+      {
+        "name": "2m1",
+        "kind": "botMid",
+        "set": 2,
+        "rect": [
+          179,
+          73,
+          16,
+          11
+        ]
+      },
+      {
+        "name": "2m2",
+        "kind": "botMid",
+        "set": 2,
+        "rect": [
+          196,
+          73,
+          16,
+          11
+        ]
+      },
+      {
+        "name": "2m3",
+        "kind": "botMid",
+        "set": 2,
+        "rect": [
+          213,
+          73,
+          16,
+          11
+        ]
+      },
+      {
+        "name": "2m4",
+        "kind": "botMid",
+        "set": 2,
+        "rect": [
+          230,
+          73,
+          16,
+          11
+        ]
+      },
+      {
+        "name": "2m5",
+        "kind": "botMid",
+        "set": 2,
+        "rect": [
+          0,
+          114,
+          16,
+          11
+        ]
+      },
+      {
+        "name": "2R1",
+        "kind": "botCap",
+        "set": 2,
+        "side": "R",
+        "rect": [
+          17,
+          114,
+          16,
+          11
+        ]
+      },
+      {
+        "name": "2R2",
+        "kind": "botCap",
+        "set": 2,
+        "side": "R",
+        "rect": [
+          34,
+          114,
+          16,
+          11
+        ]
+      }
+    ]
   }
 }

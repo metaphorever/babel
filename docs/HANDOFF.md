@@ -1,6 +1,6 @@
 # Handoff: where Babel stands, and what's next
 
-*Updated 2026-11-26 in session 10 (steps 4 and 5). A new session should start here, then read [DESIGN.md](DESIGN.md) (§16.9 is the plan being built now; §15 is P1 and what's been built since) and [README.md](../README.md).*
+*Updated 2026-11-26 in session 11 (clouds from parts). A new session should start here, then read [DESIGN.md](DESIGN.md) (§16.9 is the plan being built now; §15 is P1 and what's been built since) and [README.md](../README.md).*
 
 ## The project in one paragraph
 
@@ -17,7 +17,7 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
   - **Every push to `main` deploys:** `.github/workflows/pages.yml` runs the tests, builds, and publishes to GitHub Pages.
   - **Commit author:** "Clover <metaphorever@gmail.com>". The user chose to publish that as is.
 - **GitHub CLI:** on this machine it's at `C:\Program Files\GitHub CLI\gh.exe` and is logged in as `metaphorever`. Shells started before it was installed may need the full path.
-- **Tests:** keep them passing (`npm test`, 186 now; `npx tsc --noEmit -p .` for types; `npm run build` is what the deploy runs). For tuning the social web and the economy over time, `npm run sim:month` runs 30-day colonies and prints how labels settle, what moved feelings (by cause), what changed labels, churn, drinking, work and remittances. Compare settings side by side on the same seeds: `npm run sim:month -- gossip.chance=0.6 vs job.help=0.0015` (options: `--seeds=`, `--days=`, `--size=`, `--rich`). See DESIGN.md §15.13 for the findings and the current drama tuning (help minimal, once-a-day events strong). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
+- **Tests:** keep them passing (`npm test`, 191 now; `npx tsc --noEmit -p .` for types; `npm run build` is what the deploy runs). For tuning the social web and the economy over time, `npm run sim:month` runs 30-day colonies and prints how labels settle, what moved feelings (by cause), what changed labels, churn, drinking, work and remittances. Compare settings side by side on the same seeds: `npm run sim:month -- gossip.chance=0.6 vs job.help=0.0015` (options: `--seeds=`, `--days=`, `--size=`, `--rich`). See DESIGN.md §15.13 for the findings and the current drama tuning (help minimal, once-a-day events strong). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
 - **Playtest feedback:** the user playtests on the live site and sends batches of notes. Fix bugs, record design decisions in DESIGN.md, and keep "provisional" notes up to date.
 
 ## Code rules that matter
@@ -59,7 +59,7 @@ The README's checklist has the same list. DESIGN.md §13 records how P0 works, i
 
 Built and tested: the random map, the opening text and founding, placement mode and dialogs, the tower site, generic buildings (any width 3 to 16, one or two stories), every fixture, beer and the bar, stockpile capacities, demolishing, the grace period, and draft tutorials. DESIGN.md §15.10 has the details and the decisions made while building it. **Not yet playtested by the user.**
 
-**Art:** all world art goes through `worldSprite()` in `sprites.ts`: the built-in grids in `src/render/worldArt.ts` (and `extraWorldArt()` for set pieces that aren't on the sheets) are the fallback, replaced at load time by `public/art/world.png` from the user's art (session 3). Only clouds and the stars are still drawn in code.
+**Art:** all world art goes through `worldSprite()` in `sprites.ts`: the built-in grids in `src/render/worldArt.ts` (and `extraWorldArt()` for set pieces that aren't on the sheets) are the fallback, replaced at load time by `public/art/world.png` from the user's art (session 3). Clouds are built from the user's parts (`src/render/clouds.ts`, `public/art/clouds.png`; session 11); the flat code clouds and the built-in stars are only fallbacks now.
 
 ## Where session 3 left things
 
@@ -106,7 +106,7 @@ Built and tested: the random map, the opening text and founding, placement mode 
   - Add `'Babel To Do': '<file>.png'` to `SHEET_SHOTS` in `tools/shots.ts`, run `npm run art:import`, and check every box.
   - The shelves, wheelbarrow and cart show up in the game right away.
   - The shelves are 16x32 now (two blocks), but the renderer's `case 'shelves'` in `src/render/renderer.ts` still puts the goods rows at `base - 1 - i * 5`, which fit the old 16x16 stand-in. Line the stone, wood and grain rows up with the planks the user draws.
-  - Everything else on the sheet (clouds, stairs, the site marker, scriptorium icons, pulley, winches, stable, flags, bells) gets wired in when its feature is built.
+  - Everything else on the sheet (stairs, the site marker, scriptorium icons, pulley, winches, stable, flags, bells) gets wired in when its feature is built.
 - **While the user draws, the next session works on code:** next step 1 below.
 
 ## Session 9 (2026-11-26)
@@ -119,12 +119,17 @@ Built and tested: the random map, the opening text and founding, placement mode 
 - **§16.9 step 4, recruiting, is built, tested and checked in the browser** (DESIGN.md §16.9 step 4 has Claude's decisions). "Recruit a worker (N gold)" sits under the table in the Workers window; it opens a confirmation, and the `recruit` command takes the fee at once and puts the recruit on the road (`recruit.ts`: `recruitFee`, `recruitError`, `recruitWorker`, `arriveOnRoad`, which the patron's newcomers now share). The fee is 15 × the headcount with the recruit (so 15 with nobody left), never past the cap of 30. The patron's arrival rate is now set by difficulty (`ARRIVALS.every`).
 - **§16.9 step 5, the other alerts, is built, tested and checked in the browser** (DESIGN.md §16.9 step 5 has the decisions): the patron at 50/25/0, a supply running out (an alert line per good in the state, `alertBelow`, for step 6's Stores window to set), the treasury unable to pay wages, a scroll given up, a newcomer and a level finished (muted by default), the goal reached with the score, and everyone gone (recruit / wait / the end). The **Alerts** menu lists recent alerts and turns kinds on and off. Sim side in `src/sim/alerts.ts`, UI and mutes in `src/ui/alerts.ts`. **Quit Game** starts a new game until the title screen exists.
 
+## Session 11 (2026-11-26)
+
+- **Clouds are built from the user's parts** and are in the game. The user drew a parts sheet with its own rules (top, middle and bottom layers; yellow edges that must touch the bottom, orange edges that must be hidden; two bottom sets; a combined bottom + middle end for option 2), and tuned them in a harness page (`art-src/picker/clouds.html`) before calling it done. Their picks: every choice random, and no middle centre twice side by side. SPRITES.md has how the sheet is read; the rules and the builder are in `src/render/clouds.ts`, shared by the importer, the game, the tests and the harness.
+- `tools/pngDecode.ts` is the PNG reader without Node (the tests read the cloud sheet through Vite's `?inline` and `DecompressionStream`, since the project has no Node types).
+
 ## Next steps, in order
 
 1. **§16.9, step 6: the Stores window** (its "alert below" setting writes `s.alertBelow`; the word **report** comes with flags and bells). Then 7 saves, 8 the New Game screen and taller maps, 9 the title screen and Settings. Build in that order.
 2. **Flags and bells** (§16.7): fixtures, RAISE / LOWER / RING, range circles, heraldic hatching, and the word **report** (§16.9 step 6). Then standing orders on boards.
 3. **Hauling, the rest of §16.8:** the rope pulley and winches up the tower, then the wagon, beasts of burden and the stable.
-4. **Art from the user:** the "Babel To Do" sheet (`art-src/Babel To Do.png`, refreshed 2026-11-26 with flags and bells; shelves, wheelbarrow and cart feed straight in, see SPRITES.md), more beards and hats for portraits, clouds from parts. Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art. Sheets go to the user as PNGs only.
+4. **Art from the user:** the "Babel To Do" sheet (`art-src/Babel To Do.png`, refreshed 2026-11-26 with flags and bells; shelves, wheelbarrow and cart feed straight in, see SPRITES.md), more beards and hats for portraits, any redrawn cloud parts (save over `art-src/shots/cloud-parts.png` and import; check them in `art-src/picker/clouds.html` first). Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art. Sheets go to the user as PNGs only.
 5. **Playtest notes** as they come: the tutorial text needs the user's voice; gold from bar takings; whether the starting supplies last the grace period; social tuning (§16.6) only from playtests.
 6. **P0 leftovers:** mailboxes and upper job boards, the COPY order, night changing behavior.
 7. **The rest of §16:** the About window (quick), stairs, the trader, pilgrimages.

@@ -3,7 +3,7 @@ import { activeProject, deckRow, projectFraction } from '../sim/tower';
 import { worksFraction } from '../sim/build';
 import { buildingLabel, groundRow, HOUSE_STORY_ROWS } from '../sim/world';
 import { INK, PAPER, Patterns, type PatternName } from './patterns';
-import { itemSprite, nightSky, propSprite, thoughtSprite, workerSprite, worldSprite } from './sprites';
+import { cloudSprite, itemSprite, nightSky, propSprite, thoughtSprite, workerSprite, worldSprite } from './sprites';
 
 /** Height in pixels of one story of a building: its rooms stack straight on top of each other. */
 const STORY_PX = HOUSE_STORY_ROWS * 8;
@@ -599,13 +599,26 @@ export class Renderer {
     this.drawClouds(s, cy, bh);
   }
 
-  /** Clouds drift in above the first few floors, so height reads at a glance. */
+  /**
+   * Clouds drift in above the first few floors, so height reads at a glance.
+   * Each is built from the user's cloud parts (cloudSprite), the same sky for
+   * the same game; until the parts load, flat stand-ins.
+   */
   private drawClouds(s: SimState, cy: number, bh: number): void {
     const groundPx = s.height * TILE;
     for (let i = 0; i < 18; i++) {
       const y = groundPx - 260 - ((i * 131) % (groundPx - 300));
+      const drift = i * 197 + Math.floor(s.tick / (40 + (i % 5) * 15));
+      const spr = cloudSprite(s.seed, i);
+      if (spr) {
+        // its bottom where the stand-in's was; it slides fully off one side before coming in the other
+        const top = y + 10 - spr.height;
+        if (top > cy + bh || y + 10 < cy) continue;
+        this.g.drawImage(spr, (drift % (s.width * TILE + spr.width)) - spr.width, top);
+        continue;
+      }
       if (y < cy - 20 || y > cy + bh + 20) continue;
-      const x = (i * 197 + Math.floor(s.tick / (40 + (i % 5) * 15))) % (s.width * TILE + 80) - 40;
+      const x = drift % (s.width * TILE + 80) - 40;
       const w = 24 + ((i * 7) % 4) * 8;
       this.rect(x + 6, y, w - 12, 4, 'sparse');
       this.rect(x, y + 4, w, 5, 'light');

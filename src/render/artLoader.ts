@@ -1,4 +1,5 @@
-import { setArt, setNightSky, setPortraitArt, setWorldArt } from './sprites';
+import { setArt, setCloudSheet, setNightSky, setPortraitArt, setWorldArt } from './sprites';
+import { makePart, type CloudPartInfo } from './clouds';
 import { emptyPortraitArt, PORTRAIT_KINDS, type PortraitKind } from './portrait';
 import {
   CELL,
@@ -34,6 +35,8 @@ interface Manifest {
   nightSky?: string;
   /** Portrait parts (a row per kind, in kinds order) and the background patterns (8x8 grids). */
   portraits?: { file: string; cell: [number, number]; kinds: string[]; patterns: string[][] };
+  /** Cloud parts: each a rectangle of the atlas, with what it is and its marked edges. */
+  clouds?: { file: string; sets: number; parts: (CloudPartInfo & { rect: [number, number, number, number] })[] };
 }
 
 async function loadPixels(url: string): Promise<ImageData> {
@@ -180,6 +183,25 @@ export async function loadArt(): Promise<void> {
       setPortraitArt(p);
     } catch (e) {
       console.warn(`Babel art: couldn't load ${info.file}; no portraits.`, e);
+    }
+  }
+  if (manifest.clouds) {
+    const info = manifest.clouds;
+    try {
+      const px = await loadPixels(`art/${info.file}${bust}`);
+      loaded.push(info.file);
+      const parts = info.parts.map(({ rect: [x, y, w, h], ...part }) => {
+        const pix = new Uint8Array(w * h);
+        for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
+          const i = ((y + r) * px.width + x + c) * 4;
+          if (px.data[i + 3] < 128) continue;
+          pix[r * w + c] = 0.3 * px.data[i] + 0.59 * px.data[i + 1] + 0.11 * px.data[i + 2] < 128 ? 1 : 2;
+        }
+        return makePart(part, w, h, pix);
+      });
+      setCloudSheet({ parts, sets: info.sets });
+    } catch (e) {
+      console.warn(`Babel art: couldn't load ${info.file}; keeping the built-in clouds.`, e);
     }
   }
   console.info(`Babel art: loaded ${loaded.join(', ')}.`);
