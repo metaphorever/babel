@@ -982,3 +982,39 @@ details > summary {
   margin-top: 6px;
   font-size: 11px;
 }
+
+/* ---------------------------------------------------------- stores (§16.9 step 6) */
+
+.stores .num {
+  text-align: right;
+}
+
+.stores tr.store-good {
+  cursor: pointer;
+}
+
+.stores tr.store-good:hover > td:first-child {
+  text-decoration: underline;
+}
+
+.stores tr.store-low > td:first-child {
+  font-weight: bold;
+}
+
+.stores .disclosure {
+  display: inline-block;
+  width: 10px;
+}
+
+.stores tr.store-site td:first-child {
+  padding-left: 16px;
+}
+
+.stores input.alert-line {
+  width: 44px;
+  margin: 0;
+}
+
+.stores .btn-small {
+  margin: 0;
+}

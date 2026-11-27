@@ -336,6 +336,8 @@ export const ALERTS = {
   supplyCheckTicks: 100,
   /** The default alert line per good: under 1 means all gone. */
   supplyBelow: 1,
+  /** The highest alert line the Stores window lets you set. */
+  supplyBelowMax: 999,
   /** Back this far above the line before the same good can raise another (so a pantry hovering at 0 doesn't nag). */
   supplyRearm: 5,
   /** The score: levels × this ÷ days played, plus the treasury's gold (the user, session 10: 10,000 so speed leads and gold mostly breaks ties). */

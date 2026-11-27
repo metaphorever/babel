@@ -666,7 +666,7 @@ A popup message when something needs the player's attention, with a little sound
 
 ### 16.9 Keeping workers, alerts, and a real start (planned 2026-11-26)
 
-*From the user's playtest notes and a friend's playtest. Agreed plan; built in this order. Steps 1 to 5 are built; **step 6, the Stores window, is next.***
+*From the user's playtest notes and a friend's playtest. Agreed plan; built in this order. Steps 1 to 6 are built (step 6's word REPORT waits for flags and bells); **step 7, saves, is next.***
 
 1. **Quitting on shifts** *(built 2026-11-26: `morale.ts`; `QUIT` in tuning. A worker fed up for under 15 seconds when the shift ends waits for the next one, so the bubble always comes first)*.
    - **Fed up:** a worker whose mood falls below the quit threshold (30) shows the quitting bubble at once. That's the early warning, with no countdown yet. If their mood is back at the threshold before the shift ends, it passes quietly.
@@ -725,6 +725,13 @@ A popup message when something needs the player's attention, with a little sound
      - **Checked in the browser (2026-11-26):** bread emptied → "Bread has run out"; muting it from the dialog showed it as "(muted)" in the Alerts window and ticking it there turned it back on; everyone leaving with 15 gold → [Recruit New Worker] hired one and opened the Workers window; the goal alert's score; Quit started a new game.
      - **Watch in playtests:** whether stone and wood running out is too frequent early on (they're used as fast as they're mined), and whether the patron's 50% alert is worth a pause.
 6. **Stores window:** a total per good (stored, lying around) that expands to every store holding it. Alerts for one store aren't given for free: rig a flag rule and the new word **report** ("if red flag 1 is up → report «Bread low on Level 5»"): a worker carries the message to the scriptorium and it pops up as an alert. The message never drifts, like a name. It comes with flags and bells.
+   - **The window is built (2026-11-27, session 12;** `src/ui/stores.ts`, `goodHoldings` and `setAlertLine` in `alerts.ts`, the `setAlertBelow` command, `tests/stores.test.ts`). **REPORT is not:** it's built with flags and bells (§16.7). Claude's decisions:
+     - **One row per good:** stored, lying around, and the alert line. Click a good to open it out to every finished store holding some, most first (the patron's supplies marked "take only", a store being taken down "coming down"), plus what's lying around. Each store has a **Show** button that centres the view on it and opens its window. It replaces the old Stores table, which only had totals.
+     - **The alert line is a command** (`setAlertBelow`, 0 to `ALERTS.supplyBelowMax` 999), since it's in the game state and saves will carry it. 0 never alerts, 1 means "all gone", higher means "running low".
+     - **Setting it doesn't alert on the spot:** if the colony is already under the new line, the good counts as already raised (the player is looking at the number), and the row is marked bold, "low" or "all gone". It alerts the next time it dips under after recovering past the line by `ALERTS.supplyRearm`. Lowering the line well below what there is re-arms it.
+     - **Typing isn't interrupted:** the window doesn't redraw while an alert line has the focus, and a line set while paused shows its new value until the sim takes it.
+     - **Checked in the browser (2026-11-27):** totals match, Bread and Stone opened out to Pantry 1 and Stockpile 1, Show opened Pantry 1's window, Bread's line set to 30 while paused held, applied, and marked Bread "low" with no alert; typing in a line held through 200 ticks at full speed.
+     - **Watch in playtests:** whether the line should be per good across the colony only (as now) or also per level, before REPORT arrives.
 7. **Saves:** the game state is plain data, so a save is a snapshot. Slots in the browser, plus download and upload as a file.
 8. **New Game screen:**
    - **Difficulty:** Easy / Medium / Hard / Custom / Sandbox. The knobs are the patron's stipend, patience drain, the quit threshold, the notice period, starting supplies, how often the patron sends workers, the recruiting fee, drift speed, starting workers, and the seed.

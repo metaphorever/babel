@@ -36,6 +36,7 @@ import {
   type ActivityKind,
   type Sim,
   type SimState,
+  type Site,
   type Worker,
 } from '../sim';
 import { HABIT_LABEL, relationsOf, temperWords } from '../sim/social';
@@ -45,6 +46,7 @@ import { ScriptoriumPanel } from './scriptorium';
 import { TowerPanel } from './tower';
 import { LanguagesPanel } from './languages';
 import { AlertsPanel } from './alerts';
+import { StoresPanel } from './stores';
 import { WindowManager } from './windows';
 
 const DOING: Record<ActivityKind, string> = {
@@ -93,6 +95,8 @@ export interface UiHooks {
   sendBonus?(workerId: number): void;
   /** Open the "Recruit a worker" dialog. */
   recruit?(): void;
+  /** Centre the view on a store and open its window. */
+  showSite?(site: Site): void;
 }
 
 export class Ui {
@@ -102,6 +106,7 @@ export class Ui {
   tower!: TowerPanel;
   languages!: LanguagesPanel;
   alertsPanel!: AlertsPanel;
+  stores!: StoresPanel;
 
   private gold!: HTMLElement;
   private patron!: HTMLElement;
@@ -133,7 +138,7 @@ export class Ui {
     });
     this.wm.create('inspector', 'Worker', -336, 34, 320);
     this.wm.create('roster', 'Workers', -656, 34, 300);
-    this.wm.create('stores', 'Stores', 390, 34, 220);
+    this.stores = new StoresPanel(this.wm, this.sim, (site) => this.hooks.showSite?.(site));
     this.wm.create('log', 'Log', 16, -220, 440);
     this.buildHelp();
     // at the opening, the opening text does the welcoming
@@ -484,32 +489,6 @@ export class Ui {
     return DOING[w.activity.kind];
   }
 
-  private refreshStores(): void {
-    const win = this.wm.get('stores')!;
-    if (!win.open) return;
-    clear(win.body);
-    // totals across every stockpile, on the ground and up the tower (the patron's supplies count too)
-    const sum = (kind: string, k: 'stone' | 'wood' | 'grain' | 'bread' | 'beer') => this.s.sites.filter((x) => x.kind === kind && x.build === null).reduce((n, x) => n + x.store[k], 0);
-    const room = this.s.sites.filter((x) => (x.kind === 'stockpile' || x.kind === 'shelves') && x.build === null && !x.supplies);
-    const cap0 = room.reduce((n, x) => n + (x.capacity ?? 0), 0);
-    const used = room.reduce((n, x) => n + x.store.stone + x.store.wood + x.store.grain, 0);
-    const loose = { stone: 0, wood: 0, grain: 0, bread: 0, beer: 0 };
-    for (const it of this.s.items) loose[it.type]++;
-    const supplies = this.s.sites.find((x) => x.supplies);
-    const t = h('table', { class: 'stores' });
-    t.append(h('tr', {}, h('th', {}, ''), h('th', {}, 'Stored'), h('th', {}, 'Lying around')));
-    for (const k of ['stone', 'wood', 'grain'] as const) t.append(h('tr', {}, h('td', {}, cap(k)), h('td', { class: 'num' }, sum('stockpile', k) + sum('shelves', k)), h('td', { class: 'num' }, loose[k])));
-    const breadSupplies = supplies?.store.bread ?? 0;
-    t.append(h('tr', {}, h('td', {}, 'Bread'), h('td', { class: 'num' }, sum('pantry', 'bread') + breadSupplies), h('td', { class: 'hint' }, breadSupplies ? 'pantries and supplies' : 'in the pantries')));
-    t.append(h('tr', {}, h('td', {}, 'Beer'), h('td', { class: 'num' }, sum('bar', 'beer')), h('td', { class: 'hint' }, 'at the bar')));
-    win.body.append(
-      t,
-      h('div', { class: 'hint' }, room.length ? `Stockpiles at the base: ${used} of ${cap0} full.` : 'No stockpiles yet. Goods lying around can still be used, but workers would rather take from a stockpile.'),
-      supplies ? h('div', { class: 'hint' }, "The patron's supplies are counted in. Nothing can be added to them.") : '',
-      h('div', { class: 'hint' }, 'The Tower window shows each level.'),
-    );
-  }
-
   private lastLogTick = -1;
   private refreshLog(): void {
     const win = this.wm.get('log')!;
@@ -599,7 +578,7 @@ export class Ui {
     if (this.wm.get('alerts')!.open) this.alertsPanel.refresh();
     this.refreshInspector();
     this.refreshRoster();
-    this.refreshStores();
+    if (this.wm.get('stores')!.open) this.stores.refresh();
     this.refreshLog();
   }
 }

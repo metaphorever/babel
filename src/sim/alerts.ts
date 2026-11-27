@@ -2,7 +2,7 @@ import { alert } from './actions';
 import { floorName, levelName } from './lang';
 import { headcount, goldText, recruitError } from './recruit';
 import { ALERTS, PATRON, TIME } from './tuning';
-import { ITEM_TYPES, type ItemType, type SimState } from './types';
+import { ITEM_TYPES, type ItemType, type SimState, type Site } from './types';
 
 // The alerts that watch the colony as a whole (§16.9 step 5): a supply
 // running out, the patron's goal reached, and everyone gone. The ones tied to
@@ -15,6 +15,38 @@ export function goodTotal(s: SimState, g: ItemType): number {
   for (const x of s.sites) if (x.build === null) n += x.store[g];
   for (const it of s.items) if (it.type === g) n++;
   return n;
+}
+
+/** One store's share of a good, for the Stores window. */
+export interface Holding {
+  site: Site;
+  n: number;
+}
+
+/**
+ * Where a good is (§16.9 step 6): every finished store holding some, most
+ * first, and how much is lying around. Adds up to goodTotal.
+ */
+export function goodHoldings(s: SimState, g: ItemType): { stores: Holding[]; loose: number } {
+  const stores: Holding[] = [];
+  for (const site of s.sites) if (site.build === null && site.store[g] > 0) stores.push({ site, n: site.store[g] });
+  stores.sort((a, b) => b.n - a.n || a.site.id - b.site.id);
+  let loose = 0;
+  for (const it of s.items) if (it.type === g) loose++;
+  return { stores, loose };
+}
+
+/**
+ * The player moved a good's alert line. Already under the new line counts as
+ * raised (they're looking at the number as they set it), so it speaks up the
+ * next time the good dips under after recovering, not this moment.
+ */
+export function setAlertLine(s: SimState, g: ItemType, below: number): void {
+  s.alertBelow[g] = below;
+  const n = goodTotal(s, g);
+  const out = s.supplyOut.includes(g);
+  if (n < below && !out) s.supplyOut.push(g);
+  else if (out && n >= below + ALERTS.supplyRearm) s.supplyOut = s.supplyOut.filter((x) => x !== g);
 }
 
 /** Goods already under their alert line, so a game doesn't open with alerts for what was never there. */

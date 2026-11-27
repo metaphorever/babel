@@ -44,6 +44,10 @@ const ui = new Ui(document.getElementById('ui')!, sim, {
   },
   sendBonus: (id) => build.bonusDialog(id),
   recruit: () => build.recruitDialog(),
+  showSite: (site) => {
+    renderer.centerOn(((site.x0 + site.x1 + 1) / 2) * TILE, site.y * TILE);
+    build.inspect({ kind: 'site', site });
+  },
 });
 const build = new BuildUi(document.getElementById('ui')!, ui.wm, sim, renderer, ui.scriptorium, {
   // until the title screen (§16.9 step 9): a fresh game, same difficulty and start, new seed

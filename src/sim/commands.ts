@@ -5,10 +5,11 @@ import { ALL, FOREVER, GOODS, STATE_WORDS, allowsAll, allowsForever, condRule, i
 function cap(t: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
-import { BONUS, BUILD, ECONOMY, LOGIC, SCRIBE, TOWER } from './tuning';
+import { ALERTS, BONUS, BUILD, ECONOMY, LOGIC, SCRIBE, TOWER } from './tuning';
+import { setAlertLine } from './alerts';
 import { branchError } from './logic';
 import { recruitError, recruitWorker } from './recruit';
-import type { Dest, SimState } from './types';
+import { ITEM_TYPES, type Dest, type ItemType, type SimState } from './types';
 import { applyDemolish, applyPlace, applyRename, applyRenameFixture, validateDemolish, validatePlace, validateRename, validateRenameFixture, type DemolishTarget, type PlaceRequest } from './build';
 
 // Every player action is a command. The sim applies commands at the start of
@@ -65,7 +66,9 @@ export type Command =
   | { type: 'rename'; playerId: number; buildingId: number; name: string }
   /** Rename a fixture (blank goes back to its number). */
   | { type: 'renameFixture'; playerId: number; siteId: number; name: string }
-  | { type: 'setBeerPrice'; playerId: number; siteId: number; price: number };
+  | { type: 'setBeerPrice'; playerId: number; siteId: number; price: number }
+  /** The Stores window's "alert below" for one good (§16.9 step 6): 0 never alerts, 1 when it's all gone. */
+  | { type: 'setAlertBelow'; playerId: number; good: ItemType; below: number };
 
 export interface StampedCommand {
   tick: number;
@@ -250,6 +253,11 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       if (!Number.isInteger(cmd.price) || cmd.price < 0 || cmd.price > ECONOMY.beerPriceMax) return { ok: false, error: `A beer costs from 0 to ${ECONOMY.beerPriceMax} gold.` };
       return { ok: true };
     }
+    case 'setAlertBelow': {
+      if (!ITEM_TYPES.includes(cmd.good)) return { ok: false, error: 'That isn’t a good.' };
+      if (!Number.isInteger(cmd.below) || cmd.below < 0 || cmd.below > ALERTS.supplyBelowMax) return { ok: false, error: `An alert line runs from 0 (never) to ${ALERTS.supplyBelowMax}.` };
+      return { ok: true };
+    }
   }
 }
 
@@ -316,6 +324,9 @@ export function applyCommand(s: SimState, cmd: Command): CommandResult {
       log(s, `${bar.label}: a beer now costs ${cmd.price === 0 ? 'nothing' : `${cmd.price} gold`}.`);
       break;
     }
+    case 'setAlertBelow':
+      setAlertLine(s, cmd.good, cmd.below);
+      break;
   }
   return { ok: true };
 }
