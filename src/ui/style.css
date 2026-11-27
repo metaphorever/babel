@@ -1018,3 +1018,34 @@ details > summary {
 .stores .btn-small {
   margin: 0;
 }
+
+/* ------------------------------------------------------ saved games (§16.9 step 7) */
+
+.save-row {
+  margin-bottom: 6px;
+}
+
+.save-row .save-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.save-list {
+  max-height: 260px;
+  overflow: auto;
+  margin-bottom: 6px;
+}
+
+.save-entry {
+  border-bottom: 1px dotted var(--ink);
+  padding: 4px 0;
+}
+
+.save-entry .row {
+  margin-top: 2px;
+  gap: 4px;
+}
+
+.save-file {
+  display: none;
+}

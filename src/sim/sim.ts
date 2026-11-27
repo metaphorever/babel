@@ -18,6 +18,9 @@ import { fixedMap, generateMap, groundRow, sitesOf } from './world';
 import { applyPlace, campJobs, finishNow, type PlaceRequest } from './build';
 import { generateSocial, newSocial, rollHabits, rollMonogamy, rollTemper, updateSocial } from './social';
 
+/** The shape of SimState. Bump it (and SimState's `version`) when that changes, with a step in save.ts's MIGRATIONS. */
+export const STATE_VERSION = 12 as const;
+
 /**
  * A new game. 'opening' is the real start (P1): a fresh random map with
  * nothing built, the patron's supplies, and workers waiting by the road.
@@ -26,7 +29,7 @@ import { generateSocial, newSocial, rollHabits, rollMonogamy, rollTemper, update
  */
 export function createState(seed: number, difficulty: Difficulty = 'normal', start: StartMode = 'prebuilt'): SimState {
   const s: SimState = {
-    version: 12,
+    version: STATE_VERSION,
     start,
     seed,
     tick: 0,
@@ -256,6 +259,13 @@ export class Sim {
 
   constructor(seed: number, difficulty: Difficulty = 'normal', start: StartMode = 'opening') {
     this.state = createState(seed, difficulty, start);
+  }
+
+  /** A game loaded from a save. Its command history starts over: a replay from the seed alone can't reach it. */
+  static fromState(state: SimState): Sim {
+    const sim = new Sim(state.seed, state.difficulty, state.start);
+    sim.state = state;
+    return sim;
   }
 
   /** Check a command now so the UI can show errors, then queue it. */

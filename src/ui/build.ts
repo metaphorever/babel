@@ -1,4 +1,4 @@
-import { goneState, goldText, headcount, recruitError, recruitFee, ALL, BONUS, BUILD, DRIFT, ECONOMY, QUIT, availableGold, bonusLift, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
+import { goneState, goldText, headcount, recruitError, recruitFee, ALL, BONUS, BUILD, DRIFT, ECONOMY, QUIT, availableGold, bonusLift, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site, type SaveUi } from '../sim';
 import { fixtureWidth, footprint, houseCost, placeCost, towerSiteWaiting, worksFraction, type PlaceRequest } from '../sim/build';
 import { barMood } from '../sim/activities';
 import { deckRow } from '../sim/tower';
@@ -603,6 +603,22 @@ export class BuildUi {
     this.modalEl = null;
   }
 
+  /** A dialog for other windows (the Saved Games window's questions). */
+  ask(title: string, body: (HTMLElement | string | null)[], buttons: { label: string; primary?: boolean; run: () => void }[], focus?: HTMLElement | null): void {
+    this.modal(title, body, buttons, focus);
+  }
+
+  /** What only the interface knows about this game, for a save: the alerts already shown and the tutorial step. */
+  uiSnapshot(): { alertsSeen: number[]; tutorial: number } {
+    return { alertsSeen: this.s.alerts.filter((a) => this.alertsSeen.has(a.id)).map((a) => a.id), tutorial: this.tutorial.at };
+  }
+
+  /** A loaded game: don't show its old alerts again, and pick the tutorial up where it was. */
+  restoreUi(ui: SaveUi): void {
+    this.alertsSeen = new Set(Array.isArray(ui.alertsSeen) ? ui.alertsSeen : this.s.alerts.map((a) => a.id));
+    if (typeof ui.tutorial === 'number') this.tutorial.resume(ui.tutorial);
+  }
+
   get modalOpen(): boolean {
     return this.modalEl !== null;
   }
@@ -1014,6 +1030,21 @@ class Tutorial {
   ) {
     const win = this.wm.create('tutorial', 'Tutorial', -380, 300, 360);
     this.body = win.body;
+  }
+
+  /** The step it's on (-1: not running). */
+  get at(): number {
+    return this.step;
+  }
+
+  /** Pick up at a step (a loaded game). */
+  resume(step: number): void {
+    if (step < 0) this.skip();
+    else {
+      this.step = step;
+      this.shown = '';
+      this.refresh();
+    }
   }
 
   begin(): void {

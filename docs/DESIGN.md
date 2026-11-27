@@ -666,7 +666,7 @@ A popup message when something needs the player's attention, with a little sound
 
 ### 16.9 Keeping workers, alerts, and a real start (planned 2026-11-26)
 
-*From the user's playtest notes and a friend's playtest. Agreed plan; built in this order. Steps 1 to 6 are built (step 6's word REPORT waits for flags and bells); **step 7, saves, is next.***
+*From the user's playtest notes and a friend's playtest. Agreed plan; built in this order. Steps 1 to 7 are built (step 6's word REPORT waits for flags and bells); **step 8, the New Game screen, is next.***
 
 1. **Quitting on shifts** *(built 2026-11-26: `morale.ts`; `QUIT` in tuning. A worker fed up for under 15 seconds when the shift ends waits for the next one, so the bubble always comes first)*.
    - **Fed up:** a worker whose mood falls below the quit threshold (30) shows the quitting bubble at once. That's the early warning, with no countdown yet. If their mood is back at the threshold before the shift ends, it passes quietly.
@@ -733,6 +733,17 @@ A popup message when something needs the player's attention, with a little sound
      - **Checked in the browser (2026-11-27):** totals match, Bread and Stone opened out to Pantry 1 and Stockpile 1, Show opened Pantry 1's window, Bread's line set to 30 while paused held, applied, and marked Bread "low" with no alert; typing in a line held through 200 ticks at full speed.
      - **Watch in playtests:** whether the line should be per good across the colony only (as now) or also per level, before REPORT arrives.
 7. **Saves:** the game state is plain data, so a save is a snapshot. Slots in the browser, plus download and upload as a file.
+   - **Built 2026-11-27, session 12** (`src/sim/save.ts` for the format, pure like the rest of the sim; `src/ui/saves.ts` for slots, files and the window; `tests/save.test.ts`). Claude's decisions:
+     - **A File menu** (first in the menu bar, as on a Mac) opens the **Saved Games** window: a name box and Save (the name defaults to "Day 4, 3 levels"), every save in this browser with Load, Save over, Download and Delete, then "Download this game" and "Load from a file…".
+     - **An autosave:** the game saves itself over one **Autosave** slot when the day turns over at midnight. Not asked for; cheap, and it's what saves a game from a closed tab. It can be loaded, downloaded or deleted, not saved over by hand.
+     - **The file:** JSON, a wrapper (`format: 'babel-save'`, its own version, the name, when it was saved, a summary for the list, and the interface's part) around the whole state. The map is run-length encoded (it was three-quarters of a save): about 32 KB for an early colony instead of 90. Slots live in localStorage, one key each plus an index, so the list doesn't read every save.
+     - **The interface's part** goes with the save but never into the sim: which alerts were already shown (so a loaded game doesn't show them again), the tutorial step, and the camera.
+     - **Loading reloads the page** with the save handed over in sessionStorage, so every window starts fresh on the loaded game rather than holding on to the old one. Loading always asks first ("Anything … since you last saved it will be lost"), and so do Save over and Delete.
+     - **A loaded game carries on exactly as the saved one would have:** the RNG is in the state. Its command history starts over (`Sim.fromState`), so a replay from the seed alone can't reach it.
+     - **Older saves:** `SimState.version` (now `STATE_VERSION` in `sim.ts`) says which shape the state has. When it changes, bump it and add a step to `MIGRATIONS` in `save.ts`. Top-level fields an older save never had are filled from a new game of the same seed, which covers plain additions. A save from a newer version, or older than `OLDEST_STATE_VERSION`, is turned away with a reason. A damaged file, or one that isn't a save, says so and changes nothing.
+     - **Storage full:** the save fails with "This browser has no room left for saves. Delete an old one, or download the game as a file instead." An autosave that fails only warns in the console.
+     - **Checked in the browser (2026-11-27):** saved a running colony, loaded it (same tick, gold, every worker in the same place, the camera back where it was, a clean URL); the autosave appeared at midnight going into day 2; a bad file said "That isn't a Babel save."; a good file asked before loading; Delete asked, then removed the save.
+     - **Watch in playtests:** whether one autosave is enough (a rotating two or three would cover a bad day), and whether saves from before a deploy keep loading as the state grows: field additions inside workers or sites need a migration step, not just the top-level fill.
 8. **New Game screen:**
    - **Difficulty:** Easy / Medium / Hard / Custom / Sandbox. The knobs are the patron's stipend, patience drain, the quit threshold, the notice period, starting supplies, how often the patron sends workers, the recruiting fee, drift speed, starting workers, and the seed.
    - **Tower goal:** Small (20) / Medium (50) / Large (100) / Monumental (250) / Infinite (1,000 levels, revisit if anyone gets there). The map's height follows the goal.

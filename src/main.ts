@@ -1,9 +1,11 @@
 import './ui/style.css';
 import { Sim, TICKS_PER_SECOND, type Difficulty, type StartMode } from './sim';
-import { Renderer, TILE } from './render/renderer';
+import { Renderer, TILE, ZOOMS } from './render/renderer';
 import { Ui } from './ui/ui';
 import { BuildUi } from './ui/build';
+import { h } from './ui/dom';
 import { loadArt } from './render/artLoader';
+import { SavesPanel, takeBootSave } from './ui/saves';
 
 // Seed from the URL (?seed=123) so a playtest can be reproduced exactly.
 const params = new URLSearchParams(location.search);
@@ -12,7 +14,10 @@ const diffParam = params.get('difficulty');
 const difficulty: Difficulty = diffParam === 'easy' || diffParam === 'hard' ? diffParam : 'normal';
 // ?start=prebuilt skips the opening with a colony already laid out (handy for playtesting later stages)
 const start: StartMode = params.get('start') === 'prebuilt' ? 'prebuilt' : 'opening';
-const sim = new Sim(seed, difficulty, start);
+// a save handed over by the Saved Games window (§16.9 step 7) takes the place of a new game
+const boot = takeBootSave();
+const loaded = boot?.ok ? boot : null;
+const sim = loaded ? Sim.fromState(loaded.state) : new Sim(seed, difficulty, start);
 
 const canvas = document.getElementById('world') as HTMLCanvasElement;
 const renderer = new Renderer(canvas);
@@ -64,6 +69,23 @@ const build = new BuildUi(document.getElementById('ui')!, ui.wm, sim, renderer, 
     if (w) renderer.centerOn(w.x * TILE, w.y * TILE);
   },
 });
+
+const saves = new SavesPanel(ui.wm, sim, {
+  ask: (title, body, buttons, focus) => build.ask(title, body, buttons, focus),
+  uiSnapshot: () => ({ ...build.uiSnapshot(), camera: { x: renderer.camX, y: renderer.camY, zoom: renderer.zoom } }),
+});
+if (loaded) {
+  build.restoreUi(loaded.save.ui);
+  const cam = loaded.save.ui.camera;
+  if (cam && [cam.x, cam.y, cam.zoom].every(Number.isFinite)) {
+    if ((ZOOMS as readonly number[]).includes(cam.zoom)) renderer.zoom = cam.zoom;
+    renderer.camX = cam.x;
+    renderer.camY = cam.y;
+    framed = true;
+  }
+} else if (boot && !boot.ok) {
+  build.ask('Couldn’t load the game', [h('p', {}, boot.error), h('p', {}, 'A new game has started instead.')], [{ label: 'OK', primary: true, run: () => undefined }]);
+}
 
 // ------------------------------------------------------------------ input
 
@@ -213,6 +235,7 @@ function frame(now: number) {
     }
     if (n === 16) acc = 0; // fell behind; drop the backlog rather than spiral
   }
+  saves.tick();
   const alpha = mult > 0 ? acc / TICK_MS : 0;
   renderer.render(sim.state, alpha, ui.selected, hover);
 
@@ -235,5 +258,5 @@ void loadArt();
 if (import.meta.env.DEV) window.addEventListener('focus', () => void loadArt());
 
 // handy in the console while tuning: babel.sim.state, babel.seed
-(window as unknown as { babel: unknown }).babel = { sim, seed, renderer, ui, build };
-console.info(`Babel P1 — seed ${seed}. Reload with ?seed=${seed} to replay this start (add &start=prebuilt to skip the opening).`);
+(window as unknown as { babel: unknown }).babel = { sim, seed, renderer, ui, build, saves };
+console.info(loaded ? `Babel P1 — loaded “${loaded.save.name}” (seed ${sim.state.seed}).` : `Babel P1 — seed ${seed}. Reload with ?seed=${seed} to replay this start (add &start=prebuilt to skip the opening).`);

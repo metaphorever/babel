@@ -174,6 +174,7 @@ export class Ui {
       'div',
       { class: 'menubar' },
       h('span', { class: 'menu-apple' }, 'Babel'),
+      menu('File', 'saves'),
       menu('Build', 'build'),
       menu('Orders', 'board'),
       menu('Scriptorium', 'scriptorium'),

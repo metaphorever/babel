@@ -18,3 +18,4 @@ export { COMPLAINT_TEXT, bonusLift, complaintsText, topComplaints, whenText } fr
 export { daysPlayed, goneState, goodHoldings, goodTotal, score, type GoneState, type Holding } from './alerts';
 export { goldText, headcount, recruitError, recruitFee } from './recruit';
 export { clockText, darkness, dayOf, hourOf, isNight } from './time';
+export { makeSave, readSave, saveSummary, SAVE_FORMAT, type SaveFile, type SaveSummary, type SaveUi } from './save';
