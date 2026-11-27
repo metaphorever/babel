@@ -1,6 +1,6 @@
 import { log } from './actions';
 import { ALL, countText, isSpecialCount, isWorkVerb, makeOrder, orderText, untilIndex, type LangId, type Order } from './lang';
-import { SCRIBE, TOWER } from './tuning';
+import { BONUS, SCRIBE, TOWER } from './tuning';
 import type { Carrier, Design, Dest, Notice, SimState } from './types';
 
 // Orders are physical. The player composes a carrier; it waits in the
@@ -57,6 +57,7 @@ export function isNoticeCard(c: Carrier): boolean {
 
 export function writingCost(c: Carrier): number {
   if (c.kind === 'blueprint') return TOWER.blueprintCost;
+  if (c.kind === 'letter') return BONUS.writeCost;
   const tokens = c.orders.reduce((n, o) => n + o.length, 0);
   return SCRIBE.baseCost + tokens * SCRIBE.perToken;
 }
@@ -119,6 +120,7 @@ export function orderLineText(order: Order, n: number): string {
 
 export function carrierText(c: Carrier): string {
   if (c.kind === 'blueprint') return 'blueprint for the next level';
+  if (c.kind === 'letter') return `bonus of ${c.gold ?? 0} gold`;
   return c.orders.map((_, i) => lineText(c, i)).join(' → ');
 }
 
@@ -133,8 +135,9 @@ export function destText(s: SimState, d: Dest): string {
   return workerName(s, d.workerId);
 }
 
-/** Gold to set aside when this is composed: notices promise their whole count up front. */
-export function boardReserve(c: Carrier): number {
+/** Gold to set aside when this is composed: notices promise their whole count up front, a letter its bonus. */
+export function upfrontReserve(c: Carrier): number {
+  if (c.kind === 'letter') return c.gold ?? 0;
   // "all" and "forever" can't promise a total; they pay as they go
   return isNoticeCard(c) && !isSpecialCount(c.counts[0]) ? c.counts[0] * c.wage : 0;
 }
@@ -143,7 +146,7 @@ export function boardReserve(c: Carrier): number {
 export function cancelDesign(s: SimState, designId: number): void {
   const d = s.designs.find((x) => x.id === designId);
   if (!d) return;
-  s.reserved -= boardReserve(d.carrier);
+  s.reserved -= upfrontReserve(d.carrier);
   s.designs = s.designs.filter((x) => x.id !== designId);
   log(s, `Scrapped before writing: ${carrierText(d.carrier)}.`);
 }
@@ -157,5 +160,13 @@ export function hasWriteLine(c: Carrier): boolean {
 export function newBlueprint(s: SimState): Carrier {
   const c = newCarrier(s, [], 0, { kind: 'tower' });
   c.kind = 'blueprint';
+  return c;
+}
+
+/** A bonus for one worker: no orders, just gold, handed over by a courier. */
+export function newLetter(s: SimState, workerId: number, gold: number): Carrier {
+  const c = newCarrier(s, [], 0, { kind: 'worker', workerId });
+  c.kind = 'letter';
+  c.gold = gold;
   return c;
 }

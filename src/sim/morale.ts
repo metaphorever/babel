@@ -2,7 +2,7 @@ import { addMoodlet, alert, dropCarried, log, moveTo, releaseReservations } from
 import { startActivity } from './activities';
 import { carrierText } from './carriers';
 import { dayOf, hourOf } from './time';
-import { GRIEVANCE_DECAY, QUIT, REMIT, TIME } from './tuning';
+import { BONUS, GRIEVANCE_DECAY, QUIT, REMIT, TIME } from './tuning';
 import type { Complaint, SimState, Worker } from './types';
 import { siteOf } from './world';
 import { farewell } from './social';
@@ -145,6 +145,36 @@ export function sendMoneyHome(s: SimState): void {
     sent.push(`${w.name} ${gold}`);
   }
   if (sent.length) log(s, `Sent home to their families at dawn: ${sent.join(', ')} gold.`);
+}
+
+/**
+ * How much a bonus of this much gold would lift them, handed over now: less
+ * when their purse is already full, more when they're greedy, and never
+ * less than BONUS.leastPerGold a gold (100 gold always rescues).
+ */
+export function bonusLift(w: Worker, gold: number): number {
+  const rich = BONUS.purseRef / (BONUS.purseRef + Math.max(0, w.purse));
+  const full = gold * BONUS.perGold * w.p.greed * rich;
+  return Math.round(Math.min(BONUS.max, Math.max(full, gold * BONUS.leastPerGold)));
+}
+
+/**
+ * A bonus in hand: the gold goes in their purse and the lift lands at once,
+ * lasting a day. Another bonus while that's still warm adds to it, up to
+ * BONUS.max. Paid well, they stop grumbling about pay.
+ */
+export function receiveBonus(s: SimState, w: Worker, gold: number): number {
+  const lift = bonusLift(w, gold);
+  w.purse += gold;
+  const before = w.moodlets.find((m) => m.kind === 'bonus');
+  const value = Math.min(BONUS.max, (before?.value ?? 0) + lift);
+  addMoodlet(s, w, 'bonus', before ? 'Bonuses lately' : `A bonus of ${gold} gold`, value, BONUS.ticks);
+  w.mood = Math.min(100, w.mood + (value - (before?.value ?? 0)));
+  if (w.grievances) {
+    delete w.grievances.unpaid;
+    delete w.grievances.lowpay;
+  }
+  return value - (before?.value ?? 0);
 }
 
 /** Put everything down and head for the road home. */

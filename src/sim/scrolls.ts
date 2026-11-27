@@ -1,6 +1,6 @@
 import { addMoodlet, gotPaid, judgeWage, letGo, log, moveTo, releaseReservations, settle } from './actions';
 import { startActivity, train, workOrder, type Result } from './activities';
-import { carrierText, hasWriteLine, lineText, pinCarrier, writingCost } from './carriers';
+import { carrierText, hasWriteLine, lineText, pinCarrier, workerName, writingCost } from './carriers';
 import { addConfusion, knows, knowsWord } from './drift';
 import { ALL, DRIFTABLE, LANGS, conditionText, isSpecialCount, isWorkVerb, langName, orderText, parseOrder, splitUntil, word, type LangId, type Order, type TokenId, type Verb } from './lang';
 import { evalCondition, readCondition, statementEnd } from './logic';
@@ -10,6 +10,7 @@ import { startFloorFromBlueprint, topSpot } from './tower';
 import type { Carrier, SimState, Worker } from './types';
 import { findSite, spotFor } from './world';
 import { lessonWord } from './social';
+import { receiveBonus } from './morale';
 
 // A worker holding a card or scroll carries it out line by line; the
 // current line is their current job. Needs can still pull them away, but the
@@ -329,6 +330,13 @@ function writeLine(s: SimState, w: Worker): Result {
   d.progress += writeSpeed(w) * (writingCost(d.carrier) / writingCostFor(d.carrier, w));
   if (d.progress < d.cost) return 'running';
   s.designs = s.designs.filter((x) => x !== d);
+  // a bonus is paid out of the treasury the moment it's written: from now on the gold is in the letter
+  if (d.carrier.kind === 'letter') {
+    const gold = d.carrier.gold ?? 0;
+    s.reserved -= gold;
+    s.gold -= gold;
+    log(s, `${w.name} wrote out a ${carrierText(d.carrier)} for ${workerName(s, (d.carrier.dest as { workerId: number }).workerId)}. The gold has left the treasury.`, w.id);
+  }
   // a scribe who also delivers keeps it in their bag; a pure writer leaves it in the outbox
   if (delivers(activeCarrier(w)!)) w.bag.push(d.carrier);
   else s.outbox.push(d.carrier);
@@ -397,6 +405,13 @@ function deliverLine(s: SimState, w: Worker): Result {
   }
   const dest = c.dest;
   const to = s.workers.find((x) => x.id === dest.workerId);
+  // a bonus for someone who has quit (or already gone) goes back to the treasury; it doesn't change their mind
+  if (c.kind === 'letter' && (!to || to.leaving)) {
+    w.bag = w.bag.filter((x) => x !== c);
+    s.gold += c.gold ?? 0;
+    log(s, `${w.name} brought a ${carrierText(c)} back to the treasury: ${to ? `${to.name} has quit` : 'who it was for is gone'}.`, w.id);
+    return 'running';
+  }
   if (!to) {
     w.bag = w.bag.filter((x) => x !== c);
     log(s, `${w.name} threw away a ${c.kind}: its reader is gone.`, w.id);
@@ -412,6 +427,13 @@ function deliverLine(s: SimState, w: Worker): Result {
   }
   w.bag = w.bag.filter((x) => x !== c);
   a.timer++;
+  if (c.kind === 'letter') {
+    // no words to read, just gold: it lands however far their language has drifted
+    const gold = c.gold ?? 0;
+    const lift = receiveBonus(s, to, gold);
+    log(s, to === w ? `${w.name} kept their own bonus of ${gold} gold (+${lift} mood).` : `${w.name} handed ${to.name} a bonus of ${gold} gold (+${lift} mood).`, w.id);
+    return 'running';
+  }
   log(s, to === w ? `${w.name} kept a ${c.kind} for themself: ${carrierText(c)}.` : `${w.name} handed ${to.name} a ${c.kind}: ${carrierText(c)}.`, w.id);
   giveCarrier(s, to, c);
   // handing yourself a new order replaces this very scroll
@@ -422,7 +444,7 @@ function deliverLine(s: SimState, w: Worker): Result {
 
 /** A scribe's cost to write this, given which words they know. */
 export function writingCostFor(c: Carrier, w: Worker): number {
-  if (c.kind === 'blueprint') return writingCost(c);
+  if (c.kind === 'blueprint' || c.kind === 'letter') return writingCost(c);
   let cost = SCRIBE.baseCost;
   for (const o of c.orders) for (const tok of o) cost += SCRIBE.perToken * (knows(w, tok) ? 1 : SCRIBE.unknownWordMult);
   return cost;

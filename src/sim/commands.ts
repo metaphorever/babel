@@ -1,11 +1,11 @@
 import { log } from './actions';
-import { boardReserve, cancelDesign, carrierText, destText, newBlueprint, newCarrier, queueDesign } from './carriers';
+import { cancelDesign, carrierText, destText, newBlueprint, newCarrier, newLetter, queueDesign, upfrontReserve } from './carriers';
 import { ALL, FOREVER, GOODS, STATE_WORDS, allowsAll, allowsForever, condRule, isSpecialCount, isStoreWord, isVehicleWord, isWorkVerb, takesWithin, isValidLine, type Condition, langName, makeOrder, placeKey, placeName, FIXTURE_WORDS, FIXTURE_WORD_KIND, STORES_FOR, takesPlaces, takesWho, type LangId, type Noun, type Place, type Verb } from './lang';
 
 function cap(t: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
-import { BUILD, ECONOMY, LOGIC, SCRIBE, TOWER } from './tuning';
+import { BONUS, BUILD, ECONOMY, LOGIC, SCRIBE, TOWER } from './tuning';
 import { branchError } from './logic';
 import type { Dest, SimState } from './types';
 import { applyDemolish, applyPlace, applyRename, applyRenameFixture, validateDemolish, validatePlace, validateRename, validateRenameFixture, type DemolishTarget, type PlaceRequest } from './build';
@@ -52,6 +52,8 @@ export type Command =
   | { type: 'removeNotice'; playerId: number; noticeId: number }
   | { type: 'takeDown'; playerId: number; carrierId: number }
   | { type: 'blueprint'; playerId: number }
+  /** A bonus for one worker: a scribe writes the letter (the gold leaves the treasury then) and a courier hands it over. */
+  | { type: 'bonus'; playerId: number; workerId: number; gold: number }
   /** Lay out a building, fixture, the scriptorium or the tower site. Workers build it. */
   | { type: 'place'; playerId: number; place: PlaceRequest }
   /** Mark something to be taken down. */
@@ -211,6 +213,14 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       if (planned >= TOWER.maxFloors) return { ok: false, error: 'The tower is as tall as this world allows.' };
       return { ok: true };
     }
+    case 'bonus': {
+      const w = s.workers.find((x) => x.id === cmd.workerId);
+      if (!w) return { ok: false, error: 'Who is it for?' };
+      if (w.leaving) return { ok: false, error: w.name + ' has already quit.' };
+      if (!Number.isInteger(cmd.gold) || cmd.gold < 1 || cmd.gold > BONUS.maxGold) return { ok: false, error: 'A bonus is 1 to ' + BONUS.maxGold + ' gold.' };
+      if (cmd.gold > availableGold(s)) return { ok: false, error: 'Needs ' + cmd.gold + ' gold; only ' + availableGold(s) + ' available.' };
+      return { ok: true };
+    }
     case 'place': {
       const error = validatePlace(s, cmd.place);
       return error ? { ok: false, error } : { ok: true };
@@ -243,7 +253,7 @@ export function applyCommand(s: SimState, cmd: Command): CommandResult {
     case 'compose': {
       const c = buildCarrier(s, cmd);
       // a notice's wages are set aside now and paid as the work is done
-      s.reserved += boardReserve(c);
+      s.reserved += upfrontReserve(c);
       queueDesign(s, c);
       log(s, `Sent to the scriptorium: a ${c.kind} for ${destText(s, c.dest)}: ${carrierText(c)}.`);
       break;
@@ -268,6 +278,14 @@ export function applyCommand(s: SimState, cmd: Command): CommandResult {
       // a drawing for the next floor; a courier has to carry it to the top
       queueDesign(s, newBlueprint(s));
       log(s, 'Sent to the scriptorium: a blueprint for the next level.');
+      break;
+    }
+    case 'bonus': {
+      // set aside now, paid out of the treasury when it's written
+      const c = newLetter(s, cmd.workerId, cmd.gold);
+      s.reserved += upfrontReserve(c);
+      queueDesign(s, c);
+      log(s, 'Sent to the scriptorium: a letter for ' + destText(s, c.dest) + ': ' + carrierText(c) + '.');
       break;
     }
     case 'place':

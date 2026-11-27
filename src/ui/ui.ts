@@ -84,6 +84,8 @@ export interface UiHooks {
   centerOnWorker(id: number): void;
   /** Center the view on a tile. */
   centerOnTile(x: number, y: number): void;
+  /** Open the "Send a bonus" dialog for a worker. */
+  sendBonus?(workerId: number): void;
 }
 
 export class Ui {
@@ -387,6 +389,7 @@ export class Ui {
         h('button', { class: 'btn', onclick: () => this.hooks.centerOnWorker(w.id) }, 'Find'),
         h('button', { class: 'btn', onclick: () => this.scriptorium.openFor(w.id, 'board') }, 'Post a notice for them'),
         h('button', { class: 'btn', onclick: () => this.scriptorium.openFor(w.id, 'hand') }, 'Hand them an order'),
+        h('button', { class: 'btn', disabled: w.leaving, title: 'A letter with gold in it: a scribe writes it, a courier hands it over, and it lifts their mood at once.', onclick: () => this.hooks.sendBonus?.(w.id) }, 'Send a bonus…'),
       ),
     );
   }
@@ -514,7 +517,7 @@ export class Ui {
         h('li', {}, h('b', {}, 'B'), ' the Build window · ', h('b', {}, 'Esc'), ' stop placing · ', h('b', {}, '[ ]'), ' building width'),
         h('li', {}, h('b', {}, 'Space'), ' pause · ', h('b', {}, '1 2 3'), ' speed · ', h('b', {}, 'N'), ' show all names'),
       ),
-      h('p', { class: 'hint' }, `Languages drift from ${levelName(DRIFT.lineFloor)} up (see the Languages window). Keep the patron pleased by finishing levels, and keep your workers fed or they’ll quit. Not in yet: mailboxes, upper job boards, COPY.`),
+      h('p', { class: 'hint' }, `Languages drift from ${levelName(DRIFT.lineFloor)} up (see the Languages window). Keep the patron pleased by finishing levels, and keep your workers fed or they’ll quit (a bonus, from a worker’s window, can talk a fed-up worker round). Not in yet: mailboxes, upper job boards, COPY.`),
       // the reference that used to be spread around the windows, folded away until wanted
       h(
         'details',

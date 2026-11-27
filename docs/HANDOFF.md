@@ -1,6 +1,6 @@
 # Handoff: where Babel stands, and what's next
 
-*Updated 2026-11-26 at the end of session 8. A new session should start here, then read [DESIGN.md](DESIGN.md) (§16.9 is the plan being built now; §15 is P1 and what's been built since) and [README.md](../README.md).*
+*Updated 2026-11-26 in session 9. A new session should start here, then read [DESIGN.md](DESIGN.md) (§16.9 is the plan being built now; §15 is P1 and what's been built since) and [README.md](../README.md).*
 
 ## The project in one paragraph
 
@@ -17,7 +17,7 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
   - **Every push to `main` deploys:** `.github/workflows/pages.yml` runs the tests, builds, and publishes to GitHub Pages.
   - **Commit author:** "Clover <metaphorever@gmail.com>". The user chose to publish that as is.
 - **GitHub CLI:** on this machine it's at `C:\Program Files\GitHub CLI\gh.exe` and is logged in as `metaphorever`. Shells started before it was installed may need the full path.
-- **Tests:** keep them passing (`npm test`, 158 now; `npx tsc --noEmit -p .` for types; `npm run build` is what the deploy runs). For tuning the social web and the economy over time, `npm run sim:month` runs 30-day colonies and prints how labels settle, what moved feelings (by cause), what changed labels, churn, drinking, work and remittances. Compare settings side by side on the same seeds: `npm run sim:month -- gossip.chance=0.6 vs job.help=0.0015` (options: `--seeds=`, `--days=`, `--size=`, `--rich`). See DESIGN.md §15.13 for the findings and the current drama tuning (help minimal, once-a-day events strong). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
+- **Tests:** keep them passing (`npm test`, 167 now; `npx tsc --noEmit -p .` for types; `npm run build` is what the deploy runs). For tuning the social web and the economy over time, `npm run sim:month` runs 30-day colonies and prints how labels settle, what moved feelings (by cause), what changed labels, churn, drinking, work and remittances. Compare settings side by side on the same seeds: `npm run sim:month -- gossip.chance=0.6 vs job.help=0.0015` (options: `--seeds=`, `--days=`, `--size=`, `--rich`). See DESIGN.md §15.13 for the findings and the current drama tuning (help minimal, once-a-day events strong). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
 - **Playtest feedback:** the user playtests on the live site and sends batches of notes. Fix bugs, record design decisions in DESIGN.md, and keep "provisional" notes up to date.
 
 ## Code rules that matter
@@ -109,9 +109,14 @@ Built and tested: the random map, the opening text and founding, placement mode 
   - Everything else on the sheet (clouds, stairs, the site marker, scriptorium icons, pulley, winches, stable, flags, bells) gets wired in when its feature is built.
 - **While the user draws, the next session works on code:** next step 1 below.
 
+## Session 9 (2026-11-26)
+
+- **§16.9 step 3, the bonus letter, is built, tested and checked in the browser** (DESIGN.md §16.9 step 3 has the details and Claude's decisions). "Send a bonus…" in the worker window opens a dialog with the amount and a preview of the lift; a scribe writes a letter (a new carrier kind, `letter`, holding `gold`), the gold leaves the treasury when it's written, and a courier hands it over: into their purse, and an immediate mood lift for a day (`BONUS` in tuning; `bonusLift` and `receiveBonus` in `morale.ts`). 100 gold lifts anyone at least 30. A letter for someone who has quit comes back to the treasury.
+- `boardReserve` is now `upfrontReserve` (`carriers.ts`): letters set their gold aside the same way notices do.
+
 ## Next steps, in order
 
-1. **§16.9, step 3: the bonus letter.** Then 4 recruiting, 5 the other alerts (including the win and everyone-gone alerts, the menu-bar list, and somewhere to unmute), 6 the Stores window, 7 saves, 8 the New Game screen and taller maps, 9 the title screen and Settings. Build in that order.
+1. **§16.9, step 4: recruiting.** Then 5 the other alerts (including the win and everyone-gone alerts, the menu-bar list, and somewhere to unmute), 6 the Stores window, 7 saves, 8 the New Game screen and taller maps, 9 the title screen and Settings. Build in that order.
 2. **Flags and bells** (§16.7): fixtures, RAISE / LOWER / RING, range circles, heraldic hatching, and the word **report** (§16.9 step 6). Then standing orders on boards.
 3. **Hauling, the rest of §16.8:** the rope pulley and winches up the tower, then the wagon, beasts of burden and the stable.
 4. **Art from the user:** the "Babel To Do" sheet (`art-src/Babel To Do.png`, refreshed 2026-11-26 with flags and bells; shelves, wheelbarrow and cart feed straight in, see SPRITES.md), more beards and hats for portraits, clouds from parts. Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art. Sheets go to the user as PNGs only.

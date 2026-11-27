@@ -42,6 +42,7 @@ const ui = new Ui(document.getElementById('ui')!, sim, {
     const w = sim.state.workers.find((x) => x.id === id);
     if (w) renderer.centerOn(w.x * TILE, w.y * TILE);
   },
+  sendBonus: (id) => build.bonusDialog(id),
 });
 const build = new BuildUi(document.getElementById('ui')!, ui.wm, sim, renderer, ui.scriptorium, {
   centerOnTile: (x, y) => renderer.centerOn(x * TILE, y * TILE),

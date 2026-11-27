@@ -1,4 +1,4 @@
-import { ALL, BUILD, DRIFT, ECONOMY, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type AlertKind, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
+import { ALL, BONUS, BUILD, DRIFT, ECONOMY, QUIT, availableGold, bonusLift, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type AlertKind, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
 import { fixtureWidth, footprint, houseCost, placeCost, towerSiteWaiting, worksFraction, type PlaceRequest } from '../sim/build';
 import { barMood } from '../sim/activities';
 import { deckRow } from '../sim/tower';
@@ -628,6 +628,67 @@ export class BuildUi {
 
   get modalOpen(): boolean {
     return this.modalEl !== null;
+  }
+
+  // ------------------------------------------------------------- bonuses
+
+  /**
+   * "Send a bonus…": how much gold goes in the letter, with a guess at how
+   * much it would cheer them if it were handed over now. The gold is set
+   * aside at once and leaves the treasury when the scribe writes the letter.
+   */
+  bonusDialog(workerId: number): void {
+    const w = this.s.workers.find((x) => x.id === workerId);
+    if (!w || w.leaving) return;
+    const free = availableGold(this.s);
+    const input = h('input', { type: 'number', min: 1, max: Math.min(BONUS.maxGold, free), step: 1, value: String(Math.max(1, Math.min(25, free))), 'aria-label': 'Gold', class: 'bonus-gold' });
+    const preview = h('p', { class: 'hint' });
+    const update = () => {
+      const g = Math.floor(Number(input.value));
+      if (!Number.isFinite(g) || g < 1) preview.textContent = 'How much gold?';
+      else if (g > free) preview.textContent = `Only ${free} gold is free in the treasury.`;
+      else {
+        const lift = bonusLift(w, g);
+        preview.textContent = `Handed over now, it would lift ${w.name}’s mood by about ${lift} (${Math.round(w.mood)} → ${Math.min(100, Math.round(w.mood) + lift)}) for a day.${w.mood < QUIT.lowMood && w.mood + lift >= QUIT.lowMood ? ' Enough to stop them quitting, for now.' : ''}`;
+      }
+    };
+    input.addEventListener('input', update);
+    const quick = h(
+      'div',
+      { class: 'row' },
+      ...[10, 25, 50, 100].map((g) =>
+        h('button', {
+          class: 'btn btn-small',
+          disabled: g > free,
+          onclick: () => {
+            input.value = String(g);
+            update();
+          },
+        }, `${g}`),
+      ),
+    );
+    update();
+    this.modal(
+      'Send a bonus',
+      [
+        h('div', { class: 'dialog-title' }, `A bonus for ${w.name}`),
+        h('p', {}, `A scribe writes out a pay packet and a courier hands it to ${w.name}. The gold leaves the treasury when it’s written. Their purse has ${w.purse} gold; the fuller it is, the less a bonus impresses them.`),
+        h('div', { class: 'row' }, h('label', {}, 'Gold ', input), quick),
+        preview,
+      ],
+      [
+        { label: 'Cancel', run: () => undefined },
+        {
+          label: 'Send',
+          primary: true,
+          run: () => {
+            const r = this.sim.enqueue({ type: 'bonus', playerId: 0, workerId: w.id, gold: Math.floor(Number(input.value)) });
+            if (!r.ok) this.modal('Send a bonus', [h('p', {}, r.error)], [{ label: 'OK', primary: true, run: () => undefined }]);
+          },
+        },
+      ],
+      input,
+    );
   }
 
   // ------------------------------------------------------------- alerts

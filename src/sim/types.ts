@@ -142,7 +142,8 @@ export type Dest =
 /**
  * A physical object with orders written on it. A card holds one order; a
  * scroll holds several, carried out top to bottom. Each line has a count:
- * the units to finish before moving to the next line.
+ * the units to finish before moving to the next line. A letter holds no
+ * orders, only a bonus in gold for the worker it's handed to.
  *
  * A one-line card pinned on the board becomes a notice: anyone can read it
  * and take one job at a time from it, and it stays up until its count runs
@@ -150,8 +151,10 @@ export type Dest =
  */
 export interface Carrier {
   id: number;
-  kind: 'card' | 'scroll' | 'blueprint';
+  kind: 'card' | 'scroll' | 'blueprint' | 'letter';
   orders: Order[];
+  /** A letter: the bonus it carries. It leaves the treasury when the letter is written. */
+  gold?: number;
   /** Units to finish on each line before moving on. */
   counts: number[];
   /** Gold per unit of work. */

@@ -289,6 +289,29 @@ export const PAY = {
   lowTicks: 1500,
 };
 
+/**
+ * A bonus: a letter with gold in it, written by a scribe and handed over by
+ * a courier (§16.9 step 3). The lift lands at once, and lasts a day. It's
+ * sized by the gold against their purse (a full purse is less impressed) and
+ * their greed, but never less than leastPerGold, so 100 gold lifts anyone at
+ * least 30: back to the quit line from rock bottom.
+ */
+export const BONUS = {
+  /** Mood per gold for a worker with an empty purse and ordinary greed. */
+  perGold: 0.6,
+  /** A purse this full halves it (perGold × purseRef / (purseRef + purse)). */
+  purseRef: 40,
+  /** However full their purse, at least this much a gold. */
+  leastPerGold: 0.3,
+  /** The most one bonus, or several stacked, can lift them. */
+  max: 45,
+  ticks: TIME.dayTicks,
+  /** The most one letter can carry. */
+  maxGold: 500,
+  /** Writing a letter takes this long (scribe work units; a one-line card is about 90). */
+  writeCost: 60,
+};
+
 /** Working a long stretch without a real break (a meal, a drink, sleep, a wander) wears on them. */
 export const OVERWORK = {
   /** Ticks of work before it starts to tell (2 shifts). */
