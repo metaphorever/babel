@@ -666,7 +666,7 @@ A popup message when something needs the player's attention, with a little sound
 
 ### 16.9 Keeping workers, alerts, and a real start (planned 2026-11-26)
 
-*From the user's playtest notes and a friend's playtest. Agreed plan; built in this order. Steps 1 to 3 are built; **step 4, recruiting, is next.***
+*From the user's playtest notes and a friend's playtest. Agreed plan; built in this order. Steps 1 to 4 are built; **step 5, the rest of the alerts, is next.***
 
 1. **Quitting on shifts** *(built 2026-11-26: `morale.ts`; `QUIT` in tuning. A worker fed up for under 15 seconds when the shift ends waits for the next one, so the bubble always comes first)*.
    - **Fed up:** a worker whose mood falls below the quit threshold (30) shows the quitting bubble at once. That's the early warning, with no countdown yet. If their mood is back at the threshold before the shift ends, it passes quietly.
@@ -694,7 +694,16 @@ A popup message when something needs the player's attention, with a little sound
    - **Checked in the browser (2026-11-26):** a 100-gold bonus for a fed-up worker at mood 16 was written, handed over and took them to 61 at once; the fed-up mark cleared, and they went straight to the bar.
    - **Watch in playtests:** whether the lift is too generous for the price (a 25-gold bonus costs more per point of mood than a beer, but lasts longer and lands at once), and whether a day is the right length.
    - **The notice alert points to it** (the user's call, session 9): its last sentence is now "…or if all else fails send them a bonus", and the alert has a **Send a bonus…** button beside Show [worker], which opens the bonus dialog for them.
-4. **Recruiting:** "Recruit a worker (N gold)" in the Workers window, outside the order system. The fee scales with headcount (about 15 × workers²), cheap when few are left. The patron still sends workers too, at a rate set by difficulty.
+4. **Recruiting:** "Recruit a worker (N gold)" in the Workers window, outside the order system. The fee scales with headcount (about 15 × workers²), cheap when few are left. The patron still sends workers too, at a rate set by difficulty. *(Built 2026-11-26, session 10: `src/sim/recruit.ts`, `RECRUIT` in tuning, the `recruit` command, `tests/recruit.test.ts`.)* Claude's decisions while building it:
+   - **The fee is 15 × the headcount you'd have with the recruit** (`recruitFee`, `RECRUIT.perSquare`): the 9th worker costs 1,215, the 10th 1,500, the 30th 13,500; a lone survivor's company costs 60, and with nobody left a recruit costs 15. Counting the recruit means it's never free, so "no workers and no money" is still a real end. Workers walking home don't count.
+   - **Paid at once, and they arrive at once,** on the road at the left edge, and walk into camp like one of the patron's newcomers (the same code, `arriveOnRoad`: everyone gets feelings about them, and they may turn out to be someone's grown child). No waiting period: the walk in is the delay, and the fee's growth is what stops you buying a crowd.
+   - **Not past `POPULATION.cap`** (30): it's the camp's limit, not just the patron's. At 30 the fee would be 13,500 anyway. The button says why when it's off.
+   - **A confirmation dialog** before paying, since the fee is large and can't be taken back. The everyone-gone alert's [Recruit New Worker] button (step 5) should open the same dialog (`recruitDialog` in `build.ts`).
+   - **When the treasury can't pay,** the button stays in the window, greyed, still showing the fee, with the reason under it ("A recruit costs 1,215 gold; only 274 is free in the treasury."). Gold already set aside for notices and letters doesn't count as free.
+   - **A recruit counts toward the patron's headcount:** the patron tops the camp up to start + 1 per finished level, so hiring above that means the patron sends nobody until the tower catches up.
+   - **The patron's rate by difficulty** (`ARRIVALS.every`; it was one number for all): a chance every 1,800 ticks on easy, 2,400 on normal (as before), 3,600 on hard. It still needs patience at 50 or more and a camp below its target.
+   - **Checked in the browser (2026-11-26):** with 5,000 gold the button read "Recruit a worker (1,215 gold)"; the recruit (Ubii) appeared on the road, walked in to the job board, and the button moved to 1,500. With everyone gone and 15 gold, it offered one for 15 ("Nobody is left, so they come cheap.").
+   - **Watch in playtests:** whether 15 × n² is too steep mid-game (an 8-worker camp's 9th recruit is about five days of the full stipend), and whether easy's newcomers come too fast.
 5. **Alerts** (§16.5):
    - **Each alert:** Acknowledge, "mute this type", "mute all", and a list in the menu bar. *(The dialog, the two mute boxes and their storage are built with step 1, `showNextAlert` in `build.ts`; still to do: the menu-bar list of past alerts, and somewhere to unmute: Settings, step 9, or a small Alerts window until then. Add each new kind to `AlertKind` and `ALERT_KIND_TEXT`.)*
    - **Types:** a worker gives notice; a worker quits; the patron's favour falls to 50%, 25% and 0; a supply runs out (per good, with an "alert below" setting in Stores, 1 by default); the treasury can't pay wages; a worker gives up on a scroll they can't read. A newcomer arriving and a level finished are info only, muted by default.

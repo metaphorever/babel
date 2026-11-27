@@ -7,6 +7,7 @@ function cap(t: string): string {
 }
 import { BONUS, BUILD, ECONOMY, LOGIC, SCRIBE, TOWER } from './tuning';
 import { branchError } from './logic';
+import { recruitError, recruitWorker } from './recruit';
 import type { Dest, SimState } from './types';
 import { applyDemolish, applyPlace, applyRename, applyRenameFixture, validateDemolish, validatePlace, validateRename, validateRenameFixture, type DemolishTarget, type PlaceRequest } from './build';
 
@@ -54,6 +55,8 @@ export type Command =
   | { type: 'blueprint'; playerId: number }
   /** A bonus for one worker: a scribe writes the letter (the gold leaves the treasury then) and a courier hands it over. */
   | { type: 'bonus'; playerId: number; workerId: number; gold: number }
+  /** Hire a worker now (§16.9 step 4): no order; the fee (recruitFee) leaves the treasury at once and they walk in from the road. */
+  | { type: 'recruit'; playerId: number }
   /** Lay out a building, fixture, the scriptorium or the tower site. Workers build it. */
   | { type: 'place'; playerId: number; place: PlaceRequest }
   /** Mark something to be taken down. */
@@ -221,6 +224,10 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       if (cmd.gold > availableGold(s)) return { ok: false, error: 'Needs ' + cmd.gold + ' gold; only ' + availableGold(s) + ' available.' };
       return { ok: true };
     }
+    case 'recruit': {
+      const error = recruitError(s);
+      return error ? { ok: false, error } : { ok: true };
+    }
     case 'place': {
       const error = validatePlace(s, cmd.place);
       return error ? { ok: false, error } : { ok: true };
@@ -288,6 +295,9 @@ export function applyCommand(s: SimState, cmd: Command): CommandResult {
       log(s, 'Sent to the scriptorium: a letter for ' + destText(s, c.dest) + ': ' + carrierText(c) + '.');
       break;
     }
+    case 'recruit':
+      recruitWorker(s);
+      break;
     case 'place':
       applyPlace(s, cmd.place);
       break;

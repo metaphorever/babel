@@ -605,14 +605,14 @@ describe('the patron and quitting', () => {
     const s = createState(12);
     s.floors = 3; // room for a few more workers
     const before = s.workers.length;
-    run(s, ARRIVALS.every + 10);
+    run(s, ARRIVALS.every.normal + 10);
     expect(s.workers.length).toBe(before + 1);
     // an impatient patron sends nobody
     const t = createState(12);
     t.floors = 3;
     t.patience = PATRON.recruitAbove - 1;
     t.difficulty = 'easy';
-    run(t, ARRIVALS.every + 10);
+    run(t, ARRIVALS.every.normal + 10);
     expect(t.workers.length).toBe(before);
   });
 });

@@ -1,4 +1,4 @@
-import { ALL, BONUS, BUILD, DRIFT, ECONOMY, QUIT, availableGold, bonusLift, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type AlertKind, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
+import { goldText, headcount, recruitError, recruitFee, ALL, BONUS, BUILD, DRIFT, ECONOMY, QUIT, availableGold, bonusLift, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type AlertKind, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site } from '../sim';
 import { fixtureWidth, footprint, houseCost, placeCost, towerSiteWaiting, worksFraction, type PlaceRequest } from '../sim/build';
 import { barMood } from '../sim/activities';
 import { deckRow } from '../sim/tower';
@@ -688,6 +688,40 @@ export class BuildUi {
         },
       ],
       input,
+    );
+  }
+
+  // ------------------------------------------------------------ recruiting
+
+  /**
+   * "Recruit a worker": a confirmation, since the fee is large and can't be
+   * taken back. Also what the "everyone gone" alert's button will open.
+   */
+  recruitDialog(): void {
+    const why = recruitError(this.s);
+    if (why) {
+      this.modal('Recruit a worker', [h('p', {}, why)], [{ label: 'OK', primary: true, run: () => undefined }]);
+      return;
+    }
+    const fee = recruitFee(this.s);
+    const n = headcount(this.s);
+    this.modal(
+      'Recruit a worker',
+      [
+        h('div', { class: 'dialog-title' }, `Recruit a worker for ${goldText(fee)} gold?`),
+        h('p', {}, `The fee leaves the treasury now, and the recruit walks in from the road. ${n === 0 ? 'Nobody is left, so they come cheap.' : `They would make ${n + 1}: the bigger the camp, the more each recruit costs.`}`),
+      ],
+      [
+        { label: 'Cancel', run: () => undefined },
+        {
+          label: 'Recruit',
+          primary: true,
+          run: () => {
+            const r = this.sim.enqueue({ type: 'recruit', playerId: 0 });
+            if (!r.ok) this.modal('Recruit a worker', [h('p', {}, r.error)], [{ label: 'OK', primary: true, run: () => undefined }]);
+          },
+        },
+      ],
     );
   }
 

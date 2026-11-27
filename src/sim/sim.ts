@@ -52,7 +52,7 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
     difficulty,
     graceUntil: start === 'opening' ? TIME.dayTicks * PATRON.graceDays : 0,
     nextStipend: TIME.dayTicks,
-    nextArrival: ARRIVALS.every,
+    nextArrival: ARRIVALS.every[difficulty],
     income: 0,
     leftWith: 0,
     takings: 0,

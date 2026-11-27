@@ -494,6 +494,10 @@ label {
   border-color: var(--paper);
 }
 
+.recruit-row {
+  margin-top: 8px;
+}
+
 .roster .bar {
   width: 60px;
 }

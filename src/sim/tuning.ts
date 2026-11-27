@@ -327,10 +327,20 @@ export const OVERWORK = {
 export const GRIEVANCE_DECAY = 0.99953802;
 
 export const ARRIVALS = {
-  /** How often a newcomer may turn up on the road. */
-  every: 2400,
+  /** How often the patron may send a newcomer up the road, by difficulty (2400 is 0.4 of a day). */
+  every: { easy: 1800, normal: 2400, hard: 3600 } as Record<Difficulty, number>,
   /** Population the patron aims for: start + this many per finished floor (up to the cap). */
   perFloor: 1,
+};
+
+/**
+ * Recruiting a worker yourself (§16.9 step 4): no order, paid at once, and
+ * they walk in from the road. The fee is perSquare × the headcount you'd have
+ * with them, so a 9th worker costs 1,215 and a lone survivor's company 60.
+ * Not past POPULATION.cap.
+ */
+export const RECRUIT = {
+  perSquare: 15,
 };
 
 export const ECONOMY = {

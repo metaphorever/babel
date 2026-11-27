@@ -43,6 +43,7 @@ const ui = new Ui(document.getElementById('ui')!, sim, {
     if (w) renderer.centerOn(w.x * TILE, w.y * TILE);
   },
   sendBonus: (id) => build.bonusDialog(id),
+  recruit: () => build.recruitDialog(),
 });
 const build = new BuildUi(document.getElementById('ui')!, ui.wm, sim, renderer, ui.scriptorium, {
   centerOnTile: (x, y) => renderer.centerOn(x * TILE, y * TILE),

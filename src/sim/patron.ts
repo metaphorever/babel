@@ -2,12 +2,10 @@ import { log } from './actions';
 import { hasWriteLine, scribeLoop } from './carriers';
 import { knows, knowsWord } from './drift';
 import { LANGS, floorName, langName, type LangId } from './lang';
-import { addWorker } from './sim';
 import { ARRIVALS, PATRON, POPULATION, TIME } from './tuning';
 import { dayOf } from './time';
-import { siteOf } from './world';
 import type { Carrier, SimState } from './types';
-import { socialArrival } from './social';
+import { arriveOnRoad, headcount } from './recruit';
 import { sendMoneyHome } from './morale';
 
 // The patron's charter is a standing order nailed to the board:
@@ -112,15 +110,10 @@ export function updatePatron(s: SimState): void {
   }
 
   if (s.tick >= s.nextArrival) {
-    s.nextArrival = s.tick + ARRIVALS.every;
+    s.nextArrival = s.tick + ARRIVALS.every[s.difficulty];
     const target = Math.min(POPULATION.cap, POPULATION.start + s.floors * ARRIVALS.perFloor);
-    const staying = s.workers.filter((w) => !w.leaving).length;
-    if (s.patience >= PATRON.recruitAbove && staying < target) {
-      const w = addWorker(s);
-      socialArrival(s, w);
-      const road = siteOf(s, 'home');
-      w.x = road.x0;
-      w.y = road.y;
+    if (s.patience >= PATRON.recruitAbove && headcount(s) < target) {
+      const w = arriveOnRoad(s);
       log(s, `${w.name} arrived on the road, sent by the patron to work on the tower.`, w.id);
     }
   }

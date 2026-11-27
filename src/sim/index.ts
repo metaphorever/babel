@@ -15,4 +15,5 @@ export { standable, tileAt, siteOf } from './world';
 export { findPath } from './path';
 export { branchError } from './logic';
 export { COMPLAINT_TEXT, bonusLift, complaintsText, topComplaints, whenText } from './morale';
+export { goldText, headcount, recruitError, recruitFee } from './recruit';
 export { clockText, darkness, dayOf, hourOf, isNight } from './time';

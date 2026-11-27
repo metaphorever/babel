@@ -29,6 +29,10 @@ import {
   skillLevel,
   TICKS_PER_SECOND,
   TRAITS,
+  goldText,
+  headcount,
+  recruitError,
+  recruitFee,
   type ActivityKind,
   type Sim,
   type SimState,
@@ -86,6 +90,8 @@ export interface UiHooks {
   centerOnTile(x: number, y: number): void;
   /** Open the "Send a bonus" dialog for a worker. */
   sendBonus?(workerId: number): void;
+  /** Open the "Recruit a worker" dialog. */
+  recruit?(): void;
 }
 
 export class Ui {
@@ -452,7 +458,18 @@ export class Ui {
       );
       t.append(row);
     }
-    win.body.append(t);
+    // hiring outside the order system: paid at once, they walk in from the road
+    const fee = recruitFee(this.s);
+    const why = recruitError(this.s);
+    win.body.append(
+      t,
+      h(
+        'div',
+        { class: 'row recruit-row' },
+        h('button', { class: 'btn', disabled: why !== null, title: why ?? 'No scribe or courier: the fee leaves the treasury now and they walk in from the road. Each recruit costs more the bigger the camp.', onclick: () => this.hooks.recruit?.() }, `Recruit a worker (${goldText(fee)} gold)`),
+      ),
+      h('div', { class: 'hint' }, why ?? `${headcount(this.s)} working here. The patron sends newcomers too, while they're pleased and the tower grows.`),
+    );
   }
 
   private doingShort(w: Worker): string {
