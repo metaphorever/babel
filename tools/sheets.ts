@@ -95,9 +95,6 @@ const world = (list: WorldSprite[]): Slot[] =>
 /** The pages and what's on them, filled with the given art. */
 export function buildPages(art: ArtSet = defaultArt(), worldArt?: { terrain: WorldSprite[]; nature: WorldSprite[]; buildings: WorldSprite[]; fixtures: WorldSprite[]; sky: WorldSprite[]; extras?: WorldSprite[] }): Page[] {
   const wa = worldArt ?? { terrain: terrainArt(), nature: natureArt(), buildings: buildingArt(), fixtures: fixtureArt(), sky: skyArt(), extras: extrasArt() };
-  // boxes the user asked to get blank, to draw from scratch
-  const blank = new Set(['fixture.shelves']);
-  const extras = world(wa.extras ?? extrasArt()).map((sl) => (blank.has(sl.key) ? { ...sl, grid: null } : sl));
   const bodies: Slot[] = [];
   const nBody = art.body.length + SPARE.body;
   for (let v = 0; v < nBody; v++) {
@@ -166,9 +163,10 @@ export function buildPages(art: ArtSet = defaultArt(), worldArt?: { terrain: Wor
           slots: Array.from({ length: 6 }, (_, i) => todo(`cloud.${i}`, `CLOUD PART ${i + 1}`, 32, 16)),
         },
         {
-          title: 'FIXTURES: WHOLE BLOCKS (A BLOCK IS 16 PX)',
+          title: 'FIXTURES: WHOLE BLOCKS (A BLOCK IS 16 PX). SHELVES: THE GAME PUTS STONE, WOOD AND GRAIN ON THEM.',
           perRow: 3,
-          slots: [todo('shelves', 'SHELVES (2 BLOCKS TALL)', 16, 32), todo('stairs', 'STAIRS (ONE LEVEL)', 32, 32)],
+          // the real name, so a drawing here replaces the stand-in in the game
+          slots: [{ key: 'fixture.shelves', label: 'SHELVES (2 BLOCKS TALL)', w: 16, h: 32, grid: null }, todo('stairs', 'STAIRS (ONE LEVEL)', 32, 32)],
         },
         {
           title: 'TOWER SITE MARKER, BEFORE ANYTHING IS BUILT (NOW DRAWN IN CODE). THE MIDDLE REPEATS.',
@@ -181,7 +179,7 @@ export function buildPages(art: ArtSet = defaultArt(), worldArt?: { terrain: Wor
           slots: [todo('icon.anyone', 'BOARD: ANYONE', 16, 16, svgIcon(BOARD_ICON)), todo('icon.named', 'BOARD: BY NAME', 16, 16, svgIcon(NAMED_ICON)), todo('icon.hand', 'HAND TO', 16, 16, svgIcon(HAND_ICON))],
         },
         {
-          title: 'HAULING EQUIPMENT (TO COME). THE GAME DRAWS THE LOAD ON TOP.',
+          title: 'HAULING EQUIPMENT. WHEELBARROW AND CART ARE IN THE GAME AS STAND-INS, THE REST IS TO COME. THE GAME DRAWS THE LOAD.',
           perRow: 4,
           slots: [
             // the real names, so a drawing here replaces the stand-in in the game
@@ -193,13 +191,29 @@ export function buildPages(art: ArtSet = defaultArt(), worldArt?: { terrain: Wor
             todo('stable', 'STABLE STALL', 32, 32),
           ],
         },
-      ],
-    },
-    {
-      name: 'Babel Extras',
-      title: 'BABEL EXTRAS',
-      groups: [
-        { title: 'NEW PIECES. SHELVES: PLANKS ON ROWS 5, 10 AND 15', perRow: 3, slots: extras },
+        {
+          // DESIGN.md 16.7: flags and bells come in three sizes; a flag's colour is heraldic hatching
+          title: 'FLAGPOLES (NEXT). SMALL, MEDIUM, LARGE.',
+          perRow: 3,
+          slots: [todo('flagpole.s', 'POLE SMALL', 16, 32), todo('flagpole.m', 'POLE MEDIUM', 16, 48), todo('flagpole.l', 'POLE LARGE', 16, 64)],
+        },
+        {
+          title: 'FLAGS: DRAW THE OUTLINE. THE GAME FILLS THE INSIDE WITH ITS COLOR AS HERALDIC HATCHING.',
+          perRow: 3,
+          slots: [todo('flag.s', 'FLAG SMALL', 8, 6), todo('flag.m', 'FLAG MEDIUM', 12, 8), todo('flag.l', 'FLAG LARGE', 16, 12)],
+        },
+        {
+          title: 'BELLS (NEXT), HANGING IN THEIR FRAME: STILL, AND SWUNG WHILE RINGING.',
+          perRow: 4,
+          slots: [
+            todo('bell.s', 'BELL SMALL', 16, 16),
+            todo('bell.s.ring', 'RINGING', 16, 16),
+            todo('bell.m', 'BELL MEDIUM', 32, 32),
+            todo('bell.m.ring', 'RINGING', 32, 32),
+            todo('bell.l', 'BELL LARGE', 48, 48),
+            todo('bell.l.ring', 'RINGING', 48, 48),
+          ],
+        },
       ],
     },
   ];

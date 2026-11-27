@@ -107,7 +107,7 @@ Built and tested: the random map, the opening text and founding, placement mode 
 1. **§16.9, step 3: the bonus letter.** Then 4 recruiting, 5 the other alerts (including the win and everyone-gone alerts, the menu-bar list, and somewhere to unmute), 6 the Stores window, 7 saves, 8 the New Game screen and taller maps, 9 the title screen and Settings. Build in that order.
 2. **Flags and bells** (§16.7): fixtures, RAISE / LOWER / RING, range circles, heraldic hatching, and the word **report** (§16.9 step 6). Then standing orders on boards.
 3. **Hauling, the rest of §16.8:** the rope pulley and winches up the tower, then the wagon, beasts of burden and the stable.
-4. **Art from the user:** the "Babel To Do" sheet (wheelbarrow and cart boxes feed straight in), more beards and hats for portraits, clouds from parts. Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art. Sheets go to the user as PNGs only.
+4. **Art from the user:** the "Babel To Do" sheet (`art-src/Babel To Do.png`, refreshed 2026-11-26 with flags and bells; shelves, wheelbarrow and cart feed straight in, see SPRITES.md), more beards and hats for portraits, clouds from parts. Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art. Sheets go to the user as PNGs only.
 5. **Playtest notes** as they come: the tutorial text needs the user's voice; gold from bar takings; whether the starting supplies last the grace period; social tuning (§16.6) only from playtests.
 6. **P0 leftovers:** mailboxes and upper job boards, the COPY order, night changing behavior.
 7. **The rest of §16:** the About window (quick), stairs, the trader, pilgrimages.
