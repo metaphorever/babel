@@ -1,6 +1,6 @@
 # Handoff: where Babel stands, and what's next
 
-*Updated 2026-11-26 at the end of session 7. A new session should start here, then read [DESIGN.md](DESIGN.md) (§16.9 is the plan being built now; §15 is P1 and what's been built since) and [README.md](../README.md).*
+*Updated 2026-11-26 at the end of session 8. A new session should start here, then read [DESIGN.md](DESIGN.md) (§16.9 is the plan being built now; §15 is P1 and what's been built since) and [README.md](../README.md).*
 
 ## The project in one paragraph
 
@@ -101,6 +101,13 @@ Built and tested: the random map, the opening text and founding, placement mode 
 - **The Workers sheet is in, final:** all new art for bodies, heads, beards, hats, items, props and thought symbols, after five revisions (`art-src/shots/workers-clover-6.png`). Loads and thought clouds now sit on each worker's real top row, since hats reach the top of the box. Sleepers lie face up, and in a bed with their head on the pillow, 1 pixel off the floor.
 - **Preview pages** for art in progress live in `art-src/picker/` (not committed): `workers.html` shows every worker part labeled, a crowd, walking and sleeping, using the game's own code; open it through the dev server.
 - **The MacPaint `.bin`/`.pntg` tooling is gone** at the user's request: sheets are PNGs (`npm run art:export`), art comes back as screenshots. Don't make MacPaint-format files again.
+- **The Babel To Do sheet is refreshed** and the user is drawing it now. Babel Extras is merged into it (that page is gone), and it has new boxes for flagpoles, flag outlines and bells (still and ringing) in three sizes. The box sizes were Claude's guesses; the user may resize them.
+- **When the To Do screenshot arrives:**
+  - Add `'Babel To Do': '<file>.png'` to `SHEET_SHOTS` in `tools/shots.ts`, run `npm run art:import`, and check every box.
+  - The shelves, wheelbarrow and cart show up in the game right away.
+  - The shelves are 16x32 now (two blocks), but the renderer's `case 'shelves'` in `src/render/renderer.ts` still puts the goods rows at `base - 1 - i * 5`, which fit the old 16x16 stand-in. Line the stone, wood and grain rows up with the planks the user draws.
+  - Everything else on the sheet (clouds, stairs, the site marker, scriptorium icons, pulley, winches, stable, flags, bells) gets wired in when its feature is built.
+- **While the user draws, the next session works on code:** next step 1 below.
 
 ## Next steps, in order
 
