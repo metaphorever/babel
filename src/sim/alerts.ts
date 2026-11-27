@@ -54,9 +54,9 @@ export function daysPlayed(s: SimState): number {
   return Math.round((s.tick * 10) / TIME.dayTicks) / 10;
 }
 
-/** (tower height × 1000) / (days played) + gold in the treasury: the user's formula. */
+/** (tower height × ALERTS.scorePerLevel) / (days played) + gold in the treasury: the user's formula. Levels over time lead; gold mostly breaks ties. */
 export function score(s: SimState): number {
-  return Math.round((s.floors * 1000 * TIME.dayTicks) / Math.max(1, s.tick)) + s.gold;
+  return Math.round((s.floors * ALERTS.scorePerLevel * TIME.dayTicks) / Math.max(1, s.tick)) + s.gold;
 }
 
 /** The patron's goal reached: once a game. */
@@ -67,7 +67,7 @@ export function checkGoal(s: SimState): void {
     s,
     'goal',
     'The patron’s goal is reached',
-    `Congratulations! You reached the patron's goal of a tower ${s.goal} levels tall. Your score is ${goldText(score(s))}: ${s.goal} levels × 1000 ÷ ${daysPlayed(s)} days, plus ${goldText(s.gold)} gold in the treasury.`,
+    `Congratulations! You reached the patron's goal of a tower ${s.goal} levels tall. Your score is ${goldText(score(s))}: ${s.goal} levels × ${goldText(ALERTS.scorePerLevel)} ÷ ${daysPlayed(s)} days, plus ${goldText(s.gold)} gold in the treasury.`,
   );
 }
 

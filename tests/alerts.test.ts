@@ -144,8 +144,9 @@ describe('§16.9 step 5: alerts', () => {
     checkGoal(s);
     expect(kinds(s, 'goal')).toHaveLength(1);
     expect(daysPlayed(s)).toBe(20);
-    expect(score(s)).toBe((s.goal * 1000) / 20 + 512);
-    expect(kinds(s, 'goal')[0].text).toContain(`Your score is 2,012`);
+    expect(score(s)).toBe((s.goal * ALERTS.scorePerLevel) / 20 + 512);
+    expect(ALERTS.scorePerLevel).toBe(10000);
+    expect(kinds(s, 'goal')[0].text).toContain(`Your score is 15,512: 30 levels × 10,000 ÷ 20 days, plus 512 gold`);
     expect(s.won).toBe(true);
   });
 

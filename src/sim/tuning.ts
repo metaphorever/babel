@@ -338,6 +338,8 @@ export const ALERTS = {
   supplyBelow: 1,
   /** Back this far above the line before the same good can raise another (so a pantry hovering at 0 doesn't nag). */
   supplyRearm: 5,
+  /** The score: levels × this ÷ days played, plus the treasury's gold (the user, session 10: 10,000 so speed leads and gold mostly breaks ties). */
+  scorePerLevel: 10000,
   /** After a "can't pay wages" alert, none again for this long (half a day). */
   wagesQuietTicks: TIME.dayTicks / 2,
 };
