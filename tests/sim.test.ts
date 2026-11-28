@@ -16,7 +16,7 @@ import { deckRow, newProject, placeMaterial } from '../src/sim/tower';
 import { findJob, finishNow, type PlaceRequest } from '../src/sim/build';
 
 import type { Dest } from '../src/sim/types';
-import { ARRIVALS, PATRON, QUIT, SKILLS, TIME, TOWER, WORLD } from '../src/sim/tuning';
+import { ARRIVALS, PATRON, QUIT, SKILLS, TIME, TOWER } from '../src/sim/tuning';
 import { currentStipend, patronFloorDone } from '../src/sim/patron';
 
 type State = ReturnType<typeof createState>;
@@ -106,7 +106,7 @@ describe('determinism', () => {
 describe('pathfinding', () => {
   it('walks along the ground', () => {
     const s = createState(1);
-    const y = groundRow();
+    const y = groundRow(s);
     const p = findPath(s, { x: 10, y }, { x: 20, y });
     expect(p).not.toBeNull();
     expect(p!.length).toBe(10);
@@ -114,7 +114,7 @@ describe('pathfinding', () => {
 
   it('climbs a ladder through a deck', () => {
     const s = createState(1);
-    const ground = groundRow(); // standing row
+    const ground = groundRow(s); // standing row
     const deckRow = ground - 4;
     for (let x = 76; x <= 90; x++) setTile(s, x, deckRow, Tile.Deck);
     // ladder from the ground up through a hole in the deck
@@ -212,7 +212,7 @@ describe('skills and multi-unit work', () => {
     if (!w.traits.includes('strong')) w.traits.push('strong');
     w.skills.hauling = 0;
     w.hunger = w.thirst = w.fatigue = 0;
-    const y = groundRow();
+    const y = groundRow(s);
     s.items.push({ id: s.nextId++, type: 'stone', x: w.x, y, reservedBy: null });
     s.items.push({ id: s.nextId++, type: 'stone', x: w.x + 1, y, reservedBy: null });
     const gold = s.gold;
@@ -378,7 +378,7 @@ describe('the tower', () => {
     const p = s.projects[0];
     for (let i = 0; i < p.needs.stone; i++) placeMaterial(s, p, 'stone');
     for (let i = 0; i < p.needs.wood; i++) placeMaterial(s, p, 'wood');
-    const row = deckRow(1);
+    const row = deckRow(s, 1);
     const T = s.tower!;
     for (let x = T.x0; x <= T.x1; x++) {
       const t = tileAt(s, x, row);
@@ -396,16 +396,16 @@ describe('the tower', () => {
     expect(runUntil(s, () => s.floors === 1, 20 * 400)).toBe(true);
     // no ladder and no stockpile come with it: nobody can get up yet
     const t = s.tower!;
-    const up = { x: t.x0 + 8, y: groundRow() - TOWER.floorHeight };
+    const up = { x: t.x0 + 8, y: groundRow(s) - TOWER.floorHeight };
     expect(stockpileOn(s, 1)).toBeNull();
-    expect(findPath(s, { x: 60, y: groundRow() }, up)).toBeNull();
+    expect(findPath(s, { x: 60, y: groundRow(s) }, up)).toBeNull();
     // a ladder on the tower's ground floor, built by "build fixtures in tower" work, is the way up
     expect(applyCommand(s, placeCmd({ what: 'fixture', fixture: 'ladder', x0: t.x0 + 2, story: 0 })).ok).toBe(true);
     pinNotice(s, makeOrder('BUILD', 'FIXTURES', { within: 'tower' }), ALL, 1, null);
     s.sites.find((x) => x.kind === 'stockpile' && x.level === 0 && !x.supplies)!.store.wood += 5;
     const ladder = s.sites.find((x) => x.kind === 'ladder')!;
     expect(runUntil(s, () => ladder.build === null, 20 * 600)).toBe(true);
-    expect(findPath(s, { x: 60, y: groundRow() }, up)).not.toBeNull();
+    expect(findPath(s, { x: 60, y: groundRow(s) }, up)).not.toBeNull();
   });
 
   it('tower rooms take any fixture; ladders need a finished floor above, and only go in the tower', () => {
@@ -472,7 +472,7 @@ describe('language drift', () => {
   /** Put a worker on a floor and keep them there (needs off) until a condition holds. */
   function strand(s: State, w: (typeof s.workers)[number], level: number) {
     w.x = s.tower!.x0 + 5;
-    w.y = WORLD.groundRow - 1 - level * TOWER.floorHeight;
+    w.y = groundRow(s) - level * TOWER.floorHeight;
     w.hunger = w.thirst = w.fatigue = 0;
   }
 
@@ -611,7 +611,6 @@ describe('the patron and quitting', () => {
     const t = createState(12);
     t.floors = 3;
     t.patience = PATRON.recruitAbove - 1;
-    t.difficulty = 'easy';
     run(t, ARRIVALS.every.normal + 10);
     expect(t.workers.length).toBe(before);
   });
@@ -649,7 +648,7 @@ describe('all and forever counts', () => {
     const s = createState(6);
     s.notices = [];
     s.reserved = 0;
-    const y = groundRow();
+    const y = groundRow(s);
     for (let i = 0; i < 4; i++) s.items.push({ id: s.nextId++, type: 'stone', x: 60 + i, y, reservedBy: null });
     pinNotice(s, makeOrder('HAUL', 'STONE'), ALL, 1, null);
     const before = baseStore(s, 'stone');
@@ -661,7 +660,7 @@ describe('all and forever counts', () => {
     const s = createState(6);
     const w = s.workers[3];
     s.items = [];
-    const y = groundRow();
+    const y = groundRow(s);
     s.items.push({ id: s.nextId++, type: 'wood', x: w.x, y, reservedBy: null });
     giveCarrier(s, w, newCarrier(s, [{ order: makeOrder('HAUL', 'WOOD'), count: ALL }, { order: makeOrder('CHOP', 'WOOD'), count: 1 }], 0, { kind: 'worker', workerId: w.id }));
     const card = w.held[0];

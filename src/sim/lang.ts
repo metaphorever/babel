@@ -13,14 +13,13 @@ export type LangId = 'en' | 'fr' | 'el';
 export interface LangInfo {
   id: LangId;
   name: string;
-  /** Workers can only drift into a language once the tower is this tall. */
-  fromFloor: number;
 }
 
+/** The languages. When each opens to drift depends on the patron's goal: langFromFloor in drift.ts. */
 export const LANGS: readonly LangInfo[] = [
-  { id: 'en', name: 'English', fromFloor: Infinity },
-  { id: 'fr', name: 'French', fromFloor: 3 },
-  { id: 'el', name: 'Greek', fromFloor: 5 },
+  { id: 'en', name: 'English' },
+  { id: 'fr', name: 'French' },
+  { id: 'el', name: 'Greek' },
 ];
 
 export function langName(id: LangId): string {

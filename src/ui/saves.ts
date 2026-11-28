@@ -1,4 +1,4 @@
-import { dayOf, makeSave, readSave, type SaveFile, type SaveSummary, type SaveUi, type Sim } from '../sim';
+import { dayOf, difficultyLabel, goldText, makeSave, TOWER, readSave, type SaveFile, type SaveSummary, type SaveUi, type Sim } from '../sim';
 import { clear, h } from './dom';
 import type { WindowManager } from './windows';
 
@@ -89,7 +89,8 @@ export function takeBootSave(): ReturnType<typeof readSave> | null {
 
 export function summaryText(m: SaveSummary): string {
   const tower = m.floors === 0 ? 'no tower yet' : `${m.floors} ${m.floors === 1 ? 'level' : 'levels'}`;
-  return `Day ${m.day} · ${tower} · ${m.workers} ${m.workers === 1 ? 'worker' : 'workers'} · ${m.gold} gold · ${m.difficulty}`;
+  const goal = `goal ${goldText(m.goal ?? TOWER.goal)}`;
+  return `Day ${m.day} · ${tower} · ${goal} · ${m.workers} ${m.workers === 1 ? 'worker' : 'workers'} · ${m.gold} gold · ${difficultyLabel(m.difficulty)}`;
 }
 
 function whenSaved(iso: string): string {

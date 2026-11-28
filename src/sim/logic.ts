@@ -35,8 +35,8 @@ export function readCondition(w: Worker, toks: Order): CondReading {
 }
 
 /** Can this worker read a store from where they stand? */
-function canSee(w: Worker, site: Site): boolean {
-  if (levelOfRow(w.y) !== site.level || Math.abs(w.y - site.y) > 1) return false;
+function canSee(s: SimState, w: Worker, site: Site): boolean {
+  if (levelOfRow(s, w.y) !== site.level || Math.abs(w.y - site.y) > 1) return false;
   const dx = w.x < site.x0 ? site.x0 - w.x : w.x > site.x1 ? w.x - site.x1 : 0;
   return dx <= LOGIC.lookRange;
 }
@@ -56,7 +56,7 @@ export function evalCondition(s: SimState, w: Worker, c: Condition): CondResult 
   const type = c.noun.toLowerCase() as ItemType;
   const sites = storesAt(s, c.place, type);
   const near = nearest(sites, w);
-  if (near && !canSee(w, near)) {
+  if (near && !canSee(s, w, near)) {
     w.thought = `Going to look at ${placeName(c.place)}.`;
     const m = moveTo(s, w, spotFor(near, w.id));
     if (m === 'unreachable') return 'unreachable';

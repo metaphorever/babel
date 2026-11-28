@@ -1,4 +1,4 @@
-import { goneState, goldText, headcount, recruitError, recruitFee, ALL, BONUS, BUILD, DRIFT, ECONOMY, QUIT, availableGold, bonusLift, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site, type SaveUi } from '../sim';
+import { goneState, goldText, headcount, recruitError, recruitFee, ALL, BONUS, BUILD, ECONOMY, availableGold, driftLine, bonusLift, FIXTURE_LABEL, FIXTURE_WORD, PATRON, TOWER, floorName, levelName, currentStipend, type Building, type FixtureKind, type Place, type Sim, type SimState, type Site, type SaveUi } from '../sim';
 import { fixtureWidth, footprint, houseCost, placeCost, towerSiteWaiting, worksFraction, type PlaceRequest } from '../sim/build';
 import { barMood } from '../sim/activities';
 import { deckRow } from '../sim/tower';
@@ -231,7 +231,7 @@ export class BuildUi {
         const row = Math.floor(wy / TILE);
         const t = this.sim.state.tower;
         const inTower = !!t && tx >= t.x0 && tx <= t.x1;
-        const story = inTower ? Math.max(0, Math.floor((deckRow(0) - 1 - row) / TOWER.floorHeight)) : storyOfRow(row);
+        const story = inTower ? Math.max(0, Math.floor((deckRow(this.s, 0) - 1 - row) / TOWER.floorHeight)) : storyOfRow(this.s, row);
         const w = fixtureWidth(p.fixture);
         return { what: 'fixture', fixture: p.fixture, x0: tx - Math.floor(w / 2) + (w % 2 === 0 ? 1 : 0), story };
       }
@@ -363,7 +363,7 @@ export class BuildUi {
   }
 
   private bounds(t: Thing): { x0: number; x1: number; y: number; height: number } {
-    if (t.kind === 'building') return { x0: t.building.x0, x1: t.building.x1, y: groundRow(), height: buildingHeight(t.building.stories) };
+    if (t.kind === 'building') return { x0: t.building.x0, x1: t.building.x1, y: groundRow(this.s), height: buildingHeight(t.building.stories) };
     return { x0: t.site.x0, x1: t.site.x1, y: t.site.y, height: t.site.buildingId !== null ? 16 : 24 };
   }
 
@@ -523,7 +523,7 @@ export class BuildUi {
         ? h('div', { class: 'kv' }, h('span', { class: 'k' }, 'Name'), h('span', { class: 'v' }, site.label, ' ', h('button', { class: 'btn btn-small', onclick: () => this.rename({ kind: 'site', site }) }, 'Rename…')))
         : '',
       site.named ? kv('Number', `${FIXTURE_LABEL[site.kind as FixtureKind]} ${site.num}`) : '',
-      kv('Where', b ? `${b.name}${site.y < groundRow() ? ', upstairs' : ''}` : site.level > 0 || (s.tower && site.x0 >= s.tower.x0 && site.x1 <= s.tower.x1) ? levelName(site.level) : 'Out in the open'),
+      kv('Where', b ? `${b.name}${site.y < groundRow(s) ? ', upstairs' : ''}` : site.level > 0 || (s.tower && site.x0 >= s.tower.x0 && site.x1 <= s.tower.x1) ? levelName(site.level) : 'Out in the open'),
       kv('State', statusOf(this.s, site)),
       site.capacity !== null && !site.supplies ? kv('Holds', `${storedTotal(site)} of ${site.capacity}`) : '',
       goods.length ? kv('Has', goods.join(', ')) : '',
@@ -642,7 +642,7 @@ export class BuildUi {
       else if (g > free) preview.textContent = `Only ${free} gold is free in the treasury.`;
       else {
         const lift = bonusLift(w, g);
-        preview.textContent = `Handed over now, it would lift ${w.name}’s mood by about ${lift} (${Math.round(w.mood)} → ${Math.min(100, Math.round(w.mood) + lift)}) for a day.${w.mood < QUIT.lowMood && w.mood + lift >= QUIT.lowMood ? ' Enough to stop them quitting, for now.' : ''}`;
+        preview.textContent = `Handed over now, it would lift ${w.name}’s mood by about ${lift} (${Math.round(w.mood)} → ${Math.min(100, Math.round(w.mood) + lift)}) for a day.${w.mood < this.s.settings.quitBelow && w.mood + lift >= this.s.settings.quitBelow ? ' Enough to stop them quitting, for now.' : ''}`;
       }
     };
     input.addEventListener('input', update);
@@ -794,7 +794,7 @@ export class BuildUi {
   // ------------------------------------------------------------ the opening
 
   private needsOpening(): boolean {
-    return this.s.start === 'opening' && !this.s.sites.some((x) => x.kind === 'scriptorium');
+    return this.s.settings.start === 'opening' && !this.s.sites.some((x) => x.kind === 'scriptorium');
   }
 
   private word(w: FlavorWord): HTMLElement {
@@ -842,7 +842,7 @@ export class BuildUi {
     if (!this.openingShown && this.needsOpening()) this.showOpening();
     if (!this.sawCharter && this.s.charter) {
       this.sawCharter = true;
-      if (this.s.start === 'opening') this.showFounded();
+      if (this.s.settings.start === 'opening') this.showFounded();
     }
     this.showNextAlert();
     if (this.wm.get('build')!.open && !this.placing && !this.demolishing) this.renderPalette();
@@ -1013,7 +1013,7 @@ function steps(s: SimState): Step[] {
     },
     {
       title: 'A warning',
-      text: `One last thing. High in the tower, from ${levelName(DRIFT.lineFloor)} up, your workers’ words start to drift into other languages. You’ll learn more when it happens.`,
+      text: `One last thing. High in the tower, from ${levelName(driftLine(s))} up, your workers’ words start to drift into other languages. You’ll learn more when it happens.`,
     },
   ];
 }

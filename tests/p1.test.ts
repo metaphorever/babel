@@ -212,7 +212,7 @@ describe('buildings and fixtures', () => {
     s.notices = [];
     s.reserved = 0;
     for (const p of s.sites.filter((x) => x.kind === 'stockpile')) p.store.stone = (p.capacity ?? 0) - p.store.wood - p.store.grain;
-    const y = groundRow();
+    const y = groundRow(s);
     for (let i = 0; i < 4; i++) s.items.push({ id: s.nextId++, type: 'stone', x: 60 + i, y, reservedBy: null });
     pinNotice(s, makeOrder('HAUL', 'STONE'), 4, 1, null);
     run(s, 20 * 120);
@@ -222,11 +222,11 @@ describe('buildings and fixtures', () => {
   it('a two-story building gets a deck and a ladder, and its upstairs can be reached', () => {
     const s = createState(3);
     const x0 = withHouse(s, 6, 2);
-    expect(tileAt(s, x0 + 3, houseDeckRow())).toBe(Tile.Deck);
-    expect(tileAt(s, x0, houseDeckRow())).toBe(Tile.Ladder);
+    expect(tileAt(s, x0 + 3, houseDeckRow(s))).toBe(Tile.Deck);
+    expect(tileAt(s, x0, houseDeckRow(s))).toBe(Tile.Ladder);
     // the rooms stack straight on top of each other: no gap between the stories
-    expect(houseDeckRow()).toBe(groundRow() - 2);
-    expect(findPath(s, { x: x0 - 3, y: groundRow() }, { x: x0 + 4, y: storyRow(1) })).not.toBeNull();
+    expect(houseDeckRow(s)).toBe(groundRow(s) - 2);
+    expect(findPath(s, { x: x0 - 3, y: groundRow(s) }, { x: x0 + 4, y: storyRow(s, 1) })).not.toBeNull();
     // fixtures can't block the ladder
     expect(validateCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 1 })).ok).toBe(false);
     expect(applyCommand(s, place({ what: 'fixture', fixture: 'bed', x0: x0 + 2, story: 1 })).ok).toBe(true);
@@ -401,7 +401,7 @@ describe('session 3: shelves, cancelling, renaming, loose materials', () => {
     s.notices = [];
     s.reserved = 0;
     for (const site of s.sites) site.store.wood = 0;
-    const gy = groundRow();
+    const gy = groundRow(s);
     for (let i = 0; i < 4; i++) s.items.push({ id: s.nextId++, type: 'wood', x: x0 - 3 - i, y: gy, reservedBy: null });
     applyCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 0 }));
     const bed = s.sites[s.sites.length - 1];
@@ -415,7 +415,7 @@ describe('session 3: shelves, cancelling, renaming, loose materials', () => {
     const x0 = withHouse(s, 6);
     s.notices = [];
     s.reserved = 0;
-    const gy = groundRow();
+    const gy = groundRow(s);
     for (let i = 0; i < 4; i++) s.items.push({ id: s.nextId++, type: 'wood', x: x0 - 3 - i, y: gy, reservedBy: null });
     const loose = s.items.filter((it) => it.type === 'wood').length;
     applyCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 0 }));
@@ -460,7 +460,7 @@ describe('session 4: fixtures by number and name in orders', () => {
     s.notices = [];
     s.reserved = 0;
     s.items = s.items.filter((it) => it.type !== 'stone');
-    const gy = groundRow();
+    const gy = groundRow(s);
     for (let i = 0; i < 4; i++) s.items.push({ id: s.nextId++, type: 'stone', x: 10 + i, y: gy, reservedBy: null });
     pinNotice(s, makeOrder('HAUL', 'STONE', { to }), ALL, 1, null);
   }
@@ -548,7 +548,7 @@ describe('session 4: hauling bread and beer', () => {
     bar.store.beer = 0;
     s.notices = [];
     s.reserved = 0;
-    const gy = groundRow();
+    const gy = groundRow(s);
     for (let i = 0; i < 3; i++) s.items.push({ id: s.nextId++, type: 'beer', x: 20 + i, y: gy, reservedBy: null });
     pinNotice(s, makeOrder('HAUL', 'BEER'), ALL, 1, null);
     expect(runUntil(s, () => !s.items.some((it) => it.type === 'beer') && !s.workers.some((w) => w.carrying === 'beer'), 20 * 900)).toBe(true);
@@ -594,7 +594,7 @@ describe('session 5: haul anything, build one thing', () => {
     for (const p of s.sites.filter((x) => x.kind === 'stockpile' && !x.supplies)) p.capacity = null;
     const bar = s.sites.find((x) => x.kind === 'bar')!;
     bar.store.beer = 0;
-    const gy = groundRow();
+    const gy = groundRow(s);
     const loose = ['stone', 'wood', 'grain', 'beer', 'stone', 'wood'] as const;
     loose.forEach((type, i) => s.items.push({ id: s.nextId++, type, x: 12 + i * 3, y: gy, reservedBy: null }));
     pinNotice(s, makeOrder('HAUL', 'ANY'), ALL, 1, null);

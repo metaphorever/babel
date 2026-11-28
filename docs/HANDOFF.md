@@ -1,6 +1,6 @@
 # Handoff: where Babel stands, and what's next
 
-*Updated 2026-11-27 in session 12 (the Stores window and saves). A new session should start here, then read [DESIGN.md](DESIGN.md) (§16.9 is the plan being built now; §15 is P1 and what's been built since) and [README.md](../README.md).*
+*Updated 2026-11-27 in session 13 (the New Game screen). A new session should start here, then read [DESIGN.md](DESIGN.md) (§16.9 is the plan being built now; §15 is P1 and what's been built since) and [README.md](../README.md).*
 
 ## The project in one paragraph
 
@@ -17,7 +17,7 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
   - **Every push to `main` deploys:** `.github/workflows/pages.yml` runs the tests, builds, and publishes to GitHub Pages.
   - **Commit author:** "Clover <metaphorever@gmail.com>". The user chose to publish that as is.
 - **GitHub CLI:** on this machine it's at `C:\Program Files\GitHub CLI\gh.exe` and is logged in as `metaphorever`. Shells started before it was installed may need the full path.
-- **Tests:** keep them passing (`npm test`, 199 now; `npx tsc --noEmit -p .` for types; `npm run build` is what the deploy runs). For tuning the social web and the economy over time, `npm run sim:month` runs 30-day colonies and prints how labels settle, what moved feelings (by cause), what changed labels, churn, drinking, work and remittances. Compare settings side by side on the same seeds: `npm run sim:month -- gossip.chance=0.6 vs job.help=0.0015` (options: `--seeds=`, `--days=`, `--size=`, `--rich`). See DESIGN.md §15.13 for the findings and the current drama tuning (help minimal, once-a-day events strong). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
+- **Tests:** keep them passing (`npm test`, 218 now; `npx tsc --noEmit -p .` for types; `npm run build` is what the deploy runs). For tuning the social web and the economy over time, `npm run sim:month` runs 30-day colonies and prints how labels settle, what moved feelings (by cause), what changed labels, churn, drinking, work and remittances. Compare settings side by side on the same seeds: `npm run sim:month -- gossip.chance=0.6 vs job.help=0.0015` (options: `--seeds=`, `--days=`, `--size=`, `--rich`). See DESIGN.md §15.13 for the findings and the current drama tuning (help minimal, once-a-day events strong). Add tests for new simulation behavior. The simulation must stay deterministic (rules below). `tests/p1.test.ts` covers the map, the opening, building and demolishing; most other tests use the prebuilt start (`createState(seed)` defaults to it).
 - **Playtest feedback:** the user playtests on the live site and sends batches of notes. Fix bugs, record design decisions in DESIGN.md, and keep "provisional" notes up to date.
 
 ## Code rules that matter
@@ -27,10 +27,12 @@ Babel (working title) is a 1-bit, System 7 styled colony sim in the browser abou
   - The same seed plus the same command log must give the same game; tests check this.
   - State is plain JSON, and a save is a snapshot of it. **When SimState changes shape, bump `STATE_VERSION` (`sim.ts`) and add a step to `MIGRATIONS` in `save.ts`**, so saves made on the live site keep loading. New top-level fields are filled in automatically; new fields inside workers, sites and the like need the migration step.
   - Every player action is a `Command`, carrying a `playerId` so multiplayer stays possible (it isn't built).
+  - **A game's setup is `s.settings`** (difficulty, goal, starting camp, every knob). Read knobs from there, never from a difficulty table: `s.settings.quitBelow`, not `QUIT.lowMood`. The tables in tuning.ts are only where the presets get their numbers.
+  - **The map's height follows the goal,** so the ground row isn't a constant: `groundRow(s)`, `groundTop(s)`, `towerRoom(s)`, `deckRow(s, k)`, `standRow(s, k)`, `levelOfRow(s, y)` and the like all take the state. Where drift starts is `driftLine(s)`, not a number.
 - **Every balance number is in [`src/sim/tuning.ts`](../src/sim/tuning.ts).**
 - **The world is drawn 1-bit** (black ink, white paper, dither patterns) at native resolution and scaled by whole numbers. The camera moves in 4-pixel steps so patterns don't shimmer. Color is allowed only in the interface or overlays, with a reason.
 - **The interface** is DOM windows styled like System 7 (`src/ui/`).
-- **Debugging:** in the browser console, `babel.sim.state`, `babel.ui` and `babel.renderer` are available. `babel.sim.step()` advances one tick. To test something that takes game time, change state and step in a loop from the console, e.g. push a `{kind, label, value: -30, until}` moodlet onto a worker and step to the next shift to trigger a notice. `?start=prebuilt`, `?seed=` and `?difficulty=` in the URL skip the opening or pick a game.
+- **Debugging:** in the browser console, `babel.sim.state`, `babel.ui` and `babel.renderer` are available. `babel.sim.step()` advances one tick. To test something that takes game time, change state and step in a loop from the console, e.g. push a `{kind, label, value: -30, until}` moodlet onto a worker and step to the next shift to trigger a notice. A plain page load shows the New Game screen; `?seed=`, `?difficulty=`, `?start=prebuilt|large` and `?goal=` in the URL skip it and start at once (Medium, a goal of 30 and the opening unless given). `src/main.ts` only decides what the page starts with; the game's setup is `play()` in `src/game.ts`.
 
 ## Practical gotchas (learned the hard way)
 
@@ -129,9 +131,16 @@ Built and tested: the random map, the opening text and founding, placement mode 
 - **§16.9 step 6, the Stores window, is built, tested and checked in the browser** (DESIGN.md §16.9 step 6 has Claude's decisions). A row per good (stored, lying around, alert line) opens out to every store holding it, each with a Show button. The alert line is the `setAlertBelow` command; setting it never alerts on the spot. `src/ui/stores.ts` replaces the old totals table in `ui.ts`. The word **report** is still to come, with flags and bells.
 - **§16.9 step 7, saves, is built, tested and checked in the browser** (DESIGN.md §16.9 step 7). File menu → Saved Games: slots in localStorage, an Autosave at midnight, download and upload. Loading reloads the page with the save in sessionStorage. Maps are run-length encoded in saves.
 
+## Session 13 (2026-11-27)
+
+- **§16.9 step 8, the New Game screen, is built, tested and checked in the browser** (DESIGN.md §16.9 step 8 has every decision). Difficulty (Easy / Medium / Hard / Custom / Sandbox), the patron's goal (20 / 50 / 100 / 250 / 1,000), the starting camp (Nothing / Small / a new **Large** camp), every knob, and the sandbox's full stores and pre-built tower. The settings live in the state (`s.settings`, `STATE_VERSION` 13, a migration for version 12 saves). Quit Game comes back to it, and it can load a saved game.
+- **Drift scales with the goal** (the open question below, settled): from a tenth of the goal, fastest at the goal; identical to before against a goal of 30.
+- **Maps are as tall as the goal, plus a tenth:** the ground row comes from the map's height now (see Code rules). Checked at 1,000 levels: camera, sky, clouds (now as many as the sky is tall), pathing (reuses its buffers), saves (30 KB).
+- **Found, not fixed:** stores overfill when two deliveries arrive at once (they check for room when they set off). Older than this session; DESIGN.md §16.9 step 8 has the numbers.
+
 ## Next steps, in order
 
-1. **§16.9, step 8: the New Game screen** and taller maps, then 9 the title screen and Settings (its Load Game button opens the Saved Games window). Build in that order.
+1. **§16.9, step 9: the title screen** and Settings (its Load Game button opens the Saved Games window; until then the New Game screen has its own Load a Saved Game panel, `drawLoad` in `src/ui/newgame.ts`). The New Game screen is where its New Game button goes.
 2. **Flags and bells** (§16.7): fixtures, RAISE / LOWER / RING, range circles, heraldic hatching, and the word **report** (§16.9 step 6, the rest of the Stores plan). Then standing orders on boards.
 3. **Hauling, the rest of §16.8:** the rope pulley and winches up the tower, then the wagon, beasts of burden and the stable.
 4. **Art from the user:** the "Babel To Do" sheet (`art-src/Babel To Do.png`, refreshed 2026-11-26 with flags and bells; shelves, wheelbarrow and cart feed straight in, see SPRITES.md), more beards and hats for portraits, any redrawn cloud parts (save over `art-src/shots/cloud-parts.png` and import; check them in `art-src/picker/clouds.html` first). Each delivery: add its pieces to `tools/shots.ts`, run `npm run art:import`, and compare every box with the old art. Sheets go to the user as PNGs only.
@@ -148,4 +157,4 @@ Built and tested: the random map, the opening text and founding, placement mode 
 
 These are DESIGN.md §14, plus:
 - **The right edge of the map:** decided in session 4: the road to far-away lands (DESIGN.md §16), now 12 tiles wide.
-- **Level tuning vs. copy:** with the ground counted as level 1, drift starts at Tower Level 4 and the cap is Level 31 against a "Level 30" goal. Ask the user whether to retune to rounder levels. *(Revisit with §16.9 step 8: the tower goals become 20 / 50 / 100 / 250 / 1,000, so drift's start and cap need to scale with the goal anyway.)*
+- **Level tuning vs. copy:** *settled in session 13:* drift starts at a tenth of the goal and is fastest at the goal (the user approved). Against 30 it's still Tower Level 4 to Level 31.

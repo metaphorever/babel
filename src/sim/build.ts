@@ -105,7 +105,7 @@ export function groundUse(s: SimState): (string | null)[] {
   const mark = (x0: number, x1: number, label: string) => {
     for (let x = Math.max(0, x0); x <= Math.min(s.width - 1, x1); x++) use[x] = label;
   };
-  for (const site of s.sites) if (site.buildingId === null && site.y === groundRow()) mark(site.x0, site.x1, site.label);
+  for (const site of s.sites) if (site.buildingId === null && site.y === groundRow(s)) mark(site.x0, site.x1, site.label);
   for (const b of s.buildings) mark(b.x0, b.x1, b.name);
   if (s.tower) mark(s.tower.x0, s.tower.x1, 'Tower');
   mark(s.width - MAP.reservedRight, s.width - 1, 'The road to far-away lands');
@@ -126,20 +126,20 @@ export function footprint(s: SimState, req: PlaceRequest): Footprint {
   const width = placeWidth(req);
   const x0 = req.x0;
   const x1 = x0 + width - 1;
-  const fp: Footprint = { x0, x1, y: groundRow(), blocked: new Array(width).fill(false), building: null, towerLevel: null, error: null };
+  const fp: Footprint = { x0, x1, y: groundRow(s), blocked: new Array(width).fill(false), building: null, towerLevel: null, error: null };
   const off = (x: number) => x < 0 || x >= s.width;
 
   if (req.what === 'fixture') {
     // a wheelbarrow or cart is built on open ground (it's pushed about the ground afterwards)
     if (isVehicleKind(req.fixture)) {
-      fp.y = groundRow();
+      fp.y = groundRow(s);
       for (let i = 0; i < width; i++) if (off(x0 + i)) fp.blocked[i] = true;
       const g = groundFootprint(s, fp);
       if (g.error) g.error = `${g.error} A ${FIXTURE_LABEL[req.fixture].toLowerCase()} is built on open ground.`;
       return g;
     }
     const story = Math.max(0, Math.floor(req.story));
-    fp.y = storyRow(story);
+    fp.y = storyRow(s, story);
     // inside the tower's walls: a tower room
     if (s.tower && x1 >= s.tower.x0 && x0 <= s.tower.x1) return towerFootprint(s, req, fp, story);
     if (req.fixture === 'ladder') {
@@ -207,7 +207,7 @@ export function footprint(s: SimState, req: PlaceRequest): Footprint {
 function towerFootprint(s: SimState, req: Extract<PlaceRequest, { what: 'fixture' }>, fp: Footprint, level: number): Footprint {
   const t = s.tower!;
   fp.towerLevel = level;
-  fp.y = standRow(level);
+  fp.y = standRow(s, level);
   for (let i = 0; i < fp.blocked.length; i++) {
     const x = fp.x0 + i;
     const wall = x <= t.x0 || x >= t.x1;
@@ -344,8 +344,8 @@ export interface Job {
 export function campJobs(s: SimState): Job[] {
   const jobs: Job[] = [];
   for (const b of s.buildings) {
-    if (b.build) jobs.push({ kind: 'building', id: b.id, works: b.build, demolish: false, y: groundRow(), x0: b.x0, x1: b.x1, label: b.name });
-    else if (b.demolish && !s.sites.some((x) => x.buildingId === b.id)) jobs.push({ kind: 'building', id: b.id, works: b.demolish, demolish: true, y: groundRow(), x0: b.x0, x1: b.x1, label: b.name });
+    if (b.build) jobs.push({ kind: 'building', id: b.id, works: b.build, demolish: false, y: groundRow(s), x0: b.x0, x1: b.x1, label: b.name });
+    else if (b.demolish && !s.sites.some((x) => x.buildingId === b.id)) jobs.push({ kind: 'building', id: b.id, works: b.demolish, demolish: true, y: groundRow(s), x0: b.x0, x1: b.x1, label: b.name });
   }
   for (const site of s.sites) {
     const b = buildingOf(s, site);
@@ -506,7 +506,7 @@ function pleasePatron(s: SimState, units: number): void {
 
 /** A finished tower ladder: from its room up through a hole in the deck above. */
 function layLadder(s: SimState, site: Site): void {
-  const r = ladderRows(site.level);
+  const r = ladderRows(s, site.level);
   for (let x = site.x0; x <= site.x1; x++) for (let y = r.top; y <= r.bottom; y++) setTile(s, x, y, Tile.Ladder);
 }
 
@@ -515,7 +515,7 @@ function layLadder(s: SimState, site: Site): void {
  * left above with no other way down climbs down before it goes.
  */
 function removeLadder(s: SimState, site: Site): void {
-  const r = ladderRows(site.level);
+  const r = ladderRows(s, site.level);
   for (let x = site.x0; x <= site.x1; x++) for (let y = r.top; y <= r.bottom; y++) if (tileAt(s, x, y) === Tile.Ladder) setTile(s, x, y, y === r.top ? Tile.Deck : Tile.Air);
   const down = { x: site.x0, y: site.y };
   for (const w of s.workers) {
@@ -533,14 +533,14 @@ export const LADDER_WIDTH = 2;
 
 /** The second story's floor: a deck across the building with a ladder up its left end. */
 function layUpperFloor(s: SimState, b: Building): void {
-  const deck = houseDeckRow();
+  const deck = houseDeckRow(s);
   for (let x = b.x0; x <= b.x1; x++) setTile(s, x, deck, Tile.Deck);
-  for (let x = b.x0; x < b.x0 + LADDER_WIDTH; x++) for (let y = deck; y <= groundRow(); y++) setTile(s, x, y, Tile.Ladder);
+  for (let x = b.x0; x < b.x0 + LADDER_WIDTH; x++) for (let y = deck; y <= groundRow(s); y++) setTile(s, x, y, Tile.Ladder);
 }
 
 function finishDemolition(s: SimState, j: Job): void {
   const salvage = (m: BuildMaterial) => Math.floor(j.works.placed[m] * BUILD.salvage);
-  const at = siteCenter({ x0: j.x0, x1: j.x1, y: groundRow() });
+  const at = siteCenter({ x0: j.x0, x1: j.x1, y: groundRow(s) });
   let dropped = 0;
   for (const m of ['stone', 'wood'] as const) {
     for (let i = 0; i < salvage(m); i++) {
@@ -562,18 +562,18 @@ function finishDemolition(s: SimState, j: Job): void {
 
 /** Take the deck and ladder out. Anyone and anything up there comes down to the ground. */
 function clearUpperFloor(s: SimState, b: Building): void {
-  const deck = houseDeckRow();
+  const deck = houseDeckRow(s);
   for (let x = b.x0; x <= b.x1; x++) setTile(s, x, deck, Tile.Air);
-  for (let x = b.x0; x < b.x0 + LADDER_WIDTH; x++) for (let y = deck; y <= groundRow(); y++) if (tileAt(s, x, y) === Tile.Ladder) setTile(s, x, y, Tile.Air);
-  const inside = (x: number, y: number) => x >= b.x0 && x <= b.x1 && y < groundRow() && y > storyRow(2);
+  for (let x = b.x0; x < b.x0 + LADDER_WIDTH; x++) for (let y = deck; y <= groundRow(s); y++) if (tileAt(s, x, y) === Tile.Ladder) setTile(s, x, y, Tile.Air);
+  const inside = (x: number, y: number) => x >= b.x0 && x <= b.x1 && y < groundRow(s) && y > storyRow(s, 2);
   for (const w of s.workers) {
     if (!inside(w.x, w.y)) continue;
-    w.y = groundRow();
+    w.y = groundRow(s);
     w.path = [];
     w.pathGoal = null;
     w.stepProgress = 0;
   }
-  for (const it of s.items) if (inside(it.x, it.y)) it.y = groundRow();
+  for (const it of s.items) if (inside(it.x, it.y)) it.y = groundRow(s);
 }
 
 // ------------------------------------------------------------ demolishing
@@ -610,7 +610,7 @@ export function applyDemolish(s: SimState, t: DemolishTarget): void {
   const label = 'name' in thing ? thing.name : thing.label;
   if (thing.build) {
     const placed = thing.build.placed;
-    const y = 'stories' in thing ? groundRow() : thing.y;
+    const y = 'stories' in thing ? groundRow(s) : thing.y;
     const width = thing.x1 - thing.x0 + 1;
     let n = 0;
     for (const m of ['stone', 'wood'] as const) {

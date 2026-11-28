@@ -135,7 +135,7 @@ describe('session 6: conditions, IF / OTHERWISE, UNTIL, WAIT', () => {
       const w = s.workers[0];
       // start well away from it
       w.x = pile.x0 > 60 ? pile.x0 - 40 : pile.x1 + 40;
-      w.y = groundRow();
+      w.y = groundRow(s);
       const c = hand(s, w, [
         { order: makeOrder('IF', null, { cond: has(5, pile.num) }) },
         { order: makeOrder('WAIT'), count: 3 },
@@ -168,7 +168,7 @@ describe('session 6: conditions, IF / OTHERWISE, UNTIL, WAIT', () => {
   it('UNTIL stops a haul once the store has enough', () => {
     const s = quiet();
     const pile = emptyPile(s);
-    const gy = groundRow();
+    const gy = groundRow(s);
     for (let i = 0; i < 10; i++) s.items.push({ id: s.nextId++, type: 'stone', x: pile.x1 + 4 + i, y: gy, reservedBy: null });
     const w = s.workers[0];
     const to = { fixture: 'STOCKPILE' as const, n: pile.num };
@@ -350,7 +350,7 @@ describe('session 6: wheelbarrows and carts', () => {
   it('"haul … using cart" moves far more per trip than by hand', () => {
     const { s, cart } = withCart();
     const pile = emptyPile(s);
-    const gy = groundRow();
+    const gy = groundRow(s);
     // twelve stone lying together, a way off from the stockpile
     const at = pile.x1 + 30 < s.width - 20 ? pile.x1 + 30 : pile.x0 - 40;
     for (let i = 0; i < 12; i++) s.items.push({ id: s.nextId++, type: 'stone', x: at + (i % 4), y: gy, reservedBy: null });

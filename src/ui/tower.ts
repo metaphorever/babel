@@ -1,4 +1,4 @@
-import { currentStipend, floorName, type Sim, type SimState } from '../sim';
+import { currentStipend, difficultyLabel, floorName, type Sim, type SimState } from '../sim';
 import { activeProject, projectFraction, standRow } from '../sim/tower';
 import { siteTitle } from '../sim/world';
 import { bar, clear, h } from './dom';
@@ -26,7 +26,7 @@ export class TowerPanel {
         'div',
         { class: 'row row-end' },
         this.error,
-        h('button', { class: 'btn', onclick: () => this.s.tower && this.goTo((this.s.tower.x0 + this.s.tower.x1) / 2, standRow(this.s.floors)) }, 'Go to the top'),
+        h('button', { class: 'btn', onclick: () => this.s.tower && this.goTo((this.s.tower.x0 + this.s.tower.x1) / 2, standRow(this.s, this.s.floors)) }, 'Go to the top'),
         h('button', { class: 'btn btn-default', onclick: () => this.blueprint() }, 'Draw a blueprint'),
       ),
     );
@@ -46,12 +46,12 @@ export class TowerPanel {
     clear(this.body);
     const kv = (k: string, v: Node | string) => h('div', { class: 'kv' }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v));
     this.body.append(kv('Height', s.floors === 0 ? 'Nothing built yet' : `${s.floors} ${s.floors === 1 ? 'level' : 'levels'}, up to ${floorName(s.floors, true)}`));
-    this.body.append(kv('Patron’s goal', 'Tower Level 30: catch a cloud in a jar'));
+    this.body.append(kv('Patron’s goal', `${floorName(s.settings.goal, true)}: catch a cloud in a jar`));
     this.body.append(
       h('div', { class: 'section-label' }, 'The patron'),
       h('div', { class: 'need' }, h('span', { class: 'k' }, 'Patience'), bar(s.patience), h('span', { class: 'num' }, `${Math.round(s.patience)}%`)),
       kv('Stipend', s.patience > 0 ? `${currentStipend(s)} gold each dawn` : 'Stopped until the tower grows'),
-      kv('Difficulty', s.difficulty),
+      kv('Difficulty', difficultyLabel(s.settings.difficulty)),
       h('div', { class: 'hint' }, 'Patience drains steadily. Each finished level wins some back and brings a bonus. While the patron is pleased, newcomers arrive on the road.'),
     );
 

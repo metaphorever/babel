@@ -1,6 +1,6 @@
 import { FIXTURE_WORD_KIND, STORES_FOR, levelName, type Place } from './lang';
 import { randInt } from './rng';
-import { BUILD, FIXTURE_LABEL, MAP, WORLD } from './tuning';
+import { BUILD, FIXTURE_LABEL, MAP, TOWER, WORLD, mapHeight } from './tuning';
 import { FIXTURE_KINDS, Tile, isVehicleKind, type Building, type FixtureKind, type ItemType, type NatureKind, type Pt, type SimState, type Site, type SiteKind } from './types';
 
 export function tileAt(s: SimState, x: number, y: number): number {
@@ -34,9 +34,19 @@ export function emptyStore(): Record<ItemType, number> {
   return { stone: 0, wood: 0, grain: 0, bread: 0, beer: 0 };
 }
 
+/** The first solid row: the ground, WORLD.below rows deep, at the bottom of the map. The map's height follows the patron's goal. */
+export function groundTop(s: SimState): number {
+  return s.height - WORLD.below;
+}
+
 /** The row workers stand on, on the ground. */
-export function groundRow(): number {
-  return WORLD.groundRow - 1;
+export function groundRow(s: SimState): number {
+  return groundTop(s) - 1;
+}
+
+/** How many levels of tower this map has room for. */
+export function towerRoom(s: SimState): number {
+  return Math.floor((groundTop(s) - WORLD.above) / TOWER.floorHeight);
 }
 
 /**
@@ -48,18 +58,18 @@ export function groundRow(): number {
 export const HOUSE_STORY_ROWS = 3;
 
 /** The row workers stand on in a building's story (0 = ground floor, 1 = upstairs). */
-export function storyRow(story: number): number {
-  return groundRow() - story * HOUSE_STORY_ROWS;
+export function storyRow(s: SimState, story: number): number {
+  return groundRow(s) - story * HOUSE_STORY_ROWS;
 }
 
 /** The row of the unseen deck a building's upstairs stands on. */
-export function houseDeckRow(): number {
-  return storyRow(1) + 1;
+export function houseDeckRow(s: SimState): number {
+  return storyRow(s, 1) + 1;
 }
 
 /** Which story of a building a row is in. The deck belongs to the room below it. */
-export function storyOfRow(y: number): number {
-  return Math.max(0, Math.floor((groundRow() - y) / HOUSE_STORY_ROWS));
+export function storyOfRow(s: SimState, y: number): number {
+  return Math.max(0, Math.floor((groundRow(s) - y) / HOUSE_STORY_ROWS));
 }
 
 export interface SiteInit {
@@ -86,7 +96,7 @@ export function newSite(s: SimState, d: SiteInit): Site {
     named: false,
     x0: d.x0,
     x1: d.x1,
-    y: d.y ?? groundRow(),
+    y: d.y ?? groundRow(s),
     level: d.level ?? 0,
     store: emptyStore(),
     capacity: d.capacity === undefined ? null : d.capacity,
@@ -136,9 +146,9 @@ export function newBuilding(s: SimState, kind: Building['kind'], name: string, x
 
 function fillGround(s: SimState): void {
   s.width = WORLD.width;
-  s.height = WORLD.height;
+  s.height = mapHeight(s.settings.goal);
   s.tiles = new Array(s.width * s.height).fill(Tile.Air);
-  for (let y = WORLD.groundRow; y < s.height; y++) {
+  for (let y = groundTop(s); y < s.height; y++) {
     for (let x = 0; x < s.width; x++) setTile(s, x, y, Tile.Dirt);
   }
 }
@@ -165,7 +175,7 @@ function addShack(s: SimState, x0: number): void {
 /** The patron's starting supplies: a pile to take from until there's somewhere to store things. */
 function addSupplies(s: SimState, x0: number): void {
   const pile = newSite(s, { kind: 'stockpile', label: "Patron's supplies", x0, x1: x0 + MAP.supplies - 1, capacity: 0, supplies: true });
-  for (const [k, n] of Object.entries(BUILD.supplies)) pile.store[k as ItemType] = n;
+  for (const [k, n] of Object.entries(BUILD.supplies)) pile.store[k as ItemType] = Math.round(n * s.settings.supplies);
   s.sites.push(pile);
 }
 

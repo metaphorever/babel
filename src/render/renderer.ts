@@ -1,12 +1,15 @@
-import { CONFUSION, MOOD, floorName, TOWER, Tile, WORLD, darkness, hourOf, type Building, type SimState, type Site, type Worker } from '../sim';
+import { CONFUSION, MOOD, floorName, TOWER, Tile, darkness, hourOf, type Building, type SimState, type Site, type Worker } from '../sim';
 import { activeProject, deckRow, projectFraction } from '../sim/tower';
 import { worksFraction } from '../sim/build';
-import { buildingLabel, groundRow, HOUSE_STORY_ROWS } from '../sim/world';
+import { buildingLabel, groundRow, groundTop, HOUSE_STORY_ROWS } from '../sim/world';
 import { INK, PAPER, Patterns, type PatternName } from './patterns';
 import { cloudSprite, itemSprite, nightSky, propSprite, thoughtSprite, workerSprite, worldSprite } from './sprites';
 
 /** Height in pixels of one story of a building: its rooms stack straight on top of each other. */
 const STORY_PX = HOUSE_STORY_ROWS * 8;
+/** Sky pixels per cloud (the old 30-level map had 18 over 852 px), and the tallest a cloud picture gets, for skipping ones out of view. */
+const CLOUD_SPACING = 48;
+const CLOUD_MAX_H = 96;
 const ROOF_PX = 6;
 
 /** Set pieces drawn whole from the world art. */
@@ -273,10 +276,10 @@ export class Renderer {
   }
 
   /** A generic building from its tileable parts: walls (with a door and windows) story by story, and a roof. */
-  private drawBuilding(_s: SimState, b: Building): void {
+  private drawBuilding(s: SimState, b: Building): void {
     const left = b.x0 * TILE;
     const n = b.x1 - b.x0 + 1;
-    const base = (groundRow() + 1) * TILE;
+    const base = (groundRow(s) + 1) * TILE;
     const height = buildingHeight(b.stories);
     const draw = () => {
       if (b.kind === 'shack') {
@@ -537,10 +540,10 @@ export class Renderer {
    */
   private drawSky(s: SimState, cx: number, cy: number, bw: number, bh: number): void {
     const d = darkness(s.tick);
-    const horizon = (WORLD.groundRow - 9) * TILE; // just above the rooftops and treetops (two-story buildings included)
+    const horizon = (groundTop(s) - 9) * TILE; // just above the rooftops and treetops (two-story buildings included)
     const towerL = s.tower ? s.tower.x0 * TILE : -1;
     const towerR = s.tower ? (s.tower.x1 + 1) * TILE : -1;
-    const towerTop = s.tower ? (deckRow(s.floors) - TOWER.floorHeight) * TILE : Infinity; // the open story above the top floor
+    const towerTop = s.tower ? (deckRow(s, s.floors) - TOWER.floorHeight) * TILE : Infinity; // the open story above the top floor
     const inSky = (x: number, y: number) => y < horizon && !(x >= towerL && x < towerR && y >= towerTop);
     const pattern: PatternName | null = d < 0.15 ? null : d < 0.4 ? 'sparse' : d < 0.6 ? 'light' : d < 0.85 ? 'checker' : 'dark';
     const skyBottom = Math.min(horizon, cy + bh);
@@ -606,8 +609,13 @@ export class Renderer {
    */
   private drawClouds(s: SimState, cy: number, bh: number): void {
     const groundPx = s.height * TILE;
-    for (let i = 0; i < 18; i++) {
-      const y = groundPx - 260 - ((i * 131) % (groundPx - 300));
+    const span = groundPx - 300;
+    // as many clouds as the sky is tall, so a 1,000-level sky is as cloudy as a 30-level one (18 over the old 30-level map)
+    const n = Math.max(18, Math.round(span / CLOUD_SPACING));
+    for (let i = 0; i < n; i++) {
+      const y = groundPx - 260 - ((i * 131) % span);
+      // well off screen: don't build its picture at all (a tall sky has hundreds)
+      if (y + 10 < cy || y - CLOUD_MAX_H > cy + bh) continue;
       const drift = i * 197 + Math.floor(s.tick / (40 + (i % 5) * 15));
       const spr = cloudSprite(s.seed, i);
       if (spr) {
@@ -634,7 +642,7 @@ export class Renderer {
   private drawWagon(s: SimState, left: number, base: number): void {
     let x = left;
     let frame = 0;
-    if (s.start === 'opening' && s.tick < WAGON_ARRIVE_TICKS) {
+    if (s.settings.start === 'opening' && s.tick < WAGON_ARRIVE_TICKS) {
       const spr = worldSprite('nature.wagon');
       const from = -spr.width;
       x = Math.round(from + ((left - from) * s.tick) / WAGON_ARRIVE_TICKS);
@@ -775,7 +783,7 @@ export class Renderer {
     }
     for (const b of s.buildings) {
       const mid = ((b.x0 + b.x1 + 1) / 2) * TILE;
-      const ground = (groundRow() + 1) * TILE;
+      const ground = (groundRow(s) + 1) * TILE;
       tag(buildingLabel(s, b) + status(b.build, b.demolish), (mid - cx) * z, (ground - cy) * z + 6 * this.dpr);
     }
     if (s.tower) {
@@ -784,11 +792,11 @@ export class Renderer {
       // a tag whose left edge sits at x
       const tagLeft = (text: string, x: number, y: number) => tag(text, x + (ctx.measureText(text).width + 6 * this.dpr) / 2, y);
       for (let k = 1; k <= s.floors; k++) {
-        tagLeft(`${k + 1}`, right, (deckRow(k) * TILE - cy) * z - 4 * this.dpr);
+        tagLeft(`${k + 1}`, right, (deckRow(s, k) * TILE - cy) * z - 4 * this.dpr);
       }
       const p = activeProject(s);
       if (p) {
-        tagLeft(`${floorName(p.level, true)}: ${Math.floor(projectFraction(p) * 100)}%`, right, (deckRow(p.level) * TILE - cy) * z - 4 * this.dpr);
+        tagLeft(`${floorName(p.level, true)}: ${Math.floor(projectFraction(p) * 100)}%`, right, (deckRow(s, p.level) * TILE - cy) * z - 4 * this.dpr);
       }
     }
     for (const w of s.workers) {
@@ -819,7 +827,7 @@ export class Renderer {
       if (wx >= left && wx < right && wy >= top && wy <= floor + (site.buildingId !== null ? 0 : 14)) return { kind: 'site', site };
     }
     for (const b of s.buildings) {
-      const ground = (groundRow() + 1) * TILE;
+      const ground = (groundRow(s) + 1) * TILE;
       if (wx >= b.x0 * TILE && wx < (b.x1 + 1) * TILE && wy >= ground - buildingHeight(b.stories) && wy <= ground + 14) return { kind: 'building', building: b };
     }
     return null;

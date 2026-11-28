@@ -17,8 +17,9 @@ import {
   type Verb,
 } from './lang';
 import { pick, rand } from './rng';
-import { CONFUSION, DRIFT, TOWER, WORLD } from './tuning';
+import { CONFUSION, DRIFT, TOWER } from './tuning';
 import type { SimState, Worker } from './types';
+import { groundRow } from './world';
 
 // Language drift. The higher a worker spends their time, the more their
 // words slip into another tongue, one word at a time. Names never drift.
@@ -30,8 +31,8 @@ export function allWords(): TokenId[] {
 }
 
 /** Which tower level a row is on (0 = the ground). Between floors counts as the lower one. */
-export function levelOfRow(y: number): number {
-  return Math.max(0, Math.floor((WORLD.groundRow - 1 - y) / TOWER.floorHeight));
+export function levelOfRow(s: SimState, y: number): number {
+  return Math.max(0, Math.floor((groundRow(s) - y) / TOWER.floorHeight));
 }
 
 export function knows(w: Worker, tok: Token): boolean {
@@ -43,16 +44,43 @@ export function knowsWord(w: Worker, t: TokenId, lang: LangId): boolean {
   return w.vocab[lang]?.includes(t) ?? false;
 }
 
+/** The lowest level (0 = the ground) where words start to drift: about a tenth of the way to the goal (3 of 30). */
+export function driftLine(s: SimState): number {
+  return Math.max(1, Math.round(s.settings.goal * DRIFT.lineShare));
+}
+
+/** How tall the tower must be before workers can drift into a language (French at 3 and Greek at 5 against a goal of 30). */
+export function langFromFloor(s: SimState, id: LangId): number {
+  if (id === 'en') return Infinity;
+  const fr = Math.max(1, Math.round(s.settings.goal * DRIFT.langShare.fr));
+  if (id === 'fr') return fr;
+  return Math.max(fr + 1, Math.round(s.settings.goal * DRIFT.langShare.el));
+}
+
+/**
+ * Exposure per tick at a level: none below the line, DRIFT.rate at it,
+ * climbing evenly to DRIFT.rateAtGoal at the goal and no faster above it,
+ * times the game's drift speed.
+ */
+export function driftRate(s: SimState, level: number): number {
+  const line = driftLine(s);
+  if (level < line) return 0;
+  const top = Math.max(line + 1, s.settings.goal);
+  const perLevel = (DRIFT.rateAtGoal - DRIFT.rate) / (top - line);
+  return (DRIFT.rate + (Math.min(level, top) - line) * perLevel) * s.settings.driftSpeed;
+}
+
 /** Languages a worker can drift into, given how tall the tower is. */
 export function driftPool(s: SimState): LangId[] {
-  return LANGS.filter((l) => l.id !== 'en' && l.fromFloor <= s.floors).map((l) => l.id);
+  return LANGS.filter((l) => l.id !== 'en' && langFromFloor(s, l.id) <= s.floors).map((l) => l.id);
 }
 
 /** Per tick: build exposure high up, let it fade on the ground, drift a word when it fills. */
 export function updateDrift(s: SimState, w: Worker): void {
-  const level = levelOfRow(w.y);
-  if (level >= DRIFT.lineFloor && driftPool(s).length > 0) {
-    w.exposure += DRIFT.rate + (level - DRIFT.lineFloor) * DRIFT.ratePerFloor;
+  const level = levelOfRow(s, w.y);
+  const rate = driftRate(s, level);
+  if (rate > 0 && driftPool(s).length > 0) {
+    w.exposure += rate;
     if (w.exposure >= DRIFT.threshold) {
       w.exposure -= DRIFT.threshold;
       driftWord(s, w);

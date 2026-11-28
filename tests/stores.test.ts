@@ -54,7 +54,7 @@ describe('§16.9 step 6: the Stores window', () => {
     sim.enqueue({ type: 'setAlertBelow', playerId: 0, good: 'stone', below: 40 });
     for (let i = 0; i < 300; i++) sim.step();
     expect(sim.state.alertBelow.stone).toBe(40);
-    const again = replay(5, sim.history, 300, sim.state.difficulty, sim.state.start);
+    const again = replay(5, sim.history, 300, sim.state.settings);
     expect(JSON.stringify(again)).toBe(JSON.stringify(sim.state));
   });
 });

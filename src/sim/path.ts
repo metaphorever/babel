@@ -6,23 +6,49 @@ import { standable, tileAt } from './world';
  * up or down one tile, climb ladders. Returns the steps after the start,
  * ending at the goal, or null if the goal can't be reached.
  *
- * The world is small (a few thousand tiles) and there are at most 30
- * workers, so plain BFS is plenty. Neighbor order is fixed, which keeps
- * paths deterministic.
+ * Only standable tiles are searched (the ground and the tower), and there
+ * are at most 30 workers, so plain BFS is plenty. Neighbor order is fixed,
+ * which keeps paths deterministic.
+ *
+ * The two buffers are as big as the map (most of a million tiles on a
+ * 1,000-level map), so they're kept between searches rather than made each
+ * time; `prev` is put back to -1 only where a search touched it. They hold
+ * nothing from one search to the next, so the result never depends on them.
  */
+let prevBuf = new Int32Array(0);
+let queueBuf = new Int32Array(0);
+
 export function findPath(s: SimState, from: Pt, to: Pt): Pt[] | null {
   if (from.x === to.x && from.y === to.y) return [];
   if (!standable(s, to.x, to.y)) return null;
   const W = s.width;
   const N = W * s.height;
-  const prev = new Int32Array(N).fill(-1);
+  if (prevBuf.length < N) {
+    prevBuf = new Int32Array(N).fill(-1);
+    queueBuf = new Int32Array(N);
+  }
+  const prev = prevBuf;
+  const queue = queueBuf;
+  try {
+    return search(s, from, to, prev, queue);
+  } finally {
+    // every tile a search marks is in the queue
+    for (let i = 0; i < searched; i++) prev[queue[i]] = -1;
+  }
+}
+
+let searched = 0;
+
+function search(s: SimState, from: Pt, to: Pt, prev: Int32Array, queue: Int32Array): Pt[] | null {
+  const W = s.width;
   const start = from.y * W + from.x;
   const goal = to.y * W + to.x;
   prev[start] = start;
-  const queue = new Int32Array(N);
+  searched = 0;
   let head = 0;
   let tail = 0;
   queue[tail++] = start;
+  searched = tail;
   const nb: number[] = [];
   while (head < tail) {
     const cur = queue[head++];
@@ -35,6 +61,7 @@ export function findPath(s: SimState, from: Pt, to: Pt): Pt[] | null {
       if (prev[n] !== -1) continue;
       prev[n] = cur;
       queue[tail++] = n;
+      searched = tail;
     }
   }
   if (prev[goal] === -1) return null;

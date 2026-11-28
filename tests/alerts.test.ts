@@ -133,18 +133,18 @@ describe('§16.9 step 5: alerts', () => {
 
   it("the patron's goal: once, with the score", () => {
     const s = createState(12);
-    expect(s.goal).toBe(TOWER.goal);
-    s.floors = s.goal - 1;
+    expect(s.settings.goal).toBe(TOWER.goal);
+    s.floors = s.settings.goal - 1;
     checkGoal(s);
     expect(kinds(s, 'goal')).toHaveLength(0);
-    s.floors = s.goal;
+    s.floors = s.settings.goal;
     s.tick = TIME.dayTicks * 20;
     s.gold = 512;
     checkGoal(s);
     checkGoal(s);
     expect(kinds(s, 'goal')).toHaveLength(1);
     expect(daysPlayed(s)).toBe(20);
-    expect(score(s)).toBe((s.goal * ALERTS.scorePerLevel) / 20 + 512);
+    expect(score(s)).toBe((s.settings.goal * ALERTS.scorePerLevel) / 20 + 512);
     expect(ALERTS.scorePerLevel).toBe(10000);
     expect(kinds(s, 'goal')[0].text).toContain(`Your score is 15,512: 30 levels × 10,000 ÷ 20 days, plus 512 gold`);
     expect(s.won).toBe(true);

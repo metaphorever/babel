@@ -1,6 +1,6 @@
 import {
   availableGold,
-  DRIFT,
+  driftLine,
   levelName,
   ALL,
   FOREVER,
@@ -9,7 +9,6 @@ import {
   clockText,
   isNight,
   currentStipend,
-  QUIT,
   complaintsText,
   whenText,
   langName,
@@ -142,7 +141,7 @@ export class Ui {
     this.wm.create('log', 'Log', 16, -220, 440);
     this.buildHelp();
     // at the opening, the opening text does the welcoming
-    if (this.sim.state.start !== 'opening') {
+    if (this.sim.state.settings.start !== 'opening') {
       this.wm.show('board');
       this.wm.show('help');
     }
@@ -381,9 +380,9 @@ export class Ui {
       w.leaving
         ? kv('Leaving', 'Walking home for good')
         : w.noticeUntil !== null
-          ? kv('Giving notice', `Fed up with ${complaintsText(w)}. Leaves at ${whenText(w.noticeUntil)} (in ${formatTime(Math.max(0, w.noticeUntil - this.s.tick))}) unless their mood rises to ${QUIT.lowMood}.`)
+          ? kv('Giving notice', `Fed up with ${complaintsText(w)}. Leaves at ${whenText(w.noticeUntil)} (in ${formatTime(Math.max(0, w.noticeUntil - this.s.tick))}) unless their mood rises to ${this.s.settings.quitBelow}.`)
           : w.fedUpSince !== null && w.fedUpSince !== undefined
-            ? kv('Fed up', `With ${complaintsText(w)}. Unless their mood is back to ${QUIT.lowMood} by the end of the shift, they'll put in notice.`)
+            ? kv('Fed up', `With ${complaintsText(w)}. Unless their mood is back to ${this.s.settings.quitBelow} by the end of the shift, they'll put in notice.`)
             : '',
       w.bag.length ? kv('Bag', `${w.bag.length} to deliver`) : '',
       w.held.length ? h('div', { class: 'section-label' }, 'In hand') : '',
@@ -521,7 +520,7 @@ export class Ui {
         h('li', {}, h('b', {}, 'B'), ' the Build window · ', h('b', {}, 'Esc'), ' stop placing · ', h('b', {}, '[ ]'), ' building width'),
         h('li', {}, h('b', {}, 'Space'), ' pause · ', h('b', {}, '1 2 3'), ' speed · ', h('b', {}, 'N'), ' show all names'),
       ),
-      h('p', { class: 'hint' }, `Languages drift from ${levelName(DRIFT.lineFloor)} up (see the Languages window). Keep the patron pleased by finishing levels, and keep your workers fed or they’ll quit (a bonus, from a worker’s window, can talk a fed-up worker round). Not in yet: mailboxes, upper job boards, COPY.`),
+      h('p', { class: 'hint' }, `Languages drift from ${levelName(driftLine(this.s))} up (see the Languages window). Keep the patron pleased by finishing levels, and keep your workers fed or they’ll quit (a bonus, from a worker’s window, can talk a fed-up worker round). Not in yet: mailboxes, upper job boards, COPY.`),
       // the reference that used to be spread around the windows, folded away until wanted
       h(
         'details',

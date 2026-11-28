@@ -1,6 +1,8 @@
+import { gameSettings, isPreset } from './settings';
 import { createState, STATE_VERSION } from './sim';
 import { dayOf } from './time';
-import type { SimState } from './types';
+import { TOWER } from './tuning';
+import type { GameSettings, SimState } from './types';
 
 // Saves (§16.9 step 7). The game state is plain data, so a save is a
 // snapshot of it, wrapped with what the save list shows. Pure, like the rest
@@ -21,7 +23,9 @@ export interface SaveSummary {
   floors: number;
   workers: number;
   gold: number;
-  difficulty: SimState['difficulty'];
+  difficulty: GameSettings['difficulty'];
+  /** The patron's goal (saves from before the New Game screen don't have it: 30). */
+  goal?: number;
 }
 
 /** The interface's part of a game: kept with the save, never read by the sim. */
@@ -48,7 +52,7 @@ export interface SaveFile {
 }
 
 export function saveSummary(s: SimState): SaveSummary {
-  return { day: dayOf(s.tick), floors: s.floors, workers: s.workers.filter((w) => !w.leaving).length, gold: s.gold, difficulty: s.difficulty };
+  return { day: dayOf(s.tick), floors: s.floors, workers: s.workers.filter((w) => !w.leaving).length, gold: s.gold, difficulty: s.settings.difficulty, goal: s.settings.goal };
 }
 
 /** Tiles as "value*run" pairs: "0*4210,3*192,…". */
@@ -78,14 +82,26 @@ export function decodeTiles(text: string): number[] | null {
 
 /** A snapshot of the game, ready to be written out as JSON. */
 export function makeSave(s: SimState, name: string, savedAt: string, ui: SaveUi = {}): SaveFile {
-  const copy = JSON.parse(JSON.stringify(s)) as SimState;
-  const tilesRle = encodeTiles(copy.tiles);
+  // the map goes in encoded, never copied as it is (a 1,000-level map is most of a million tiles)
+  const tiles = s.tiles;
+  const copy = JSON.parse(JSON.stringify(s, (_k, v: unknown) => (v === tiles ? [] : v))) as Omit<SimState, 'tiles'>;
+  const tilesRle = encodeTiles(tiles);
   const state = { ...copy, tiles: [] as [], tilesRle };
   return { format: SAVE_FORMAT, saveVersion: SAVE_VERSION, name, savedAt, summary: saveSummary(s), ui, state };
 }
 
 /** One step per SimState version: MIGRATIONS[n] brings a version-n state up to n + 1. */
-const MIGRATIONS: Record<number, (s: Record<string, unknown>) => void> = {};
+const MIGRATIONS: Record<number, (s: Record<string, unknown>) => void> = {
+  // 12 → 13 (§16.9 step 8): the difficulty, the start and the goal move into the game's settings, with the knobs a
+  // difficulty had then. The map was made for a goal of 30, and its height says so.
+  12: (st) => {
+    const start = st.start === 'opening' ? 'opening' : 'prebuilt';
+    st.settings = gameSettings(isPreset(st.difficulty) ? st.difficulty : 'normal', start, { goal: typeof st.goal === 'number' ? st.goal : TOWER.goal });
+    delete st.difficulty;
+    delete st.start;
+    delete st.goal;
+  },
+};
 
 /** The oldest state version a save can be brought up from. */
 export const OLDEST_STATE_VERSION = 12;
@@ -124,15 +140,16 @@ export function readSave(input: string | unknown): ReadResult {
   for (const key of ['workers', 'sites', 'buildings', 'items', 'alerts', 'events']) if (!Array.isArray(st[key])) return { ok: false, error: `That save is damaged: it has no ${key}.` };
   if (typeof st.seed !== 'number' || typeof st.tick !== 'number') return { ok: false, error: 'That save is damaged.' };
   // anything newer than the save, from a fresh game of the same seed
-  const fresh = createState(st.seed, (st.difficulty as SimState['difficulty']) ?? 'normal', (st.start as SimState['start']) ?? 'prebuilt') as unknown as Record<string, unknown>;
-  const filled: string[] = [];
-  for (const k of Object.keys(fresh)) {
-    if (!(k in st)) {
-      st[k] = fresh[k];
-      filled.push(k);
-    }
+  if (!st.settings || typeof st.settings !== 'object') return { ok: false, error: 'That save is damaged: it has no settings.' };
+  // which fields are missing is the same for any game, so a small default one says; only then make the real one
+  const order = Object.keys(createState(st.seed));
+  const filled = order.filter((k) => !(k in st));
+  if (filled.length > 0) {
+    const fresh = createState(st.seed, gameSettings('normal', 'prebuilt', st.settings as Partial<GameSettings>)) as unknown as Record<string, unknown>;
+    for (const k of filled) st[k] = fresh[k];
   }
-  const state = st as unknown as SimState;
+  // fields in a new game's order, so a migrated game is the same as one that was always this version, down to its JSON
+  const state = Object.fromEntries([...order, ...Object.keys(st).filter((k) => !order.includes(k))].map((k) => [k, st[k]])) as unknown as SimState;
   const save: SaveFile = {
     format: SAVE_FORMAT,
     saveVersion: SAVE_VERSION,

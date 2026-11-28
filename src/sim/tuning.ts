@@ -10,20 +10,37 @@ export const TIME = {
   startHour: 7,
 };
 
-/** Tallest tower the world has room for (the patron's goals go beyond this later). */
-const MAX_FLOORS = 30;
 const FLOOR_HEIGHT = 4; // tiles per story: a deck plus three rows of headroom
 
+/**
+ * The map: sky above, the ground below. Its height follows the patron's
+ * goal (mapHeight), with room above the goal so "Keep Playing" has
+ * somewhere to go.
+ */
 export const WORLD = {
   width: 192,
-  groundRow: 8 + MAX_FLOORS * FLOOR_HEIGHT, // first solid row
-  height: 8 + MAX_FLOORS * FLOOR_HEIGHT + 16,
+  /** Rows of sky above the tallest tower the map has room for. */
+  above: 8,
+  /** Rows of ground under the surface. */
+  below: 16,
+  /** Room above the goal: this share of it, at least headroomMin levels (30 → 33, 1,000 → 1,100). */
+  headroom: 0.1,
+  headroomMin: 3,
 };
 
+/** Levels of tower a map made for this goal has room for. */
+export function towerRoomFor(goal: number): number {
+  return goal + Math.max(WORLD.headroomMin, Math.round(goal * WORLD.headroom));
+}
+
+/** Rows in a map made for this goal. */
+export function mapHeight(goal: number): number {
+  return WORLD.above + towerRoomFor(goal) * FLOOR_HEIGHT + WORLD.below;
+}
+
 export const TOWER = {
-  maxFloors: MAX_FLOORS,
-  /** The patron's goal, in levels (the New Game screen will offer 20 / 50 / 100 / 250 / 1,000). */
-  goal: MAX_FLOORS,
+  /** The patron's goal before the New Game screen (§16.9 step 8): what createState(seed) and old saves get. */
+  goal: 30,
   floorHeight: FLOOR_HEIGHT,
   /** Width of every floor, in tiles. The player picks where it stands. */
   width: 16,
@@ -207,12 +224,23 @@ export const LOGIC = {
   waitMaxHours: 48,
 };
 
+/**
+ * Drift scales with the patron's goal (§16.9 step 8; the user approved
+ * Claude's proposal): it starts at about a tenth of the goal and climbs to
+ * its fastest at the goal, where it levels off. Against a goal of 30 that's
+ * what it always was: from Tower Level 4 (level 3, counting the ground as
+ * 0), 0.08 a tick there and 0.03 more per level, up to 0.89 on the roof of
+ * the 30th. driftLine and driftRate in drift.ts work it out.
+ */
 export const DRIFT = {
-  /** Workers on this floor or higher build up exposure. */
-  lineFloor: 3,
-  /** Exposure per tick at the drift line, and extra per floor above it. */
+  /** Workers at this share of the goal or higher (rounded, at least level 1) build up exposure. */
+  lineShare: 0.1,
+  /** Exposure per tick at the drift line... */
   rate: 0.08,
-  ratePerFloor: 0.03,
+  /** ...climbing evenly to this at the goal, and no faster above it. */
+  rateAtGoal: 0.89,
+  /** Each language opens once the tower is this share of the goal tall (French at 3 and Greek at 5 of 30). Greek always after French. */
+  langShare: { fr: 0.1, el: 1 / 6 } as Record<'fr' | 'el', number>,
   /** On the ground, exposure fades this much per tick. */
   decay: 0.02,
   /** A word drifts each time exposure reaches this. */
@@ -240,7 +268,10 @@ export const LESSON = {
   pull: 48,
 };
 
+/** The difficulty presets. "Medium" on the New Game screen is 'normal'. */
 export type Difficulty = 'easy' | 'normal' | 'hard';
+/** What the New Game screen offers: a preset, your own knobs, or the sandbox. */
+export type DifficultyChoice = Difficulty | 'custom' | 'sandbox';
 
 export const PATRON = {
   /** How often the standing charter checks whether anyone is writing. */
@@ -628,4 +659,40 @@ export const REMIT = {
   /** The moodlet: this much plus this much per gold sent, up to a cap, for a day. */
   mood: { base: 4, perGold: 0.15, max: 12 },
   moodTicks: TIME.dayTicks,
+};
+
+/**
+ * The New Game screen (§16.9 step 8). The presets take their numbers from
+ * the tables above (PATRON, QUIT, ARRIVALS, ...), so Medium is the game as
+ * it was. Custom and Sandbox open every knob, within these limits.
+ */
+export const NEW_GAME = {
+  goals: [
+    { label: 'Small', levels: 20 },
+    { label: 'Medium', levels: 50 },
+    { label: 'Large', levels: 100 },
+    { label: 'Monumental', levels: 250 },
+    { label: 'Infinite', levels: 1000 },
+  ],
+  /** The screen's first choice of goal: the closest to the 30 every playtest so far has had. */
+  defaultGoal: 20,
+  /** Custom knobs: lowest and highest the screen takes. */
+  limits: {
+    stipend: [0, 5000],
+    /** Patience points lost a day (the sim keeps it per tick). */
+    patiencePerDay: [0, 100],
+    quitBelow: [0, 60],
+    noticeShifts: [1, 12],
+    /** Starting goods, times the usual. */
+    supplies: [0, 10],
+    gold: [0, 100000],
+    /** Hours between the patron's chances to send a newcomer (0: never). */
+    arrivalHours: [0, 240],
+    recruitFee: [0, 500],
+    /** Drift speed, times the usual (0: no drift). */
+    driftSpeed: [0, 5],
+    workers: [1, 30],
+  } as Record<string, [number, number]>,
+  /** The sandbox: Easy's knobs, plenty of gold, and stores the patron keeps full. */
+  sandbox: { gold: 5000, refillTicks: 100 },
 };

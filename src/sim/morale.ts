@@ -94,7 +94,7 @@ export function complaintsText(w: Worker): string {
 
 export function updateMorale(s: SimState, w: Worker): void {
   if (w.leaving) return;
-  const line = QUIT.lowMood;
+  const line = s.settings.quitBelow;
   if (w.noticeUntil === null) {
     // fed up the moment mood falls below the line; it passes quietly if it's back up before the shift ends
     if (w.mood < line) w.fedUpSince ??= s.tick;
@@ -113,7 +113,7 @@ export function updateMorale(s: SimState, w: Worker): void {
 
 /** It's official: they'll leave at the end of their notice unless their mood is back at the line. */
 function giveNotice(s: SimState, w: Worker): void {
-  w.noticeUntil = s.tick + QUIT.noticeShifts[s.difficulty] * SHIFT_TICKS;
+  w.noticeUntil = s.tick + s.settings.noticeShifts * SHIFT_TICKS;
   const when = whenText(w.noticeUntil);
   const why = complaintsText(w);
   log(s, `${w.name} has given notice: fed up with ${why}. They'll leave at ${when} unless things get better.`, w.id);
@@ -121,7 +121,7 @@ function giveNotice(s: SimState, w: Worker): void {
     s,
     'notice',
     `${w.name} has put in notice`,
-    `${w.name} is fed up with ${why} and has put in notice that they will quit and leave at ${when} unless their mood rises to ${QUIT.lowMood} or above. Address the issues that ${w.name} is complaining about or if all else fails send them a bonus.`,
+    `${w.name} is fed up with ${why} and has put in notice that they will quit and leave at ${when} unless their mood rises to ${s.settings.quitBelow} or above. Address the issues that ${w.name} is complaining about or if all else fails send them a bonus.`,
     w.id,
   );
 }

@@ -1,7 +1,7 @@
 import { log } from './actions';
 import { addWorker } from './sim';
 import { socialArrival } from './social';
-import { POPULATION, RECRUIT } from './tuning';
+import { POPULATION } from './tuning';
 import { siteOf } from './world';
 import type { SimState, Worker } from './types';
 
@@ -24,7 +24,7 @@ export function headcount(s: SimState): number {
 /** What the next recruit costs: perSquare × the headcount you'd have with them (the 9th worker costs 15 × 81). */
 export function recruitFee(s: SimState): number {
   const n = headcount(s) + 1;
-  return RECRUIT.perSquare * n * n;
+  return s.settings.recruitFee * n * n;
 }
 
 /** Why you can't recruit right now, or null if you can. */

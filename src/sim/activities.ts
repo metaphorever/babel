@@ -444,7 +444,7 @@ function getCart(s: SimState, w: Worker, cart: Site): Result | 'held' {
   if (pushed(s, w) === cart) return 'held';
   const other = cartInUse(s, w, cart);
   if (other) return failWork(s, w, `${other.name} has ${siteRef(cart)}.`, 'wait');
-  if (cart.y !== groundRow()) return failWork(s, w, `${cap(siteRef(cart))} isn't on the ground.`);
+  if (cart.y !== groundRow(s)) return failWork(s, w, `${cap(siteRef(cart))} isn't on the ground.`);
   w.thought = `Fetching ${siteRef(cart)}.`;
   const left = w.x < cart.x0 || (w.x <= cart.x1 && w.x - cart.x0 < cart.x1 - w.x);
   const end = { x: Math.max(0, Math.min(s.width - 1, left ? cart.x0 - 1 : cart.x1 + 1)), y: cart.y };
@@ -467,7 +467,7 @@ function cartDestination(s: SimState, place: Place | null, w: Worker): Pt | null
   const site = s.sites.find((x) => x.named && x.label.toLowerCase() === name);
   if (site) return spotFor(site, w.id);
   const b = s.buildings.find((x) => x.name.toLowerCase() === name);
-  return b ? { x: Math.floor((b.x0 + b.x1) / 2), y: groundRow() } : null;
+  return b ? { x: Math.floor((b.x0 + b.x1) / 2), y: groundRow(s) } : null;
 }
 
 /** "Haul cart 1 to stockpile 2": push it there and leave it. One unit of work. */
@@ -476,7 +476,7 @@ function pushCartJob(s: SimState, w: Worker, target: Place, to: Place | null): R
   if (!cart) return failWork(s, w, `There's no ${placeName(target)} to move.`);
   const dest = cartDestination(s, to, w);
   if (!dest) return failWork(s, w, to === null ? 'Push it where?' : `There's no ${placeName(to)} to push it to.`);
-  if (dest.y !== groundRow()) return failWork(s, w, `${cap(siteRef(cart))} can't go up the tower.`);
+  if (dest.y !== groundRow(s)) return failWork(s, w, `${cap(siteRef(cart))} can't go up the tower.`);
   const held = getCart(s, w, cart);
   if (held !== 'held') return held;
   w.thought = `Pushing ${siteRef(cart)} to ${placeName(to!)}.`;
@@ -538,7 +538,7 @@ function cartHaul(s: SimState, w: Worker, type: ItemType, from: Place | null, to
       }
       return 'running';
     }
-    if (spot.y !== groundRow()) {
+    if (spot.y !== groundRow(s)) {
       a.stage = cart.store[type] > 0 ? 2 : 0;
       if (a.stage === 0) {
         letGo(w);
@@ -581,7 +581,7 @@ function cartHaul(s: SimState, w: Worker, type: ItemType, from: Place | null, to
       letGo(w);
       return failWork(s, w, noDepot(s, to, type));
     }
-    if (dst.y !== groundRow()) {
+    if (dst.y !== groundRow(s)) {
       letGo(w);
       return failWork(s, w, `${cap(siteRef(cart))} can't go up the tower: ${siteRef(dst)} is up there.`);
     }

@@ -12,25 +12,37 @@ import { nextU32, pick, rand, seedRng } from './rng';
 import { emptySkills, SKILL_IDS } from './skills';
 import { rollPersonality } from './traits';
 import { checkAlerts, goodsOut } from './alerts';
-import { AI, ALERTS, TOWER, ARRIVALS, ECONOMY, PATRON, POPULATION, SKILLS, TIME, type Difficulty } from './tuning';
-import type { FixtureKind, SimState, StartMode, Worker } from './types';
+import { AI, ALERTS, PATRON, SKILLS, TIME, type DifficultyChoice } from './tuning';
+import type { FixtureKind, GameSettings, ItemType, SimState, StartMode, Worker } from './types';
 import { fixedMap, generateMap, groundRow, sitesOf } from './world';
+import { gameSettings } from './settings';
+import { newProject, placeMaterial } from './tower';
 import { applyPlace, campJobs, finishNow, type PlaceRequest } from './build';
 import { generateSocial, newSocial, rollHabits, rollMonogamy, rollTemper, updateSocial } from './social';
 
 /** The shape of SimState. Bump it (and SimState's `version`) when that changes, with a step in save.ts's MIGRATIONS. */
-export const STATE_VERSION = 12 as const;
+export const STATE_VERSION = 13 as const;
+
+/** What a new game is made with: a difficulty (and starting camp), or the New Game screen's full settings. */
+export type GameSpec = DifficultyChoice | GameSettings;
+
+function specSettings(spec: GameSpec, start: StartMode): GameSettings {
+  return typeof spec === 'string' ? gameSettings(spec, start) : gameSettings(spec.difficulty, spec.start, spec);
+}
 
 /**
  * A new game. 'opening' is the real start (P1): a fresh random map with
  * nothing built, the patron's supplies, and workers waiting by the road.
  * 'prebuilt' lays out a working colony the way P0 had it, for the tests and
- * for quick playtests (?start=prebuilt).
+ * for quick playtests (?start=prebuilt); 'large' a bigger one. With no
+ * settings it's Medium, the small camp, and a goal of 30, as it always was.
  */
-export function createState(seed: number, difficulty: Difficulty = 'normal', start: StartMode = 'prebuilt'): SimState {
+export function createState(seed: number, spec: GameSpec = 'normal', startMode: StartMode = 'prebuilt'): SimState {
+  const settings = specSettings(spec, startMode);
+  const { start } = settings;
   const s: SimState = {
     version: STATE_VERSION,
-    start,
+    settings,
     seed,
     tick: 0,
     rng: seedRng(seed),
@@ -51,19 +63,18 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
     lexicon: { en: allWords() },
     projects: [],
     floors: 0,
-    gold: ECONOMY.startingGold,
+    gold: settings.gold,
     patience: PATRON.patienceStart,
-    difficulty,
     graceUntil: start === 'opening' ? TIME.dayTicks * PATRON.graceDays : 0,
     nextStipend: TIME.dayTicks,
-    nextArrival: ARRIVALS.every[difficulty],
+    // never, with no arrivals (a huge number rather than Infinity, which JSON can't hold)
+    nextArrival: settings.arrivalEvery > 0 ? settings.arrivalEvery : Number.MAX_SAFE_INTEGER,
     income: 0,
     leftWith: 0,
     takings: 0,
     reserved: 0,
     events: [],
     alerts: [],
-    goal: TOWER.goal,
     won: false,
     alertBelow: { stone: ALERTS.supplyBelow, wood: ALERTS.supplyBelow, grain: ALERTS.supplyBelow, bread: ALERTS.supplyBelow, beer: ALERTS.supplyBelow },
     supplyOut: [],
@@ -74,7 +85,7 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
   };
   if (start === 'opening') {
     generateMap(s);
-    for (let i = 0; i < POPULATION.start; i++) addWorker(s);
+    for (let i = 0; i < settings.workers; i++) addWorker(s);
     generateSocial(s);
     // the first worker has a gift for letters: they'll be your first scribe
     const scribe = s.workers[0];
@@ -86,8 +97,10 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
     log(s, 'Your workers have arrived. Choose where to build the scriptorium.');
     return s;
   }
-  prebuild(s);
-  for (let i = 0; i < POPULATION.start; i++) addWorker(s);
+  if (start === 'large') prebuildLarge(s);
+  else prebuild(s);
+  if (settings.towerLevels > 0) buildTowerTo(s, settings.towerLevels);
+  for (let i = 0; i < settings.workers; i++) addWorker(s);
   generateSocial(s);
 
   // The patron left a few notices up so the ground is busy from the start.
@@ -124,17 +137,7 @@ export function createState(seed: number, difficulty: Difficulty = 'normal', sta
  * brewery. Everything is finished from the start.
  */
 function prebuild(s: SimState): void {
-  fixedMap(s);
-  s.charter = true; // set before the scriptorium finishes, so it doesn't decree it again
-  const place = (p: PlaceRequest) => applyPlace(s, p);
-  const fixture = (fixture: FixtureKind, x0: number) => place({ what: 'fixture', fixture, x0, story: 0 });
-  const finishAll = () => {
-    for (let guard = 0; guard < 100; guard++) {
-      const j = campJobs(s).find((x) => !x.demolish);
-      if (!j) break;
-      finishNow(s, j);
-    }
-  };
+  const { place, fixture, finishAll, stock } = camp(s);
   place({ what: 'scriptorium', x0: 58 });
   place({ what: 'tower', x0: 74 });
   place({ what: 'house', x0: 38, width: 6, stories: 1, name: 'Kitchen' });
@@ -149,15 +152,107 @@ function prebuild(s: SimState): void {
   fixture('brewery', 92);
   fixture('bar', 94);
   finishAll();
-  sitesOf(s, 'pantry')[0].store.bread = 16;
-  sitesOf(s, 'bar')[0].store.beer = 12;
+  stock(sitesOf(s, 'pantry')[0], { bread: 16 });
+  stock(sitesOf(s, 'bar')[0], { beer: 12 });
   // the patron's gift: enough to start
   const [a, b] = sitesOf(s, 'stockpile');
-  a.store.stone = 10;
-  a.store.grain = 10;
-  b.store.wood = 8;
+  stock(a, { stone: 10, grain: 10 });
+  stock(b, { wood: 8 });
   // the patron's builders from placing the scriptorium aren't needed: it's already built
   for (const w of s.workers) w.held = [];
+  s.events = [];
+}
+
+/** Tools for laying out a finished camp on the fixed map. */
+function camp(s: SimState) {
+  fixedMap(s);
+  s.charter = true; // set before the scriptorium finishes, so it doesn't decree it again
+  const place = (p: PlaceRequest) => applyPlace(s, p);
+  const fixture = (fixture: FixtureKind, x0: number, story = 0) => place({ what: 'fixture', fixture, x0, story });
+  const finishAll = () => {
+    for (let guard = 0; guard < 200; guard++) {
+      const j = campJobs(s).find((x) => !x.demolish);
+      if (!j) break;
+      finishNow(s, j);
+    }
+  };
+  /** Starting goods, times the game's supplies setting (never past what the store holds). */
+  const stock = (site: { store: Record<ItemType, number>; capacity: number | null }, goods: Partial<Record<ItemType, number>>) => {
+    for (const [k, n] of Object.entries(goods) as [ItemType, number][]) {
+      const room = site.capacity === null ? Infinity : site.capacity - Object.values(site.store).reduce((a, b) => a + b, 0);
+      site.store[k] += Math.max(0, Math.min(room, Math.round(n * s.settings.supplies)));
+    }
+  };
+  return { place, fixture, finishAll, stock };
+}
+
+/**
+ * The large camp (§16.9 step 8, Claude's layout): the small camp's
+ * buildings made bigger, and more of them. A kitchen with two ovens, a
+ * second, two-story bunkhouse (17 beds in all), a tavern with two bars and
+ * a pantry, a storehouse of shelves, a wheelbarrow and a cart, and more of
+ * everything stocked. The tower site is chosen but nothing is built on it,
+ * as in the small camp.
+ */
+function prebuildLarge(s: SimState): void {
+  const { place, fixture, finishAll, stock } = camp(s);
+  place({ what: 'scriptorium', x0: 58 });
+  place({ what: 'tower', x0: 74 });
+  place({ what: 'house', x0: 38, width: 6, stories: 1, name: 'Kitchen' });
+  place({ what: 'house', x0: 45, width: 12, stories: 1, name: 'Bunkhouse' });
+  place({ what: 'house', x0: 92, width: 12, stories: 1, name: 'Tavern' });
+  place({ what: 'house', x0: 138, width: 10, stories: 1, name: 'Storehouse' });
+  place({ what: 'house', x0: 150, width: 12, stories: 2, name: 'Bunkhouse 2' });
+  finishAll();
+  fixture('oven', 38);
+  fixture('pantry', 40);
+  fixture('oven', 42);
+  for (let i = 0; i < 6; i++) fixture('bed', 45 + i * 2);
+  fixture('stockpile', 68);
+  fixture('stockpile', 70);
+  fixture('brewery', 92);
+  fixture('bar', 94);
+  fixture('brewery', 98);
+  fixture('bar', 100);
+  fixture('pantry', 102);
+  for (let i = 0; i < 5; i++) fixture('shelves', 138 + i * 2);
+  for (let i = 0; i < 6; i++) fixture('bed', 150 + i * 2);
+  for (let i = 0; i < 5; i++) fixture('bed', 152 + i * 2, 1);
+  fixture('wheelbarrow', 105);
+  fixture('cart', 125);
+  finishAll();
+  for (const p of sitesOf(s, 'pantry')) stock(p, { bread: 16 });
+  for (const b of sitesOf(s, 'bar')) stock(b, { beer: 12 });
+  const [a, b] = sitesOf(s, 'stockpile');
+  stock(a, { stone: 12, grain: 12 });
+  stock(b, { wood: 16 });
+  const shelves = sitesOf(s, 'shelves');
+  stock(shelves[0], { stone: 30 });
+  stock(shelves[1], { wood: 30 });
+  stock(shelves[2], { grain: 30 });
+  for (const w of s.workers) w.held = [];
+  s.events = [];
+}
+
+/**
+ * The sandbox's tower, already built to a level: each floor finished and a
+ * ladder up from every level below the top, quietly (no patron's bonus, no
+ * alerts). Ladders alternate sides so the climb zigzags.
+ */
+function buildTowerTo(s: SimState, levels: number): void {
+  if (!s.tower) return;
+  const { gold, patience, income } = s;
+  for (let k = 1; k <= levels; k++) {
+    const p = newProject(s, k);
+    s.projects.push(p);
+    while (p.placed.stone < p.needs.stone) placeMaterial(s, p, 'stone');
+    while (p.placed.wood < p.needs.wood) placeMaterial(s, p, 'wood');
+  }
+  for (let k = 0; k < s.floors; k++) applyPlace(s, { what: 'fixture', fixture: 'ladder', x0: k % 2 === 0 ? s.tower.x0 + 2 : s.tower.x1 - 3, story: k });
+  // every ladder at once (one at a time would look through every site each time: slow at a thousand levels)
+  for (const j of campJobs(s)) if (!j.demolish) finishNow(s, j);
+  Object.assign(s, { gold, patience, income });
+  s.alerts = [];
   s.events = [];
 }
 
@@ -169,7 +264,7 @@ export function addWorker(s: SimState): Worker {
     traits,
     p,
     x: spawnX(s),
-    y: groundRow(),
+    y: groundRow(s),
     path: [],
     pathGoal: null,
     stepProgress: 0,
@@ -257,15 +352,14 @@ export class Sim {
   history: StampedCommand[] = [];
   private pending: Command[] = [];
 
-  constructor(seed: number, difficulty: Difficulty = 'normal', start: StartMode = 'opening') {
-    this.state = createState(seed, difficulty, start);
+  /** A new game from a seed and its settings (or a difficulty and start), or a game already under way. */
+  constructor(seed: number | SimState, spec: GameSpec = 'normal', start: StartMode = 'opening') {
+    this.state = typeof seed === 'number' ? createState(seed, spec, start) : seed;
   }
 
   /** A game loaded from a save. Its command history starts over: a replay from the seed alone can't reach it. */
   static fromState(state: SimState): Sim {
-    const sim = new Sim(state.seed, state.difficulty, state.start);
-    sim.state = state;
-    return sim;
+    return new Sim(state);
   }
 
   /** Check a command now so the UI can show errors, then queue it. */
@@ -284,8 +378,8 @@ export class Sim {
 }
 
 /** Rebuild a game from its seed and command history. */
-export function replay(seed: number, history: readonly StampedCommand[], ticks: number, difficulty: Difficulty = 'normal', start: StartMode = 'opening'): SimState {
-  const s = createState(seed, difficulty, start);
+export function replay(seed: number, history: readonly StampedCommand[], ticks: number, spec: GameSpec = 'normal', start: StartMode = 'opening'): SimState {
+  const s = createState(seed, spec, start);
   let i = 0;
   while (s.tick < ticks) {
     const cmds: Command[] = [];

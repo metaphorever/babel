@@ -1049,3 +1049,103 @@ details > summary {
 .save-file {
   display: none;
 }
+
+/* ------------------------------------------------- the New Game screen */
+
+/* the grey desktop: before a game there's no world behind the dialog */
+.newgame-back {
+  background: var(--paper) var(--dither-50);
+}
+
+.dialog.newgame {
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+}
+
+.group {
+  border: 1px solid var(--ink);
+  margin: 0 0 10px;
+  padding: 4px 10px 6px;
+}
+
+.group legend {
+  padding: 0 4px;
+  font: bold 12px var(--font-title);
+}
+
+.group .hint {
+  margin: 4px 0 0;
+}
+
+.radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.radio,
+.check {
+  gap: 4px;
+  cursor: pointer;
+}
+
+.radio input,
+.check input {
+  accent-color: var(--ink);
+  margin: 0;
+}
+
+.knobs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 14px;
+}
+
+.knob {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  font-size: 12px;
+}
+
+.knob .knob-label {
+  grid-column: 1 / 3;
+  font-weight: bold;
+}
+
+.knob input[type='number'] {
+  width: 76px;
+  margin: 0;
+}
+
+.knob .knob-unit {
+  font-size: 11px;
+  align-self: center;
+}
+
+.knob .btn {
+  justify-self: start;
+}
+
+.knob input.seed-in {
+  width: 110px;
+}
+
+.newgame-buttons {
+  align-items: center;
+}
+
+.newgame .grow {
+  flex: 1;
+}
+
+.file-in {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .knobs {
+    grid-template-columns: 1fr;
+  }
+}

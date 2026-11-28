@@ -64,7 +64,7 @@ export function scoreOptions(s: SimState, w: Worker, inProgress: boolean): Score
   }
 
   // a translator on the ground is calling this worker's name
-  if (levelOfRow(w.y) === 0 && lessonFor(s, w)) add('lesson', 'Answer the call to a lesson', LESSON.pull);
+  if (levelOfRow(s, w.y) === 0 && lessonFor(s, w)) add('lesson', 'Answer the call to a lesson', LESSON.pull);
 
   const price = cheapestBeer(s);
   if (cur === 'bar' || (price !== null && w.purse >= price)) {
@@ -90,7 +90,7 @@ export function scoreOptions(s: SimState, w: Worker, inProgress: boolean): Score
  * rather than lie down, unless they're really worn out.
  */
 function waitingForOrders(s: SimState): boolean {
-  return s.start === 'opening' && !s.sites.some((x) => x.kind === 'scriptorium');
+  return s.settings.start === 'opening' && !s.sites.some((x) => x.kind === 'scriptorium');
 }
 
 function labelOf(order: { t: string }[]): string {

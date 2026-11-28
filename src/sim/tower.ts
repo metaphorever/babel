@@ -1,9 +1,9 @@
 import { log } from './actions';
 import { floorName, levelName } from './lang';
 import { patronFloorDone } from './patron';
-import { TOWER, WORLD } from './tuning';
+import { TOWER } from './tuning';
 import { Tile, type BuildMaterial, type Pt, type Project, type SimState } from './types';
-import { setTile, tileAt } from './world';
+import { groundTop, setTile, tileAt, towerRoom } from './world';
 
 // Tower geometry. Floor k's deck sits 4k rows above the ground. Building
 // floor k means raising the stone walls of the story below it and laying
@@ -11,13 +11,13 @@ import { setTile, tileAt } from './world';
 // empty room: the ladder up to it, and everything else in it, are fixtures
 // the player places and workers build.
 
-export function deckRow(level: number): number {
-  return WORLD.groundRow - level * TOWER.floorHeight;
+export function deckRow(s: SimState, level: number): number {
+  return groundTop(s) - level * TOWER.floorHeight;
 }
 
 /** The row workers stand on at a level (0 = the ground). */
-export function standRow(level: number): number {
-  return deckRow(level) - 1;
+export function standRow(s: SimState, level: number): number {
+  return deckRow(s, level) - 1;
 }
 
 /** The tower's footprint. Only called once the site has been chosen. */
@@ -30,13 +30,13 @@ export function towerSpan(s: SimState): { x0: number; x1: number } {
 export function buildSpot(s: SimState, level: number, workerId: number): Pt {
   const t = towerSpan(s);
   const width = t.x1 - t.x0 - 3;
-  return { x: t.x0 + 2 + ((workerId * 5) % width), y: standRow(level - 1) };
+  return { x: t.x0 + 2 + ((workerId * 5) % width), y: standRow(s, level - 1) };
 }
 
 /** Where blueprints are delivered: the middle of the top finished floor. */
 export function topSpot(s: SimState): Pt {
   const t = towerSpan(s);
-  return { x: Math.floor((t.x0 + t.x1) / 2), y: standRow(s.floors) };
+  return { x: Math.floor((t.x0 + t.x1) / 2), y: standRow(s, s.floors) };
 }
 
 export function newProject(s: SimState, level: number): Project {
@@ -71,7 +71,7 @@ export function projectFraction(p: Project): number {
  */
 export function startFloorFromBlueprint(s: SimState): Project | null {
   const planned = s.floors + s.projects.length;
-  if (planned >= TOWER.maxFloors || !s.tower) return null;
+  if (planned >= towerRoom(s) || !s.tower) return null;
   const p = newProject(s, planned + 1);
   s.projects.push(p);
   log(s, `A blueprint for ${floorName(p.level)} is up. Builders can start.`);
@@ -87,7 +87,7 @@ export function placeMaterial(s: SimState, p: Project, m: BuildMaterial): void {
 
 function drawProgress(s: SimState, p: Project): void {
   const T = towerSpan(s);
-  const deck = deckRow(p.level);
+  const deck = deckRow(s, p.level);
   // walls: three rows on each side of the story below, bottom up
   const wallTiles = Math.floor((p.placed.stone / p.needs.stone) * 6);
   for (let i = 0; i < wallTiles; i++) {
@@ -115,8 +115,8 @@ function completeFloor(s: SimState, p: Project): void {
 }
 
 /** The rows a ladder on this level fills: from its room up through the deck of the floor above. */
-export function ladderRows(level: number): { top: number; bottom: number } {
-  return { top: deckRow(level + 1), bottom: standRow(level) };
+export function ladderRows(s: SimState, level: number): { top: number; bottom: number } {
+  return { top: deckRow(s, level + 1), bottom: standRow(s, level) };
 }
 
 /** Is there a finished ladder from this level up to the next? */

@@ -93,13 +93,13 @@ export function score(s: SimState): number {
 
 /** The patron's goal reached: once a game. */
 export function checkGoal(s: SimState): void {
-  if (s.won || s.floors < s.goal) return;
+  if (s.won || s.floors < s.settings.goal) return;
   s.won = true;
   alert(
     s,
     'goal',
     'The patron’s goal is reached',
-    `Congratulations! You reached the patron's goal of a tower ${s.goal} levels tall. Your score is ${goldText(score(s))}: ${s.goal} levels × ${goldText(ALERTS.scorePerLevel)} ÷ ${daysPlayed(s)} days, plus ${goldText(s.gold)} gold in the treasury.`,
+    `Congratulations! You reached the patron's goal of a tower ${s.settings.goal} levels tall. Your score is ${goldText(score(s))}: ${s.settings.goal} levels × ${goldText(ALERTS.scorePerLevel)} ÷ ${daysPlayed(s)} days, plus ${goldText(s.gold)} gold in the treasury.`,
   );
 }
 
@@ -112,7 +112,7 @@ export type GoneState = 'recruit' | 'wait' | 'end';
 
 export function goneState(s: SimState): GoneState {
   if (recruitError(s) === null) return 'recruit';
-  if (PATRON.stipendPerDay * s.patience >= 100 || s.patience >= PATRON.recruitAbove) return 'wait';
+  if (s.settings.stipend * s.patience >= 100 || s.patience >= PATRON.recruitAbove) return 'wait';
   return 'end';
 }
 
@@ -145,7 +145,7 @@ export function checkAlerts(s: SimState): void {
 export function patienceAlert(s: SimState, before: number): void {
   for (const at of ALERTS.patienceAt) {
     if (!(before > at && s.patience <= at)) continue;
-    const stipend = Math.round((PATRON.stipendPerDay * s.patience) / 100);
+    const stipend = Math.round((s.settings.stipend * s.patience) / 100);
     const text =
       at === 0
         ? 'The patron has run out of patience and will pay no more stipend until the tower grows again. Finish a level to win them back.'
@@ -158,5 +158,5 @@ export function patienceAlert(s: SimState, before: number): void {
 
 /** A level finished (info, muted by default). */
 export function levelAlert(s: SimState, floor: number, bonus: number): void {
-  alert(s, 'level', `${floorName(floor)} is finished`, `${floorName(floor)} is finished. The patron is pleased and sends ${bonus} gold.${s.floors < s.goal ? ` ${s.goal - s.floors} to go to the patron's goal.` : ''}`);
+  alert(s, 'level', `${floorName(floor)} is finished`, `${floorName(floor)} is finished. The patron is pleased and sends ${bonus} gold.${s.floors < s.settings.goal ? ` ${s.settings.goal - s.floors} to go to the patron's goal.` : ''}`);
 }

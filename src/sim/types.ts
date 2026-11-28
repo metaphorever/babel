@@ -1,6 +1,6 @@
 import type { LangId, Order, TokenId } from './lang';
 import type { RngState } from './rng';
-import type { Difficulty } from './tuning';
+import type { DifficultyChoice } from './tuning';
 
 // Everything in SimState must be plain JSON (no Maps, Sets, classes or
 // functions) so it can be saved, hashed and replayed.
@@ -469,12 +469,49 @@ export interface GameEvent {
   workerId: number | null;
 }
 
-/** How a new game starts: the P1 opening (nothing built yet), or a colony already laid out (tests, quick playtests). */
-export type StartMode = 'opening' | 'prebuilt';
+/**
+ * How a new game starts, the New Game screen's "Starting camp": the P1
+ * opening with nothing built ("Nothing"), the small colony P0 had
+ * ("Small", also the tests' and ?start=prebuilt's), or a larger one.
+ */
+export type StartMode = 'opening' | 'prebuilt' | 'large';
+
+/** What a game was made with (§16.9 step 8). Set at creation and never changed; saves carry it. */
+export interface GameSettings {
+  /** What the New Game screen called it. The knobs below are what count. */
+  difficulty: DifficultyChoice;
+  /** The patron's goal, in levels. The map's height follows it. */
+  goal: number;
+  start: StartMode;
+  /** The patron's stipend a day at full patience. */
+  stipend: number;
+  /** Patience lost per tick. */
+  patienceDrain: number;
+  /** The quit line: below it a worker is fed up. */
+  quitBelow: number;
+  /** Notice, in shifts (a quarter of a day each). */
+  noticeShifts: number;
+  /** Starting goods, times the usual. */
+  supplies: number;
+  /** Gold in the treasury at the start. */
+  gold: number;
+  /** Ticks between the patron's chances to send a newcomer (0: never). */
+  arrivalEvery: number;
+  /** A recruit costs this × the headcount with them, squared. */
+  recruitFee: number;
+  /** Drift, times the usual. */
+  driftSpeed: number;
+  /** Workers at the start (and the patron's headcount before any levels). */
+  workers: number;
+  /** The sandbox: the patron keeps every store full. */
+  fullStores: boolean;
+  /** The sandbox: levels of tower already built (with a camp to stand them in). */
+  towerLevels: number;
+}
 
 export interface SimState {
-  version: 12;
-  start: StartMode;
+  version: 13;
+  settings: GameSettings;
   seed: number;
   tick: number;
   rng: RngState;
@@ -510,7 +547,6 @@ export interface SimState {
   gold: number;
   /** The patron's patience, 0..100. Finished floors win it back. */
   patience: number;
-  difficulty: Difficulty;
   /** Until this tick the patron's patience doesn't drain, unless floor 1 is finished sooner. */
   graceUntil: number;
   nextStipend: number;
@@ -526,8 +562,6 @@ export interface SimState {
   events: GameEvent[];
   /** Things the player should know about now (a worker giving notice...). The UI shows each once, unless muted. */
   alerts: Alert[];
-  /** The tower's height the patron asked for, in levels (§16.9: 30 until the New Game screen offers others). */
-  goal: number;
   /** The goal alert has been raised (once a game; you can keep playing). */
   won: boolean;
   /** Alert when a good falls under this many in the colony (0 = never). The Stores window will set it; 1 means "all gone". */

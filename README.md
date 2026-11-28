@@ -33,11 +33,14 @@ npm run build
 
 The live build is at https://metaphorever.github.io/babel/. Every push to `main` runs the tests and redeploys it (see `.github/workflows/pages.yml`).
 
-To build it yourself, the command above writes a static site to `dist/`: an `index.html` plus an `assets/` folder. Every path in it is relative, so you can upload the contents of `dist/` to any folder on any web host and open `index.html` there. Options in the URL:
+To build it yourself, the command above writes a static site to `dist/`: an `index.html` plus an `assets/` folder. Every path in it is relative, so you can upload the contents of `dist/` to any folder on any web host and open `index.html` there.
+
+A plain page load opens the New Game screen (difficulty, the patron's goal, the starting camp, and every setting). For quick playtests, any of these in the URL skips it and starts at once (Medium, a goal of 30 and the opening, unless given):
 
 - `?seed=123` replays a particular starting world.
-- `?difficulty=easy|normal|hard` sets how fast the patron loses patience.
-- `?start=prebuilt` skips the opening with a colony already laid out (a kitchen, a bunkhouse, the scriptorium, the tower site, a tavern), for playtesting later stages.
+- `?difficulty=easy|normal|hard|custom|sandbox` picks the difficulty (`normal` is Medium; `sandbox` keeps the stores full).
+- `?start=prebuilt` skips the opening with a colony already laid out (a kitchen, a bunkhouse, the scriptorium, the tower site, a tavern), for playtesting later stages; `?start=large` lays out a bigger one.
+- `?goal=50` sets the patron's goal in levels (the map's height follows it).
 
 
 ## Drawing art

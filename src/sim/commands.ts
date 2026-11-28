@@ -5,7 +5,8 @@ import { ALL, FOREVER, GOODS, STATE_WORDS, allowsAll, allowsForever, condRule, i
 function cap(t: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
-import { ALERTS, BONUS, BUILD, ECONOMY, LOGIC, SCRIBE, TOWER } from './tuning';
+import { ALERTS, BONUS, BUILD, ECONOMY, LOGIC, SCRIBE } from './tuning';
+import { towerRoom } from './world';
 import { setAlertLine } from './alerts';
 import { branchError } from './logic';
 import { recruitError, recruitWorker } from './recruit';
@@ -87,7 +88,7 @@ function countless(verb: Verb): boolean {
 }
 
 /** What's wrong with a condition, if anything. Like places, stores that don't exist yet are fine. */
-function conditionError(c: Condition): string | null {
+function conditionError(s: SimState, c: Condition): string | null {
   if (typeof c !== 'object' || c === null) return 'No such condition.';
   if (c.kind === 'state') return STATE_WORDS.includes(c.state) && typeof c.not === 'boolean' ? null : 'No such condition.';
   if (c.kind !== 'has') return 'No such condition.';
@@ -97,7 +98,7 @@ function conditionError(c: Condition): string | null {
   const p = c.place;
   // one store, a store by name, or one tower level: somewhere a worker can go and look
   if (p === 0 || p === 'tower' || p === 'camp') return 'Check one store, or one level of the tower.';
-  const bad = placeError(p);
+  const bad = placeError(s, p);
   if (bad) return bad;
   if (typeof p === 'object' && 'fixture' in p) {
     if (!isStoreWord(p.fixture)) return `${cap(placeName(p))} doesn't keep goods.`;
@@ -124,8 +125,8 @@ function buildCarrier(s: SimState, cmd: Extract<Command, { type: 'compose' }>, d
 }
 
 /** What's wrong with a place in an order, if anything. Places that don't exist (yet) are fine: the order just fails when it's carried out. */
-function placeError(p: Place): string | null {
-  if (typeof p === 'number') return Number.isInteger(p) && p >= 0 && p <= TOWER.maxFloors ? null : 'No such level.';
+function placeError(s: SimState, p: Place): string | null {
+  if (typeof p === 'number') return Number.isInteger(p) && p >= 0 && p <= towerRoom(s) ? null : 'No such level.';
   if (p === 'tower' || p === 'camp') return null;
   if (typeof p !== 'object' || p === null) return 'No such place.';
   if ('fixture' in p) return FIXTURE_WORDS.includes(p.fixture) && Number.isInteger(p.n) && p.n >= 1 && p.n <= 999 ? null : 'No such fixture.';
@@ -140,13 +141,13 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
       for (const l of cmd.lines) {
         const target = l.target ?? null;
         if (!isValidLine(l.verb, l.noun, target)) return { ok: false, error: 'One of the lines makes no sense.' };
-        const badTarget = target === null ? null : placeError(target);
+        const badTarget = target === null ? null : placeError(s, target);
         if (badTarget) return { ok: false, error: badTarget };
         const cond = l.cond ?? null;
         const rule = condRule(l.verb);
         if (rule === 'must' && cond === null) return { ok: false, error: '"If" what? Choose something to check.' };
         if (rule === 'never' && cond !== null) return { ok: false, error: `"${l.verb.toLowerCase()}" can't take an "until".` };
-        const badCond = cond === null ? null : conditionError(cond);
+        const badCond = cond === null ? null : conditionError(s, cond);
         if (badCond) return { ok: false, error: badCond };
         if (l.verb === 'WAIT' && cond === null && (!Number.isInteger(l.count) || l.count < 1 || l.count > LOGIC.waitMaxHours)) return { ok: false, error: `Wait from 1 to ${LOGIC.waitMaxHours} hours.` };
         if (l.count === ALL && !allowsAll(l.verb)) return { ok: false, error: `"All" doesn't work for ${l.verb.toLowerCase()}: it never runs out.` };
@@ -160,12 +161,12 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
         if (using !== null) {
           if (l.verb !== 'HAUL' || moving || l.noun === null) return { ok: false, error: 'Only hauling goods can use a wheelbarrow or cart.' };
           if (typeof using !== 'object' || ('fixture' in using && !isVehicleWord(using.fixture))) return { ok: false, error: 'Haul using a wheelbarrow or cart.' };
-          const badUsing = placeError(using);
+          const badUsing = placeError(s, using);
           if (badUsing) return { ok: false, error: badUsing };
         }
         const places = [l.from, l.to].filter((p): p is Place => p !== undefined && p !== null);
         if (places.length > 0 && !takesPlaces(l.verb)) return { ok: false, error: `"${l.verb.toLowerCase()}" doesn't take a from or to.` };
-        const bad = places.map(placeError).find((e) => e !== null);
+        const bad = places.map((p) => placeError(s, p)).find((e) => e !== null);
         if (bad) return { ok: false, error: bad };
         // a fixture by number has to be a store, and the kind that keeps this good
         const notStore = moving ? undefined : places.find((p) => typeof p === 'object' && 'fixture' in p && !isStoreWord(p.fixture));
@@ -177,7 +178,7 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
         if (within !== null) {
           if (!takesWithin(l.verb, l.noun)) return { ok: false, error: 'Only "build fixtures" takes an "in".' };
           if (typeof within === 'object' && 'fixture' in within) return { ok: false, error: 'Build fixtures in the camp, the tower, a level or a building.' };
-          const badIn = placeError(within);
+          const badIn = placeError(s, within);
           if (badIn) return { ok: false, error: badIn };
         }
         if (l.from !== undefined && l.from !== null && placeKey(l.from) === placeKey(l.to ?? null)) return { ok: false, error: 'From and to are the same place.' };
@@ -216,7 +217,7 @@ export function validateCommand(s: SimState, cmd: Command): CommandResult {
     case 'blueprint': {
       if (!s.tower) return { ok: false, error: 'Choose the tower site first.' };
       const planned = s.floors + s.projects.length + s.designs.filter((d) => d.carrier.kind === 'blueprint').length;
-      if (planned >= TOWER.maxFloors) return { ok: false, error: 'The tower is as tall as this world allows.' };
+      if (planned >= towerRoom(s)) return { ok: false, error: 'The tower is as tall as this world allows.' };
       return { ok: true };
     }
     case 'bonus': {

@@ -3,9 +3,10 @@ import { levelAlert, patienceAlert } from './alerts';
 import { hasWriteLine, scribeLoop } from './carriers';
 import { knows, knowsWord } from './drift';
 import { LANGS, floorName, langName, type LangId } from './lang';
-import { ARRIVALS, PATRON, POPULATION, TIME } from './tuning';
+import { ARRIVALS, BUILD, NEW_GAME, PATRON, POPULATION, TIME } from './tuning';
 import { dayOf } from './time';
-import type { Carrier, SimState } from './types';
+import { isVehicleKind, type Carrier, type ItemType, type SimState } from './types';
+import { roomIn, usable } from './world';
 import { arriveOnRoad, headcount } from './recruit';
 import { sendMoneyHome } from './morale';
 
@@ -94,7 +95,7 @@ export function updatePatron(s: SimState): void {
   // the grace period: nothing drains until it's over, or floor 1 is done
   if (inGrace(s)) {
     if (s.tick === s.graceUntil - 1) log(s, "The patron's grace period is over. Their patience will start to wear thin.");
-  } else s.patience = Math.max(0, s.patience - PATRON.patienceDrain[s.difficulty]);
+  } else s.patience = Math.max(0, s.patience - s.settings.patienceDrain);
   patienceAlert(s, before);
   if (before > 0 && s.patience === 0) log(s, 'The patron has run out of patience. No more stipend until the tower grows again.');
   else if (before >= 25 && s.patience < 25) log(s, 'The patron is growing impatient. Finish a level of the tower soon.');
@@ -111,9 +112,11 @@ export function updatePatron(s: SimState): void {
     sendMoneyHome(s);
   }
 
+  if (s.settings.fullStores && s.tick % NEW_GAME.sandbox.refillTicks === 0) refillStores(s);
+
   if (s.tick >= s.nextArrival) {
-    s.nextArrival = s.tick + ARRIVALS.every[s.difficulty];
-    const target = Math.min(POPULATION.cap, POPULATION.start + s.floors * ARRIVALS.perFloor);
+    s.nextArrival = s.settings.arrivalEvery > 0 ? s.tick + s.settings.arrivalEvery : Number.MAX_SAFE_INTEGER;
+    const target = Math.min(POPULATION.cap, s.settings.workers + s.floors * ARRIVALS.perFloor);
     if (s.patience >= PATRON.recruitAbove && headcount(s) < target) {
       const w = arriveOnRoad(s);
       log(s, `${w.name} arrived on the road, sent by the patron to work on the tower.`, w.id);
@@ -139,5 +142,35 @@ export function inGrace(s: SimState): boolean {
 
 /** Gold per day's stipend at the current patience. */
 export function currentStipend(s: SimState): number {
-  return Math.round((PATRON.stipendPerDay * s.patience) / 100);
+  return Math.round((s.settings.stipend * s.patience) / 100);
+}
+
+/**
+ * The sandbox: the patron keeps every store full (§16.9 step 8). Every
+ * refillTicks, each pantry is filled with bread and each bar with beer;
+ * stockpiles and shelves get a third of their room each of stone, wood
+ * and grain; the patron's own supplies go back to what they started with.
+ * Carts and wheelbarrows are left alone: they're for moving things.
+ */
+export function refillStores(s: SimState): void {
+  for (const site of s.sites) {
+    if (!usable(site) || site.demolish || isVehicleKind(site.kind)) continue;
+    if (site.supplies) {
+      for (const [k, n] of Object.entries(BUILD.supplies) as [ItemType, number][]) site.store[k] = Math.max(site.store[k], Math.round(n * s.settings.supplies));
+      continue;
+    }
+    const room = roomIn(site);
+    if (room <= 0 || room === Infinity || site.capacity === null) continue;
+    if (site.kind === 'pantry') site.store.bread += room;
+    else if (site.kind === 'bar') site.store.beer += room;
+    else if (site.kind === 'stockpile' || site.kind === 'shelves') {
+      const each = Math.floor(site.capacity / 3);
+      let left = room;
+      for (const k of ['stone', 'wood', 'grain'] as const) {
+        const add = Math.min(left, Math.max(0, each - site.store[k]));
+        site.store[k] += add;
+        left -= add;
+      }
+    }
+  }
 }

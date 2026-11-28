@@ -1,4 +1,4 @@
-import { DRIFT, DRIFTABLE, LANGS, floorName, levelName, driftPool, wordIn, type Sim, type SimState } from '../sim';
+import { DRIFTABLE, LANGS, floorName, levelName, driftLine, driftPool, langFromFloor, wordIn, type Sim, type SimState } from '../sim';
 import { clear, h } from './dom';
 import type { WindowManager } from './windows';
 
@@ -30,7 +30,7 @@ export class LanguagesPanel {
       h(
         'p',
         { class: 'hint' },
-        `Workers who spend time on ${levelName(DRIFT.lineFloor)} or higher slowly lose words to another language, one word at a time. Names never drift. To bring someone back, get them down to the ground and have a translator TEACH them. To write in their language instead, have a translator LEARN from them.`,
+        `Workers who spend time on ${levelName(driftLine(s))} or higher slowly lose words to another language, one word at a time. Names never drift. To bring someone back, get them down to the ground and have a translator TEACH them. To write in their language instead, have a translator LEARN from them.`,
       ),
     );
     for (const l of LANGS) {
@@ -41,7 +41,7 @@ export class LanguagesPanel {
           ? 'The common tongue'
           : open.includes(l.id)
             ? 'Drifting in now'
-            : `Drifts in once the tower reaches ${floorName(l.fromFloor, true)}`;
+            : `Drifts in once the tower reaches ${floorName(langFromFloor(s, l.id), true)}`;
       this.body.append(
         h('div', { class: 'section-label' }, `${l.name} · ${status}`),
         h('div', { class: 'kv' }, h('span', { class: 'k' }, 'You can write'), h('span', { class: 'v' }, `${lex.length} of ${DRIFTABLE.length} words`)),
