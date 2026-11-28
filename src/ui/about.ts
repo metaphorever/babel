@@ -8,7 +8,7 @@ const THANKS: (string | Node)[][] = [
   [h('b', {}, 'Moses'), ' (or another author perhaps, I’m no Biblical scholar) for writing Genesis 11'],
   [h('b', {}, 'Derin Elada'), ' for the ', h('a', { href: 'https://www.tumblr.com/derinthescarletpescatarian/813115583067504640?source=share', target: '_blank', rel: 'noopener' }, 'original inspiration'), ' to make this game (even though they said the game should have “nothing to do with the story or its themes”)'],
   [h('b', {}, 'Ted Chiang'), ' for the beautifully detailed logistics involved in building a tower to the heavens in his novelette ', h('i', {}, 'Tower of Babylon')],
-  [h('b', {}, 'Duane Blehm'), ' for creating ', h('i', {}, 'Stunt Copter'), ' and many other Mac classics. The horse and cart and the clouds are based on his designs, in his honor'],
+  [h('b', {}, 'Duane Blehm'), ' for creating ', h('i', {}, 'Stunt Copter'), ' and many other Mac classics. The horse and wagon and the clouds are based on his designs, in his honor'],
   [h('b', {}, 'Rick Holzgrafe'), ' for creating ', h('i', {}, 'Scarab of Ra'), ', my earliest and longest-running computer game obsession'],
   [h('b', {}, 'Christopher Kent Wigginton'), ' for creating ', h('i', {}, 'Radical Castle'), ' and introducing me to the concept of rage-quitting'],
   [h('b', {}, 'John Calhoun'), ' for creating ', h('i', {}, 'Glider'), ' and showing me just how beautiful lovingly crafted 1-bit graphics could be'],

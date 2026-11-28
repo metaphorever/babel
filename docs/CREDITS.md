@@ -15,7 +15,7 @@ Many thanks to:
 - **Moses** (or another author perhaps, I'm no Biblical scholar) for writing Genesis 11
 - **Derin Elada** for the [original inspiration](https://www.tumblr.com/derinthescarletpescatarian/813115583067504640?source=share) to make this game (even though they said the game should have "nothing to do with the story or its themes")
 - **Ted Chiang** for the beautifully detailed logistics involved in building a tower to the heavens in his novelette *Tower of Babylon*
-- **Duane Blehm** for creating *Stunt Copter* and many other Mac classics. The horse and cart and the clouds are based on his designs, in his honor
+- **Duane Blehm** for creating *Stunt Copter* and many other Mac classics. The horse and wagon and the clouds are based on his designs, in his honor
 - **Rick Holzgrafe** for creating *Scarab of Ra*, my earliest and longest-running computer game obsession
 - **Christopher Kent Wigginton** for creating *Radical Castle* and introducing me to the concept of rage-quitting
 - **John Calhoun** for creating *Glider* and showing me just how beautiful lovingly crafted 1-bit graphics could be
