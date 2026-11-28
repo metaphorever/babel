@@ -97,7 +97,8 @@ export const BUILD = {
   board: { width: 2, cost: { stone: 0, wood: 2 } },
   /** The first board stands this many tiles right of the scriptorium (next to its door). */
   boardGap: 1,
-  house: { minWidth: 3, maxWidth: 16, defaultWidth: 6, woodPerTilePerStory: 1, stonePerStory: 0, maxName: 24 },
+  /** Buildings come in whole blocks (a block is 16 px, two tiles): widthStep is the block. */
+  house: { minWidth: 4, maxWidth: 16, widthStep: 2, defaultWidth: 6, woodPerTilePerStory: 1, stonePerStory: 0, maxName: 24 },
   /** Every fixture is two tiles wide. */
   fixtureWidth: 2,
   fixtures: {

@@ -702,6 +702,19 @@ function failWork(s: SimState, w: Worker, why: string, empty: boolean | 'wait' =
     }
     return scrollLineFailed(s, w, why);
   }
+  // a notice set to "all" with nothing left to do is finished, not failed: take it down
+  const mem = w.memory;
+  const notice = empty === true && mem ? s.notices.find((n) => n.id === mem.noticeId) : undefined;
+  if (notice && notice.remaining === ALL) {
+    w.memory = null;
+    w.thought = 'All done.';
+    if (allDone(s, notice)) {
+      tookNotice(s, w, notice.id);
+      s.notices = s.notices.filter((n) => n.id !== notice.id);
+      log(s, `Notice finished: ${orderText(notice.order)} (all done).`);
+    }
+    return 'done';
+  }
   return failJob(s, w, why);
 }
 
@@ -1400,8 +1413,9 @@ function completeJob(s: SimState, w: Worker, units: number): Result {
       unpaidAlert(s, w, `«${orderText(mem.order)}»`);
     }
     w.thought = `Done: ${units} ${mem.order[1]?.t.toLowerCase() ?? ''}.`;
-    // "all" is finished once there's nothing left to do
-    if (notice.remaining === ALL && units > 0 && allDone(s, notice)) {
+    // "all" is finished once there's nothing left to do. Whoever finds that takes it down, even if
+    // someone else did the last of it (else a shared job could leave it on the board for good)
+    if (notice.remaining === ALL && allDone(s, notice)) {
       tookNotice(s, w, notice.id);
       s.notices = s.notices.filter((n) => n.id !== notice.id);
       log(s, `Notice finished: ${orderText(notice.order)} (all done).`);

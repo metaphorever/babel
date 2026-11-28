@@ -50,12 +50,12 @@ export function towerRoom(s: SimState): number {
 }
 
 /**
- * Rows in one story of a building: its rooms are one wall sprite (24 px)
- * tall and stack straight on top of each other, with no deck showing
- * between them. The upstairs floor is an unseen deck in the top row of the
- * room below. (Tower floors are taller: TOWER.floorHeight, deck included.)
+ * Rows in one story of a building: its rooms are one wall sprite (32 px,
+ * as tall as a tower level) tall and stack straight on top of each other,
+ * with no deck showing between them. The upstairs floor is an unseen deck
+ * in the top row of the room below.
  */
-export const HOUSE_STORY_ROWS = 3;
+export const HOUSE_STORY_ROWS = 4;
 
 /** The row workers stand on in a building's story (0 = ground floor, 1 = upstairs). */
 export function storyRow(s: SimState, story: number): number {

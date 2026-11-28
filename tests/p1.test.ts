@@ -7,7 +7,7 @@ import { ALL, makeOrder, orderText, parseOrder, type Place } from '../src/sim/la
 import { findPath } from '../src/sim/path';
 import { BUILD, MAP, PATRON, TIME } from '../src/sim/tuning';
 import { Tile, type FixtureKind, type SimState } from '../src/sim/types';
-import { groundRow, houseDeckRow, sitesOf, storyRow, tileAt } from '../src/sim/world';
+import { groundRow, HOUSE_STORY_ROWS, houseDeckRow, sitesOf, storyRow, tileAt } from '../src/sim/world';
 
 function run(s: SimState, ticks: number) {
   for (let i = 0; i < ticks; i++) step(s);
@@ -225,7 +225,7 @@ describe('buildings and fixtures', () => {
     expect(tileAt(s, x0 + 3, houseDeckRow(s))).toBe(Tile.Deck);
     expect(tileAt(s, x0, houseDeckRow(s))).toBe(Tile.Ladder);
     // the rooms stack straight on top of each other: no gap between the stories
-    expect(houseDeckRow(s)).toBe(groundRow(s) - 2);
+    expect(houseDeckRow(s)).toBe(groundRow(s) - HOUSE_STORY_ROWS + 1);
     expect(findPath(s, { x: x0 - 3, y: groundRow(s) }, { x: x0 + 4, y: storyRow(s, 1) })).not.toBeNull();
     // fixtures can't block the ladder
     expect(validateCommand(s, place({ what: 'fixture', fixture: 'bed', x0, story: 1 })).ok).toBe(false);
@@ -312,7 +312,7 @@ describe('demolishing', () => {
   it('a building nobody has started is simply called off', () => {
     const s = createState(3);
     const x0 = freeSpot(s, 5, 100);
-    applyCommand(s, place({ what: 'house', x0, width: 5, stories: 1, name: 'Mistake' }));
+    applyCommand(s, place({ what: 'house', x0, width: 6, stories: 1, name: 'Mistake' }));
     const b = s.buildings.find((x) => x.name === 'Mistake')!;
     applyCommand(s, { type: 'demolish', playerId: 0, target: { kind: 'building', id: b.id } });
     expect(s.buildings.includes(b)).toBe(false);
@@ -609,18 +609,20 @@ describe('session 5: haul anything, build one thing', () => {
     stockUp(s);
     s.notices = [];
     s.reserved = 0;
-    const xa = freeSpot(s, 5, 100);
-    applyCommand(s, place({ what: 'house', x0: xa, width: 5, stories: 1, name: 'Annex' }));
+    const xa = freeSpot(s, 6, 100);
+    applyCommand(s, place({ what: 'house', x0: xa, width: 6, stories: 1, name: 'Annex' }));
     applyCommand(s, place({ what: 'fixture', fixture: 'bed', x0: xa + 1, story: 0 }));
-    const xb = freeSpot(s, 5, xa + 6);
-    applyCommand(s, place({ what: 'house', x0: xb, width: 5, stories: 1, name: 'Barn' }));
+    const xb = freeSpot(s, 6, xa + 7);
+    applyCommand(s, place({ what: 'house', x0: xb, width: 6, stories: 1, name: 'Barn' }));
     const annex = s.buildings.find((x) => x.name === 'Annex')!;
     const barn = s.buildings.find((x) => x.name === 'Barn')!;
     const bed = s.sites.find((x) => x.buildingId === annex.id)!;
     pinNotice(s, makeOrder('BUILD', null, { target: { name: 'Annex' } }), ALL, 1, null);
     expect(runUntil(s, () => annex.build === null && bed.build === null, 20 * 1200)).toBe(true);
     expect(barn.build!.placed).toEqual({ stone: 0, wood: 0 });
-    expect(s.notices.length).toBe(0);
+    // the notice comes down as soon as whoever's still on it finds nothing left
+    expect(runUntil(s, () => s.notices.length === 0, 20 * 60)).toBe(true);
+    expect(barn.build!.placed).toEqual({ stone: 0, wood: 0 });
   });
 
   it('a build target nobody can read means building whatever is planned', async () => {

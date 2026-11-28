@@ -189,7 +189,9 @@ export function footprint(s: SimState, req: PlaceRequest): Footprint {
     fp.error = 'Place the scriptorium first.';
   }
   if (req.what === 'house') {
-    if (!Number.isInteger(req.width) || req.width < BUILD.house.minWidth || req.width > BUILD.house.maxWidth) fp.error = `A building is ${BUILD.house.minWidth} to ${BUILD.house.maxWidth} tiles wide.`;
+    if (!Number.isInteger(req.width) || req.width < BUILD.house.minWidth || req.width > BUILD.house.maxWidth || req.width % BUILD.house.widthStep !== 0) {
+      fp.error = `A building is ${BUILD.house.minWidth} to ${BUILD.house.maxWidth} tiles wide, in steps of ${BUILD.house.widthStep}.`;
+    }
     if (req.stories !== 1 && req.stories !== 2) fp.error = 'A building has one or two stories.';
     if (!req.name.trim()) fp.error = 'Give the building a name.';
     if (req.name.length > 24) fp.error = 'That name is too long.';

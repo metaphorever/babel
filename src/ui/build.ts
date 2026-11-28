@@ -133,9 +133,9 @@ export class BuildUi {
         { class: 'row build-row' },
         houseBtn,
         h('span', { class: 'hint' }, 'width'),
-        h('button', { class: 'btn btn-small', title: 'Narrower ([)', onclick: () => setHouse(width - 1, stories) }, '−'),
+        h('button', { class: 'btn btn-small', title: 'Narrower ([)', onclick: () => setHouse(width - BUILD.house.widthStep, stories) }, '−'),
         h('span', { class: 'num' }, width),
-        h('button', { class: 'btn btn-small', title: 'Wider (])', onclick: () => setHouse(width + 1, stories) }, '+'),
+        h('button', { class: 'btn btn-small', title: 'Wider (])', onclick: () => setHouse(width + BUILD.house.widthStep, stories) }, '+'),
         h('button', { class: 'btn btn-small', title: 'One or two stories', onclick: () => setHouse(width, stories === 1 ? 2 : 1) }, stories === 1 ? '1 story' : '2 stories'),
       ),
       h('div', { class: 'hint' }, `An empty wooden shell: ${costText(houseCost(width, stories))}.`),
@@ -205,11 +205,11 @@ export class BuildUi {
     if (this.needsOpening()) this.showOpening();
   }
 
-  /** [ and ] while placing a building. */
+  /** [ and ] while placing a building: a block (two tiles) narrower or wider. */
   nudgeWidth(d: number): void {
     const p = this.placing;
     if (p?.what !== 'house') return;
-    this.start({ ...p, width: Math.max(BUILD.house.minWidth, Math.min(BUILD.house.maxWidth, p.width + d)) });
+    this.start({ ...p, width: Math.max(BUILD.house.minWidth, Math.min(BUILD.house.maxWidth, p.width + d * BUILD.house.widthStep)) });
   }
 
   private say(text: string, error = false): void {

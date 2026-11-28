@@ -141,6 +141,13 @@ Built and tested: the random map, the opening text and founding, placement mode 
 - **§16.9 step 9, the title screen, is built, tested and checked in the browser** (DESIGN.md §16.9 step 9 has the decisions): a showcase colony running behind it (`src/ui/showcase.ts`), "Welcome" scrambling through ten languages above "to Babel" in 1-bit outlined words (`src/render/titleText.ts`), and New Game, Load Game, Settings, About. **Settings** (a Language note, interface size, reduce motion; sound sliders greyed until there's sound) and **About** (§16.4, from CREDITS.md) are also under a real **Babel** menu in the game, with Quit to Title. **§16.9 is finished.**
 - **Interface size** scales the `#ui` layer with CSS zoom: code that compares a window to the screen must divide by `uiScale()` (see `windows.ts`), and CSS sizes from `100vh`/`100vw` divide by `var(--ui-scale)`.
 
+## Session 14 (2026-11-28)
+
+- **The To Do sheet is in** (`art-src/shots/todo-clover.png`; SPRITES.md lists every piece): flags with pink fill masks, the seven tinctures, bells, flagpoles, the stable, shelves, the cart's rolling frame, the pulley in three parts, the ledge. Nothing draws flags, bells, the pulley, the ledge, the stable or the rolling cart yet.
+- **Buildings are 32 px a story** (`HOUSE_STORY_ROWS` 4) **and come in whole blocks** (`BUILD.house.widthStep` 2, at least 4 tiles; the width buttons and [ ] step by 2). Saved buildings keep their old widths.
+- **Fixed: a finished "all" notice could stay on the board for good.** A worker who found nothing left failed the job (bad mood, avoided the notice) and nobody took it down. Finding nothing left on an "all" notice now finishes it (`failWork` in `activities.ts`).
+- **Shelves** show each good on two shelves: stone, wood, grain, bottom up.
+
 ## Next steps, in order
 
 1. **Flags and bells** (§16.7): fixtures, RAISE / LOWER / RING, range circles, heraldic hatching, and the word **report** (§16.9 step 6, the rest of the Stores plan). Then standing orders on boards.

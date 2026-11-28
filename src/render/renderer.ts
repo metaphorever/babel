@@ -424,11 +424,15 @@ export class Renderer {
         const spr = worldSprite('fixture.shelves');
         withProgress(spr.height, () => {
           this.g.drawImage(spr, left, base - spr.height);
-          // a shelf each, bottom to top: stone, wood, grain
+          // six shelves 5 px apart (the floor and five planks); two each, bottom to top: stone, wood, grain.
+          // Up to three on a shelf, one per 4 units, the lower shelf filling first
           (['stone', 'wood', 'grain'] as const).forEach((type, i) => {
             const item = itemSprite(type);
-            const n = Math.min(3, Math.ceil(site.store[type] / 6));
-            for (let k = 0; k < n; k++) this.g.drawImage(item, left + 2 + k * 4, base - 1 - i * 5 - item.height);
+            const n = Math.min(6, Math.ceil(site.store[type] / 4));
+            for (let k = 0; k < n; k++) {
+              const shelf = i * 2 + Math.floor(k / 3);
+              this.g.drawImage(item, left + 2 + (k % 3) * 4, base - 1 - shelf * 5 - item.height);
+            }
           });
         });
         break;

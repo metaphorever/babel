@@ -14,7 +14,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Grid } from '../src/render/spriteData';
-import { decodePngBits } from './png';
+import { decodePngBits, decodePngRgba } from './png';
 import { PAINT_H, PAINT_W, type Page, renderPage } from './sheets';
 
 const SHOTS = join(process.cwd(), 'art-src', 'shots');
@@ -24,6 +24,51 @@ export const SHEET_SHOTS: Record<string, string> = {
   'Babel Workers': 'workers-clover-6.png',
   'Babel World': 'world-clover-horse-ladder.png',
   'Babel Buildings': 'clover-buildings-final.png',
+  'Babel To Do': 'todo-clover.png',
+};
+
+/**
+ * Boxes on the To Do sheet that are new sprites, and the names they go into
+ * the atlas under. (Shelves, wheelbarrow and cart already have their real
+ * names on the sheet.) Boxes not listed here (the winches, the site marker,
+ * the Scriptorium's icons) aren't drawn yet or aren't used from the atlas.
+ */
+export const TODO_NAMES: Record<string, string> = {
+  'todo.stable': 'fixture.stable',
+  'todo.flagpole.s': 'fixture.flagpole-s',
+  'todo.flagpole.m': 'fixture.flagpole-m',
+  'todo.flagpole.l': 'fixture.flagpole-l',
+  'todo.flag.s': 'flag.s',
+  'todo.flag.m': 'flag.m',
+  'todo.flag.l': 'flag.l',
+  'todo.bell.s': 'fixture.bell-s',
+  'todo.bell.s.ring': 'fixture.bell-s-ring',
+  'todo.bell.m': 'fixture.bell-m',
+  'todo.bell.m.ring': 'fixture.bell-m-ring',
+  'todo.bell.l': 'fixture.bell-l',
+  'todo.bell.l.ring': 'fixture.bell-l-ring',
+};
+
+/**
+ * Boxes whose pink pixels (255,174,201) mark where the game fills in a
+ * pattern: a flag's cloth, hatched in its colour. Each gets a second sprite,
+ * `<name>-fill`, with '1' wherever the box is pink.
+ */
+export const PINK_FILLS = ['todo.flag.s', 'todo.flag.m', 'todo.flag.l'];
+
+/**
+ * The heraldic tinctures (DESIGN.md 16.7), drawn on the To Do sheet as
+ * 16x12 swatches in a column, top to bottom. Each is cut down to the
+ * smallest tile that repeats, so the game can tile it over any cloth.
+ */
+export const TINCTURES = {
+  file: 'todo-clover.png',
+  x: 207,
+  y: 317,
+  w: 16,
+  h: 12,
+  pitch: 16,
+  order: ['yellow', 'white', 'blue', 'red', 'purple', 'black', 'green'],
 };
 
 /** Sheet slots that a screenshot leaves alone or draws over by accident: keep the built-in art. */
@@ -37,6 +82,8 @@ export interface Loose {
   rect?: [number, number, number, number];
   /** How far right the mask is drawn; omit to work the mask out. */
   maskDx?: number;
+  /** How far down the mask is (with maskDx): another frame's mask, for a frame drawn without one. */
+  maskDy?: number;
   /** No see-through parts at all (terrain tiles). */
   opaque?: boolean;
 }
@@ -57,6 +104,25 @@ export const LOOSE: Loose[] = [
   { name: 'nature.horse-step', file: 'world-clover-horse-ladder.png', rect: [103, 82, 25, 19] },
   { name: 'sky.sun', file: 'world-clover-horse-ladder.png', rect: [2, 188, 46, 45], maskDx: 58 },
   { name: 'sky.moon', file: 'world-clover-horse-ladder.png', rect: [116, 187, 40, 44], maskDx: 48 },
+  // the To Do sheet (2026-11-28). The cart rolls: a second frame drawn under its box, with no mask
+  // box of its own (the outline is the same, so it borrows the first frame's)
+  { name: 'fixture.cart-roll', file: 'todo-clover.png', rect: [122, 271, 32, 16], maskDx: 36, maskDy: -20 },
+  // the rope pulley in three parts, in boxes the user drew over the old one: the head (the only fixed
+  // part), a stretch of rope (two strands, dotted) and the bucket on its strand
+  { name: 'pulley.head', file: 'todo-clover.png', rect: [239, 258, 16, 10], maskDx: 20 },
+  { name: 'pulley.rope', file: 'todo-clover.png', rect: [239, 272, 16, 16], maskDx: 20 },
+  { name: 'pulley.bucket', file: 'todo-clover.png', rect: [239, 292, 16, 10], maskDx: 20 },
+  // a platform one block out from the tower, level with a floor; a pulley goes on it
+  // the stairs were drawn a row below their box (and the mask a pixel right of its own)
+  { name: 'fixture.stairs', file: 'todo-clover.png', rect: [113, 103, 32, 32], maskDx: 37 },
+  { name: 'tower.ledge', file: 'todo-clover.png', rect: [293, 269, 16, 8], maskDx: 21 },
+  // buildings a story as tall as a tower level (32, was 24), edited in a copy of the atlas (1 pixel between
+  // pieces), the same pieces with 8 more rows of wall
+  { name: 'building.wall-left', file: 'todo-clover.png', rect: [291, 604, 8, 32], opaque: true },
+  { name: 'building.wall', file: 'todo-clover.png', rect: [300, 604, 8, 32], opaque: true },
+  { name: 'building.wall-right', file: 'todo-clover.png', rect: [309, 604, 8, 32], opaque: true },
+  { name: 'building.door', file: 'todo-clover.png', rect: [318, 604, 8, 32], opaque: true },
+  { name: 'building.window', file: 'todo-clover.png', rect: [327, 604, 8, 32], opaque: true },
 ];
 
 /**
@@ -120,6 +186,9 @@ function shot(file: string) {
  * the sheet's title and first labels. Whatever's outside the screenshot is
  * left blank (so those slots read as not drawn).
  */
+/** Where each sheet screenshot lined up on its page, by file. */
+export const SHOT_OFFSET = new Map<string, { dx: number; dy: number }>();
+
 export function sheetFromShot(page: Page, file: string): Uint8Array {
   const s = shot(file);
   const ref = renderPage(page);
@@ -140,6 +209,7 @@ export function sheetFromShot(page: Page, file: string): Uint8Array {
   }
   const px = new Uint8Array(PAINT_W * PAINT_H);
   for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) px[(y + best.dy) * PAINT_W + x + best.dx] = s.bits[y * s.w + x];
+  SHOT_OFFSET.set(file, { dx: best.dx, dy: best.dy });
   console.log(`  read     shots/${file} (lined up at ${best.dx},${best.dy})`);
   return px;
 }
@@ -153,7 +223,8 @@ export function readLoose(l: Loose): Grid {
   if (l.opaque) solid = () => true;
   else if (l.maskDx !== undefined) {
     const dx = l.maskDx;
-    solid = (x, y) => s.bits[(y0 + y) * s.w + x0 + dx + x] === 1 || ink(x, y);
+    const dy = l.maskDy ?? 0;
+    solid = (x, y) => s.bits[(y0 + dy + y) * s.w + x0 + dx + x] === 1 || ink(x, y);
   } else {
     // flood the see-through white in from the edges
     const clear = new Uint8Array(w * h);
@@ -176,4 +247,52 @@ export function readLoose(l: Loose): Grid {
     rows.push(r);
   }
   return rows;
+}
+
+/** '1' wherever a box in a screenshot is pink (the pattern's area), or null if none is. */
+export function readPink(file: string, x0: number, y0: number, w: number, h: number): Grid | null {
+  const png = decodePngRgba(new Uint8Array(readFileSync(join(SHOTS, file))));
+  const pink = (x: number, y: number) => {
+    const i = ((y0 + y) * png.w + x0 + x) * 4;
+    return png.rgba[i] === 255 && png.rgba[i + 1] === 174 && png.rgba[i + 2] === 201;
+  };
+  let any = false;
+  const rows: string[] = [];
+  for (let y = 0; y < h; y++) {
+    let r = '';
+    for (let x = 0; x < w; x++) {
+      const p = pink(x, y);
+      any ||= p;
+      r += p ? '1' : '.';
+    }
+    rows.push(r);
+  }
+  return any ? rows : null;
+}
+
+/** The tinctures, each cut to the smallest tile that repeats across its swatch. */
+export function readTinctures(): Record<string, Grid> {
+  const t = TINCTURES;
+  const s = shot(t.file);
+  const out: Record<string, Grid> = {};
+  t.order.forEach((name, i) => {
+    const at = (x: number, y: number) => s.bits[(t.y + i * t.pitch + y) * s.w + t.x + x];
+    const repeats = (pw: number, ph: number) => {
+      for (let y = 0; y < t.h; y++) for (let x = 0; x < t.w; x++) if (at(x, y) !== at(x % pw, y % ph)) return false;
+      return true;
+    };
+    let best: [number, number] | null = null;
+    for (let ph = 1; ph <= t.h && !best; ph++) {
+      for (let pw = 1; pw <= t.w; pw++) {
+        if (repeats(pw, ph)) {
+          best = [pw, ph];
+          break;
+        }
+      }
+    }
+    const [pw, ph] = best ?? [t.w, t.h];
+    if (!best) console.warn(`  note     tincture ${name} doesn't repeat inside its swatch; kept whole`);
+    out[name] = Array.from({ length: ph }, (_, y) => Array.from({ length: pw }, (_, x) => (at(x, y) ? '1' : '0')).join(''));
+  });
+  return out;
 }
