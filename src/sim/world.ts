@@ -272,6 +272,23 @@ export function roomIn(site: Site): number {
   return Math.max(0, site.capacity - storedTotal(site));
 }
 
+/**
+ * Goods on their way into a store: what workers bringing goods there have
+ * spoken for (a hauler's load, a cook's batch). Anyone but `except` (the
+ * worker asking, by identity).
+ */
+export function incoming(s: SimState, site: Site, except: unknown = null): number {
+  let n = 0;
+  for (const w of s.workers) if (w !== except && w.activity.into === site.id) n += w.activity.bringing ?? 0;
+  return n;
+}
+
+/** Room in a store that nobody is already bringing goods to fill. */
+export function freeRoom(s: SimState, site: Site, except: unknown = null): number {
+  const room = roomIn(site);
+  return room === Infinity ? room : Math.max(0, room - incoming(s, site, except));
+}
+
 /** Walking distance, roughly: climbing counts extra. */
 export function distance(a: Pt, b: Pt): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y) * 3;
@@ -345,8 +362,15 @@ export function sourceFor(s: SimState, place: Place, type: ItemType, from: Pt): 
 }
 
 /** The nearest store at a place (null = anywhere) with room for more, other than the ones in `not`. */
-export function depotFor(s: SimState, place: Place | null, type: ItemType, from: Pt, not: readonly Site[] = []): Site | null {
-  return nearest(storesAt(s, place, type).filter((x) => roomIn(x) > 0 && !not.includes(x)), from);
+/**
+ * The nearest store at a place that will take this good: one with room
+ * for all `need` if there is one, or else any with room. Room others are
+ * already bringing goods to fill doesn't count (`from` is the worker
+ * asking, whose own load does).
+ */
+export function depotFor(s: SimState, place: Place | null, type: ItemType, from: Pt, not: readonly Site[] = [], need = 1): Site | null {
+  const open = storesAt(s, place, type).filter((x) => !not.includes(x) && freeRoom(s, x, from) > 0);
+  return nearest(open.filter((x) => freeRoom(s, x, from) >= need), from) ?? nearest(open, from);
 }
 
 export function buildingOf(s: SimState, site: Site): Building | null {

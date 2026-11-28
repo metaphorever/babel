@@ -6,7 +6,7 @@ import { LANGS, floorName, langName, type LangId } from './lang';
 import { ARRIVALS, BUILD, NEW_GAME, PATRON, POPULATION, TIME } from './tuning';
 import { dayOf } from './time';
 import { isVehicleKind, type Carrier, type ItemType, type SimState } from './types';
-import { roomIn, usable } from './world';
+import { freeRoom, usable } from './world';
 import { arriveOnRoad, headcount } from './recruit';
 import { sendMoneyHome } from './morale';
 
@@ -159,7 +159,7 @@ export function refillStores(s: SimState): void {
       for (const [k, n] of Object.entries(BUILD.supplies) as [ItemType, number][]) site.store[k] = Math.max(site.store[k], Math.round(n * s.settings.supplies));
       continue;
     }
-    const room = roomIn(site);
+    const room = freeRoom(s, site);
     if (room <= 0 || room === Infinity || site.capacity === null) continue;
     if (site.kind === 'pantry') site.store.bread += room;
     else if (site.kind === 'bar') site.store.beer += room;

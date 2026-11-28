@@ -262,6 +262,13 @@ export interface Activity {
   ref: number | null;
   /** What a builder is working toward (a building or site id), so others can see what's on its way. */
   aim: number | null;
+  /**
+   * The store this worker is bringing goods to, and how many: room they've
+   * spoken for, so nobody else counts on it. A hauler's load; a cook's batch
+   * from the moment they start it. Absent: none.
+   */
+  into?: number | null;
+  bringing?: number;
 }
 
 export interface Score {

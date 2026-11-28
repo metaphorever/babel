@@ -8,7 +8,7 @@ import { carryCapacity, expectedUnits, practice, rollYield, SKILL_LABEL, SKILL_O
 import { BUILD, ECONOMY, MOOD, MOVE, NEEDS, SCRIBE, SKILLS, SOCIAL, TOWER, WORK } from './tuning';
 import { beatenTo, sharedJob, together, tookNotice, wokeBeside, workedBeside } from './social';
 import type { ActivityKind, BuildMaterial, Carrier, FixtureKind, Item, ItemType, Notice, Pt, SimState, Site, SiteKind, SkillId, Worker } from './types';
-import { depotFor, findSite, groundRow, nearest, roomIn, siteOf, siteRef, sitesOf, sourceFor, spotFor, standable, stockpiles, storesAt, usable, vehiclesAt } from './world';
+import { depotFor, findSite, freeRoom, groundRow, nearest, roomIn, siteOf, siteRef, sitesOf, sourceFor, spotFor, standable, stockpiles, storesAt, usable, vehiclesAt } from './world';
 import { activeProject, buildSpot, placeMaterial } from './tower';
 import { accepts, buildScope, campJobs, jobsFor, jobSpot, placeUnit, scopeText, stillNeeded, undoUnit, type BuildScope, type Job } from './build';
 
@@ -844,11 +844,15 @@ function haulJob(s: SimState, w: Worker, type: ItemType, toPlace: Place | null):
     }
   }
   if (a.stage === 2) {
-    const pile = depotFor(s, toPlace, type, w);
+    const pile = depotFor(s, toPlace, type, w, [], w.carryCount);
     if (!pile) {
       dropCarried(s, w);
+      a.into = null;
+      a.bringing = 0;
       return failWork(s, w, noDepot(s, toPlace, type));
     }
+    a.into = pile.id;
+    a.bringing = w.carryCount;
     w.thought = `Taking ${w.carryCount > 1 ? `${w.carryCount} ` : ''}${type} to ${siteRef(pile)}.`;
     const m = moveTo(s, w, spotFor(pile, w.id));
     if (m === 'moving') return 'running';
@@ -863,10 +867,7 @@ function haulJob(s: SimState, w: Worker, type: ItemType, toPlace: Place | null):
     a.stage = 2;
     return 'running';
   }
-  const units = w.carryCount;
-  pile.store[type] += units;
-  w.carrying = null;
-  w.carryCount = 0;
+  const units = deposit(s, w, pile);
   train(s, w, 'hauling');
   return finishWork(s, w, units);
 }
@@ -895,7 +896,7 @@ function haulBetween(s: SimState, w: Worker, type: ItemType, fromPlace: Place, t
       if (m === 'moving') return 'running';
       if (m === 'unreachable') return failWork(s, w, `Can't reach ${siteRef(src)}.`);
       const room = depotFor(s, toPlace, type, w, sources);
-      const take = Math.min(carryCapacity(w), src.store[type], room ? roomFor(room) : 0);
+      const take = Math.min(carryCapacity(w), src.store[type], room ? freeRoom(s, room, w) : 0);
       if (take <= 0) return failWork(s, w, `Somebody took the last ${type}.`);
       src.store[type] -= take;
       w.carrying = type;
@@ -904,11 +905,15 @@ function haulBetween(s: SimState, w: Worker, type: ItemType, fromPlace: Place, t
     }
   }
   if (a.stage === 2) {
-    const dst = depotFor(s, toPlace, type, w, sources);
+    const dst = depotFor(s, toPlace, type, w, sources, w.carryCount);
     if (!dst) {
       dropCarried(s, w);
+      a.into = null;
+      a.bringing = 0;
       return failWork(s, w, noDepot(s, toPlace, type));
     }
+    a.into = dst.id;
+    a.bringing = w.carryCount;
     w.thought = `Taking ${w.carryCount} ${type} to ${siteRef(dst)}.`;
     const m = moveTo(s, w, spotFor(dst, w.id));
     if (m === 'moving') return 'running';
@@ -923,19 +928,33 @@ function haulBetween(s: SimState, w: Worker, type: ItemType, fromPlace: Place, t
     a.stage = 2;
     return 'running';
   }
-  const units = w.carryCount;
-  dst.store[type] += units;
-  w.carrying = null;
-  w.carryCount = 0;
+  const units = deposit(s, w, dst);
   train(s, w, 'hauling');
   return finishWork(s, w, units);
 }
 
-function roomFor(site: Site): number {
-  if (site.capacity === null) return Infinity;
-  let n = 0;
-  for (const k in site.store) n += site.store[k as ItemType];
-  return Math.max(0, site.capacity - n);
+/**
+ * Put a load into a store: as much as it has room for. Should it have
+ * filled up in the moment before they got there, the rest is set down
+ * beside it, lying around for a hauler. Returns the whole load: they
+ * brought it all.
+ */
+function deposit(s: SimState, w: Worker, dst: Site): number {
+  const type = w.carrying;
+  const units = w.carryCount;
+  w.activity.into = null;
+  w.activity.bringing = 0;
+  if (!type) return 0;
+  const n = Math.min(units, roomIn(dst));
+  dst.store[type] += n;
+  w.carryCount = units - n;
+  if (w.carryCount > 0) {
+    w.thought = `${cap(siteRef(dst))} filled up: left ${w.carryCount} ${type} beside it.`;
+    dropCarried(s, w);
+  }
+  w.carrying = null;
+  w.carryCount = 0;
+  return units;
 }
 
 /** How much of a material builders are already carrying toward the project. */
@@ -1071,9 +1090,21 @@ function canProcess(s: SimState, p: Process): boolean {
   return whyNotProcess(s, p) === null;
 }
 
-function whyNotProcess(s: SimState, p: Process): string | null {
+/** The most one batch can come to (a practiced hand gets one more): the room a cook speaks for when they start. */
+function batchRoom(p: Process): number {
+  return p.per + 1;
+}
+
+/** Where a batch will go: the nearest store with room for a whole batch that nobody else has spoken for. */
+function batchStore(s: SimState, p: Process, w: Worker | null): Site | null {
+  const open = sitesOf(s, p.store).filter((x) => !x.demolish && freeRoom(s, x, w) >= batchRoom(p));
+  return w ? nearest(open, w) : open[0] ?? null;
+}
+
+function whyNotProcess(s: SimState, p: Process, w: Worker | null = null): string | null {
   if (sitesOf(s, p.station).length === 0) return `There's no ${p.stationName} to work at.`;
   if (!sitesOf(s, p.store).some((x) => !x.demolish && accepts(x, p.product))) return `There's no ${p.storeName} to keep the ${p.product} in.`;
+  if (!batchStore(s, p, w)) return `Every ${p.storeName} is full.`;
   if (!stockpiles(s).some((x) => x.level === 0 && x.store.grain > 0) && looseFree(s, 'grain') === 0) return 'No grain in the stockpiles.';
   return null;
 }
@@ -1089,8 +1120,19 @@ function processJob(s: SimState, w: Worker, p: Process): Result {
     if (w.carrying === p.product) a.stage = 4;
     else if (w.carrying === 'grain') a.stage = 2;
     else {
-      const why = whyNotProcess(s, p);
-      if (why) return failWork(s, w, why, why.startsWith('No grain'));
+      const why = whyNotProcess(s, p, w);
+      // full stores: nothing to do for now, but the work isn't done
+      if (why) {
+        a.into = null;
+        a.bringing = 0;
+        return failWork(s, w, why, why.startsWith('Every') ? 'wait' : why.startsWith('No grain'));
+      }
+      // speak for the batch's room now, so the pantry can't fill up while it bakes
+      const keep = a.into === null || a.into === undefined ? null : s.sites.find((x) => x.id === a.into) ?? null;
+      if (!keep || freeRoom(s, keep, w) < batchRoom(p)) {
+        a.into = batchStore(s, p, w)!.id;
+        a.bringing = batchRoom(p);
+      }
       if (w.carrying && w.stepProgress === 0) dropCarried(s, w);
       if (a.ref === LOOSE) {
         // picking grain up off the ground (once they have it, they carry on above)
@@ -1137,17 +1179,24 @@ function processJob(s: SimState, w: Worker, p: Process): Result {
     const units = rollYield(s.rng, w, 'cooking', p.per);
     w.carrying = p.product;
     w.carryCount = units;
+    a.bringing = units;
     train(s, w, 'cooking');
     a.stage = 4;
   }
   if (a.stage === 4) {
-    // the nearest one with room, or failing that the nearest at all (a full pantry still takes a batch)
+    // the store they spoke for; else the nearest with room for the batch, or any room; failing all that the nearest, to leave it beside
     const stores = sitesOf(s, p.store).filter((x) => !x.demolish);
-    const dst = nearest(stores.filter((x) => roomFor(x) > 0), w) ?? nearest(stores, w);
+    const kept = stores.find((x) => x.id === a.into && freeRoom(s, x, w) >= w.carryCount);
+    const open = stores.filter((x) => freeRoom(s, x, w) > 0);
+    const dst = kept ?? nearest(open.filter((x) => freeRoom(s, x, w) >= w.carryCount), w) ?? nearest(open, w) ?? nearest(stores, w);
     if (!dst) {
       dropCarried(s, w);
+      a.into = null;
+      a.bringing = 0;
       return failWork(s, w, `There's no ${p.storeName} to keep the ${p.product} in.`);
     }
+    a.into = dst.id;
+    a.bringing = w.carryCount;
     w.thought = `Taking ${w.carryCount} ${p.product} to the ${p.storeName}.`;
     const m = moveTo(s, w, spotFor(dst, w.id));
     if (m === 'moving') return 'running';
@@ -1162,11 +1211,7 @@ function processJob(s: SimState, w: Worker, p: Process): Result {
     a.stage = 4;
     return 'running';
   }
-  const units = w.carryCount;
-  dst.store[p.product] += units;
-  w.carrying = null;
-  w.carryCount = 0;
-  return finishWork(s, w, units);
+  return finishWork(s, w, deposit(s, w, dst));
 }
 
 // ---------------------------------------------------------- building camp

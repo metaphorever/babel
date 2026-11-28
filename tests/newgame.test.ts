@@ -7,7 +7,7 @@ import { findPath } from '../src/sim/path';
 import { recruitFee } from '../src/sim/recruit';
 import { currentStipend, refillStores } from '../src/sim/patron';
 import { deckRow, standRow } from '../src/sim/tower';
-import { groundRow, sitesOf, towerRoom } from '../src/sim/world';
+import { groundRow, incoming, sitesOf, towerRoom } from '../src/sim/world';
 import { ARRIVALS, DRIFT, NEW_GAME, PATRON, POPULATION, QUIT, TIME, TOWER, mapHeight, towerRoomFor, type Difficulty } from '../src/sim/tuning';
 import type { Command } from '../src/sim/commands';
 import type { SimState } from '../src/sim/types';
@@ -231,7 +231,8 @@ describe('§16.9 step 8: the sandbox', () => {
     pile.store.wood = 0;
     while (s.tick % NEW_GAME.sandbox.refillTicks !== 0) step(s);
     step(s);
-    expect(pantry.store.bread).toBe(pantry.capacity);
+    // full, leaving room for any batch a cook has already spoken for
+    expect(pantry.store.bread + incoming(s, pantry)).toBe(pantry.capacity);
     // a third of the room each, as far as it goes: the grain already there takes its share
     expect(pile.store.stone).toBe(8);
     expect(pile.store.stone + pile.store.wood + pile.store.grain).toBe(pile.capacity);
