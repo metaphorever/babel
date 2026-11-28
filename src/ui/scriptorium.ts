@@ -45,7 +45,6 @@ import {
 } from '../sim';
 import { siteTitle } from '../sim/world';
 import { clear, h } from './dom';
-import { prefs } from './prefs';
 import type { WindowManager } from './windows';
 
 type Mode = 'anyone' | 'named' | 'hand';
@@ -290,10 +289,7 @@ export class ScriptoriumPanel {
       this.summary,
       h('div', { class: 'row row-end' }, this.error, h('button', { class: 'btn btn-default', onclick: () => this.send() }, 'Send to scribe')),
     );
-    this.langSel.addEventListener('change', () => {
-      this.langPicked = true;
-      this.renderLines();
-    });
+    this.langSel.addEventListener('change', () => this.renderLines());
     this.setMode('anyone');
     this.syncWho();
     this.syncLangs();
@@ -315,15 +311,12 @@ export class ScriptoriumPanel {
     return this.canWrite(t) ? `${english} · ${wordIn(t, this.lang)}` : `${english} (can't write yet)`;
   }
 
-  /** The player chose a language here: keep it, rather than the one in Settings. */
-  private langPicked = false;
-
-  /** Offer every language you can write at least one word in, starting on the one in Settings once you can write in it. */
+  /** Offer every language you can write at least one word in. */
   private syncLangs(): void {
     const total = LANGS.reduce((n, l) => n + (this.s.lexicon[l.id]?.length ?? 0), 0);
     if (total === this.lexSeen) return;
     this.lexSeen = total;
-    const keep = this.langPicked ? this.langSel.value || 'en' : prefs().writeLang;
+    const keep = this.langSel.value || 'en';
     clear(this.langSel);
     for (const l of LANGS) {
       const n = this.s.lexicon[l.id]?.length ?? 0;

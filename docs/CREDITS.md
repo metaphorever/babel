@@ -4,16 +4,16 @@
 
 ## Who did what
 
-- **Game design, art direction and pixel art:** Clover *(to confirm: how you'd like your own credit to read)*
+- **Game design, art direction and pixel art:** Clover, followed by Clover's pixel-art clover (`art-src/shots/clover.png`)
 - **Programming, design collaboration and placeholder art:** Claude, an AI model made by Anthropic
-- **Horse, cart and clouds:** after designs by Duane Blehm (see below)
+- **Horse, wagon, and clouds:** based on designs by Duane Blehm (see below)
 
 ## Acknowledgements
 
 Many thanks to:
 
 - **Moses** (or another author perhaps, I'm no Biblical scholar) for writing Genesis 11
-- **Derin Elada** for the original idea prompt inspiration: [Tumblr link](https://www.tumblr.com/derinthescarletpescatarian/813115583067504640?source=share)
+- **Derin Elada** for the [original inspiration](https://www.tumblr.com/derinthescarletpescatarian/813115583067504640?source=share) to make this game (even though they said the game should have "nothing to do with the story or its themes")
 - **Ted Chiang** for the beautifully detailed logistics involved in building a tower to the heavens in his novelette *Tower of Babylon*
 - **Duane Blehm** for creating *Stunt Copter* and many other Mac classics. The horse and cart and the clouds are based on his designs, in his honor
 - **Rick Holzgrafe** for creating *Scarab of Ra*, my earliest and longest-running computer game obsession

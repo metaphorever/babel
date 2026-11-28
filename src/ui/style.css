@@ -1271,3 +1271,14 @@ details > summary {
 .pref-row input[type='range'] {
   accent-color: var(--ink);
 }
+
+/* Clover's mark in About, at 1x beside the name */
+.clover-mark {
+  display: inline-block;
+  vertical-align: -3px;
+  image-rendering: pixelated;
+}
+
+.pref-note {
+  margin: 2px 0 0;
+}

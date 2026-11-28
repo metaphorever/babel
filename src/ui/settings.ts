@@ -1,4 +1,3 @@
-import { LANGS, type LangId } from '../sim';
 import { h } from './dom';
 import { showDialog } from './dialog';
 import { prefs, setPrefs, UI_SCALES } from './prefs';
@@ -8,10 +7,6 @@ import { prefs, setPrefs, UI_SCALES } from './prefs';
 
 export function showSettings(root: HTMLElement): void {
   const p = prefs();
-
-  const lang = h('select', { 'aria-label': 'Write new orders in' });
-  for (const l of LANGS) lang.append(h('option', { value: l.id, selected: l.id === p.writeLang }, l.name));
-  lang.addEventListener('change', () => setPrefs({ writeLang: lang.value as LangId }));
 
   const slider = (label: string, value: number) =>
     h('label', { class: 'pref-row' }, h('span', { class: 'pref-label' }, label), h('input', { type: 'range', min: 0, max: 100, value, disabled: true, 'aria-label': label }));
@@ -33,7 +28,7 @@ export function showSettings(root: HTMLElement): void {
     root,
     'Settings',
     [
-      h('fieldset', { class: 'group' }, h('legend', {}, 'Writing'), h('label', { class: 'pref-row' }, h('span', { class: 'pref-label' }, 'Write new orders in'), lang), h('p', { class: 'hint' }, 'Once you can write in it. Until then the scriptorium writes in English.')),
+      h('fieldset', { class: 'group' }, h('legend', {}, 'Language'), h('p', { class: 'pref-note' }, 'Right now this game is only available in English. If you would like to help translate it into another language, contact Clover.')),
       h('fieldset', { class: 'group' }, h('legend', {}, 'Sound'), slider('Effects', p.effects), slider('Music', p.music), h('p', { class: 'hint' }, 'Babel has no sound yet. These will set it when it does.')),
       h('fieldset', { class: 'group' }, h('legend', {}, 'Interface size'), scales, h('p', { class: 'hint' }, 'The menus and windows; the world has its own zoom (the scroll wheel).')),
       h('fieldset', { class: 'group' }, h('legend', {}, 'Motion'), h('label', { class: 'check' }, motion, 'Reduce motion'), h('p', { class: 'hint' }, 'The title doesn’t scramble and the clouds hold still.')),

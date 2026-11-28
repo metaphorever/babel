@@ -207,20 +207,23 @@ export class Renderer {
   }
 
   private drawTiles(s: SimState, cx: number, cy: number, bw: number, bh: number): void {
-    const x0 = Math.max(0, Math.floor(cx / TILE));
-    const x1 = Math.min(s.width - 1, Math.floor((cx + bw) / TILE));
+    // past the left and right edges of the map the ground carries on, off screen (the road home and the lands beyond, one day)
+    const ground = groundTop(s);
+    const at = (x: number, y: number) => (x < 0 || x >= s.width ? (y >= ground ? Tile.Dirt : Tile.Air) : s.tiles[y * s.width + x]);
+    const x0 = Math.floor(cx / TILE);
+    const x1 = Math.floor((cx + bw) / TILE);
     const y0 = Math.max(0, Math.floor(cy / TILE));
     const y1 = Math.min(s.height - 1, Math.floor((cy + bh) / TILE));
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        const t = s.tiles[y * s.width + x];
+        const t = at(x, y);
         if (t === Tile.Air) continue;
         const px = x * TILE;
         const py = y * TILE;
         let name: string;
         if (t === Tile.Dirt) {
           let depth = 0;
-          for (let k = 1; k <= 3 && y - k >= 0 && s.tiles[(y - k) * s.width + x] === Tile.Dirt; k++) depth = k;
+          for (let k = 1; k <= 3 && y - k >= 0 && at(x, y - k) === Tile.Dirt; k++) depth = k;
           name = depth === 0 ? 'terrain.dirt-top' : depth >= 3 ? 'terrain.dirt-deep' : 'terrain.dirt';
         } else if (t === Tile.Deck) {
           // a building's upstairs floor isn't drawn: its rooms sit straight on top of each other

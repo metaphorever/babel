@@ -6,7 +6,7 @@ import { showDialog } from './dialog';
 
 const THANKS: (string | Node)[][] = [
   [h('b', {}, 'Moses'), ' (or another author perhaps, I’m no Biblical scholar) for writing Genesis 11'],
-  [h('b', {}, 'Derin Elada'), ' for the original idea prompt inspiration (', h('a', { href: 'https://www.tumblr.com/derinthescarletpescatarian/813115583067504640?source=share', target: '_blank', rel: 'noopener' }, 'Tumblr link'), ')'],
+  [h('b', {}, 'Derin Elada'), ' for the ', h('a', { href: 'https://www.tumblr.com/derinthescarletpescatarian/813115583067504640?source=share', target: '_blank', rel: 'noopener' }, 'original inspiration'), ' to make this game (even though they said the game should have “nothing to do with the story or its themes”)'],
   [h('b', {}, 'Ted Chiang'), ' for the beautifully detailed logistics involved in building a tower to the heavens in his novelette ', h('i', {}, 'Tower of Babylon')],
   [h('b', {}, 'Duane Blehm'), ' for creating ', h('i', {}, 'Stunt Copter'), ' and many other Mac classics. The horse and cart and the clouds are based on his designs, in his honor'],
   [h('b', {}, 'Rick Holzgrafe'), ' for creating ', h('i', {}, 'Scarab of Ra'), ', my earliest and longest-running computer game obsession'],
@@ -19,6 +19,37 @@ const THANKS: (string | Node)[][] = [
   [h('b', {}, 'My loving wife, Sarah,'), ' for reminding me not to stay up too late “talking to AI” about my game'],
 ];
 
+/** Clover's mark, the user's pixel art (art-src/shots/clover.png), ink only. */
+const CLOVER = [
+  '.....11.11.....',
+  '....1..1111....',
+  '....1.11111....',
+  '....1..1111....',
+  '.111.11.11.111.',
+  '11111.111.1...1',
+  '111111.1.11.1.1',
+  '.111.11.11.111.',
+  '1.1.11.1.111111',
+  '1...1..1..11111',
+  '.111....1..111.',
+  '........1......',
+  '.......1.......',
+  '.....11........',
+];
+
+/** The clover at 1× beside the text (its 14 rows sit on a 12 px line); pixel art only scales by whole numbers, and at 1× it stays crisp on any screen. */
+function cloverMark(): HTMLCanvasElement {
+  const w = CLOVER[0].length;
+  const ht = CLOVER.length;
+  const c = h('canvas', { class: 'clover-mark', width: w, height: ht, role: 'img', 'aria-label': 'a four-leaf clover' });
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#000';
+  for (let y = 0; y < ht; y++) for (let x = 0; x < w; x++) if (CLOVER[y][x] === '1') g.fillRect(x, y, 1, 1);
+  c.style.width = `${w}px`;
+  c.style.height = `${ht}px`;
+  return c;
+}
+
 export function showAbout(root: HTMLElement): void {
   showDialog(
     root,
@@ -29,9 +60,9 @@ export function showAbout(root: HTMLElement): void {
       h(
         'ul',
         { class: 'about-list' },
-        h('li', {}, h('b', {}, 'Game design, art direction and pixel art:'), ' Clover'),
+        h('li', {}, h('b', {}, 'Game design, art direction and pixel art:'), ' Clover ', cloverMark()),
         h('li', {}, h('b', {}, 'Programming, design collaboration and placeholder art:'), ' Claude, an AI model made by Anthropic'),
-        h('li', {}, h('b', {}, 'Horse, cart and clouds:'), ' after designs by Duane Blehm'),
+        h('li', {}, h('b', {}, 'Horse, wagon, and clouds:'), ' based on designs by Duane Blehm'),
       ),
       h('div', { class: 'section-label' }, 'Many thanks to'),
       h('ul', { class: 'about-list about-thanks' }, ...THANKS.map((parts) => h('li', {}, ...parts))),
