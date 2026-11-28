@@ -74,6 +74,10 @@ export class Renderer {
   camY = 0;
   zoom = 3;
   showNames = false;
+  /** Names and numbers over the world (off behind the title screen). */
+  labels = true;
+  /** Reduce motion (the player's setting): clouds hold still. */
+  stillClouds = false;
   /** The placement preview, while placing something. */
   ghost: Ghost | null = null;
   /** A box drawn around whatever demolish mode is pointing at. */
@@ -195,7 +199,7 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.buffer, 0, 0, bw, bh, 0, 0, bw * this.zoom, bh * this.zoom);
-    this.drawLabels(s, alpha, selected, hover);
+    if (this.labels) this.drawLabels(s, alpha, selected, hover);
   }
 
   private rect(x: number, y: number, w: number, h: number, p: PatternName = 'black'): void {
@@ -616,7 +620,7 @@ export class Renderer {
       const y = groundPx - 260 - ((i * 131) % span);
       // well off screen: don't build its picture at all (a tall sky has hundreds)
       if (y + 10 < cy || y - CLOUD_MAX_H > cy + bh) continue;
-      const drift = i * 197 + Math.floor(s.tick / (40 + (i % 5) * 15));
+      const drift = i * 197 + (this.stillClouds ? 0 : Math.floor(s.tick / (40 + (i % 5) * 15)));
       const spr = cloudSprite(s.seed, i);
       if (spr) {
         // its bottom where the stand-in's was; it slides fully off one side before coming in the other

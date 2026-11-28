@@ -1,12 +1,10 @@
-import { NEW_GAME, TIME, driftLine, floorName, gameSettings, goldText, isPreset, levelName, readSave, ticksPerHour, type DifficultyChoice, type GameSettings, type SimState, type StartMode } from '../sim';
+import { NEW_GAME, TIME, driftLine, floorName, gameSettings, goldText, isPreset, levelName, ticksPerHour, type DifficultyChoice, type GameSettings, type SimState, type StartMode } from '../sim';
 import { clear, h } from './dom';
-import { bootInto, listSlots, readSlot, summaryText } from './saves';
 
-// The New Game screen (§16.9 step 8): a System 7 dialog on the grey desktop,
-// before any game exists. Difficulty, the patron's goal, the starting camp,
-// every knob a difficulty sets, and the sandbox's extras. Until the title
-// screen (step 9) it's also where Quit Game leads, so it can load a saved
-// game too.
+// The New Game screen (§16.9 step 8): a System 7 dialog over the title
+// screen's colony (step 9), before any game exists. Difficulty, the patron's
+// goal, the starting camp, every knob a difficulty sets, and the sandbox's
+// extras. Cancel goes back to the title.
 
 const DIFFICULTIES: { id: DifficultyChoice; label: string; text: string }[] = [
   { id: 'easy', label: 'Easy', text: 'A patient patron, a whole day’s notice before anyone quits, and newcomers often.' },
@@ -49,6 +47,8 @@ const KNOBS: Knob[] = [
 export interface NewGameOptions {
   /** Shown at the top: why the screen is here instead of a loaded game. */
   error?: string | null;
+  /** Back to the title screen. */
+  cancel: () => void;
   /** Start the game. */
   start: (seed: number, settings: GameSettings) => void;
 }
@@ -62,7 +62,7 @@ export function showNewGame(root: HTMLElement, opts: NewGameOptions): void {
   let g: GameSettings = gameSettings('normal', 'opening', { goal: NEW_GAME.defaultGoal });
   let seed = 1 + Math.floor(Math.random() * 1e9);
 
-  const back = h('div', { class: 'modal-back newgame-back' });
+  const back = h('div', { class: 'modal-back' });
   const dialog = h('div', { class: 'dialog newgame', role: 'dialog', 'aria-label': 'New Game' });
   back.append(dialog);
   root.append(back);
@@ -83,7 +83,7 @@ export function showNewGame(root: HTMLElement, opts: NewGameOptions): void {
   const group = (title: string, ...children: (HTMLElement | string | null)[]) => h('fieldset', { class: 'group' }, h('legend', {}, title), ...children);
 
   function startGame(): void {
-    clear(root);
+    back.remove();
     // the sandbox's extras only come with the sandbox
     const extras = g.difficulty === 'sandbox' ? {} : { fullStores: false, towerLevels: 0 };
     opts.start(seed, gameSettings(g.difficulty, g.start, { ...g, ...extras }));
@@ -184,61 +184,19 @@ export function showNewGame(root: HTMLElement, opts: NewGameOptions): void {
       h(
         'div',
         { class: 'row dialog-buttons newgame-buttons' },
-        h('button', { class: 'btn', onclick: () => drawLoad() }, 'Load a Saved Game…'),
+        h('button', { class: 'btn', onclick: () => (back.remove(), opts.cancel()) }, 'Cancel'),
         h('span', { class: 'menu-spacer' }),
         h('button', { class: 'btn btn-default', onclick: startGame }, 'Start'),
       ),
     );
   }
 
-  /** The saves in this browser, and a file, without a game running. */
-  function drawLoad(message: string | null = null): void {
-    clear(dialog);
-    const slots = listSlots().sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1));
-    const load = (text: string | null) => {
-      if (text === null) return drawLoad('That save has gone missing from the browser.');
-      const r = readSave(text);
-      if (!r.ok) return drawLoad(r.error);
-      const err = bootInto(text);
-      if (err) drawLoad(err);
-    };
-    const fileIn = h('input', { type: 'file', accept: '.json,application/json', class: 'file-in' });
-    fileIn.addEventListener('change', async () => {
-      const f = fileIn.files?.[0];
-      if (!f) return;
-      if (f.size > 20 * 1024 * 1024) return drawLoad('That file is far too big to be a Babel save.');
-      load(await f.text());
-    });
-    add(
-      h('div', { class: 'dialog-title' }, 'Load a Saved Game'),
-      message ? h('p', { class: 'error' }, message) : null,
-      slots.length === 0
-        ? h('p', { class: 'hint' }, 'No games are saved in this browser.')
-        : h(
-            'div',
-            { class: 'alert-list' },
-            ...slots.map((sl) =>
-              h(
-                'div',
-                { class: 'alert-entry row' },
-                h('div', { class: 'grow' }, h('b', {}, sl.name), h('div', { class: 'hint' }, summaryText(sl.summary))),
-                h('button', { class: 'btn btn-small', onclick: () => load(readSlot(sl.id)) }, 'Load'),
-              ),
-            ),
-          ),
-      h(
-        'div',
-        { class: 'row dialog-buttons newgame-buttons' },
-        h('button', { class: 'btn', onclick: () => fileIn.click() }, 'Load from a File…'),
-        fileIn,
-        h('span', { class: 'menu-spacer' }),
-        h('button', { class: 'btn btn-default', onclick: () => draw() }, 'Back'),
-      ),
-    );
-  }
-
   back.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLInputElement && e.target.type === 'number')) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      back.remove();
+      opts.cancel();
+    } else if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLInputElement && e.target.type === 'number')) {
       e.preventDefault();
       (dialog.querySelector('.btn-default') as HTMLButtonElement | null)?.click();
     }

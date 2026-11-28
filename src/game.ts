@@ -2,8 +2,12 @@ import { TICKS_PER_SECOND, type Sim, type SaveFile } from './sim';
 import { Renderer, TILE, ZOOMS } from './render/renderer';
 import { Ui } from './ui/ui';
 import { BuildUi } from './ui/build';
-import { loadArt } from './render/artLoader';
 import { SavesPanel } from './ui/saves';
+import { h } from './ui/dom';
+import { dialogOpen } from './ui/dialog';
+import { showAbout } from './ui/about';
+import { showSettings } from './ui/settings';
+import { prefs } from './ui/prefs';
 
 /** A game loaded from a save: its interface part goes back on. */
 export interface Loaded {
@@ -33,7 +37,10 @@ export function play(sim: Sim, loaded: Loaded | null): void {
   let speed = 1;
   let lastSpeed = 1;
 
-  const ui = new Ui(document.getElementById('ui')!, sim, {
+  const uiRoot = document.getElementById('ui')!;
+  /** The page without its URL options: the title screen. */
+  const quitGame = () => location.assign(location.pathname);
+  const ui = new Ui(uiRoot, sim, {
     getSpeed: () => speed,
     setSpeed: (n) => {
       if (n > 0) lastSpeed = n;
@@ -50,10 +57,17 @@ export function play(sim: Sim, loaded: Loaded | null): void {
       renderer.centerOn(((site.x0 + site.x1 + 1) / 2) * TILE, site.y * TILE);
       build.inspect({ kind: 'site', site });
     },
+    about: () => showAbout(uiRoot),
+    settings: () => showSettings(uiRoot),
+    quitToTitle: () =>
+      build.ask('Quit to Title', [h('div', { class: 'dialog-title' }, 'Quit to the title screen?'), h('p', {}, 'Anything in this game since you last saved it will be lost. (It saves itself at midnight, and the File menu saves it whenever you like.)')], [
+        { label: 'Quit', run: () => quitGame() },
+        { label: 'Cancel', primary: true, run: () => undefined },
+      ]),
   });
   const build = new BuildUi(document.getElementById('ui')!, ui.wm, sim, renderer, ui.scriptorium, {
-    // back to the New Game screen (the title screen, once §16.9 step 9 is built)
-    quitGame: () => location.assign(location.pathname),
+    // back to the title screen
+    quitGame: () => quitGame(),
     centerOnTile: (x, y) => renderer.centerOn(x * TILE, y * TILE),
     showWorker: (id) => {
       ui.select(id);
@@ -214,7 +228,7 @@ export function play(sim: Sim, loaded: Loaded | null): void {
     renderer.clampCamera(sim.state);
 
     // time stands still while a dialog asks something
-    const mult = build.modalOpen ? 0 : SPEEDS[speed];
+    const mult = build.modalOpen || dialogOpen() ? 0 : SPEEDS[speed];
     if (mult > 0) {
       acc += dt * mult;
       let n = 0;
@@ -227,6 +241,7 @@ export function play(sim: Sim, loaded: Loaded | null): void {
     }
     saves.tick();
     const alpha = mult > 0 ? acc / TICK_MS : 0;
+    renderer.stillClouds = prefs().reduceMotion;
     renderer.render(sim.state, alpha, ui.selected, hover);
 
     uiTimer += dt;
@@ -241,11 +256,6 @@ export function play(sim: Sim, loaded: Loaded | null): void {
   build.refresh();
   requestAnimationFrame(frame);
 
-  // Sprite sheets from public/art/ replace the built-in art when present. While
-  // the dev server is running, coming back to the window reloads them, so you
-  // can save in an image editor, switch back, and see the change.
-  void loadArt();
-  if (import.meta.env.DEV) window.addEventListener('focus', () => void loadArt());
 
   // handy in the console while tuning: babel.sim.state, babel.seed
   const seed = sim.state.seed;

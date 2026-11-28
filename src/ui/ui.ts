@@ -47,6 +47,7 @@ import { LanguagesPanel } from './languages';
 import { AlertsPanel } from './alerts';
 import { StoresPanel } from './stores';
 import { WindowManager } from './windows';
+import { uiScale } from './prefs';
 
 const DOING: Record<ActivityKind, string> = {
   idle: 'Standing around',
@@ -96,6 +97,10 @@ export interface UiHooks {
   recruit?(): void;
   /** Centre the view on a store and open its window. */
   showSite?(site: Site): void;
+  /** The Babel menu: About, Settings, and back to the title screen. */
+  about?(): void;
+  settings?(): void;
+  quitToTitle?(): void;
 }
 
 export class Ui {
@@ -172,7 +177,7 @@ export class Ui {
     const bar = h(
       'div',
       { class: 'menubar' },
-      h('span', { class: 'menu-apple' }, 'Babel'),
+      this.babelMenu(),
       menu('File', 'saves'),
       menu('Build', 'build'),
       menu('Orders', 'board'),
@@ -192,6 +197,46 @@ export class Ui {
       speeds,
     );
     this.root.append(bar);
+  }
+
+  /**
+   * The Babel menu, first in the bar as the Apple menu is on a Mac: About
+   * Babel, Settings, and Quit to Title. A little list that drops down under
+   * it (outside the bar, which clips what hangs off it).
+   */
+  private babelMenu(): HTMLElement {
+    const drop = h('div', { class: 'menu-drop', role: 'menu' });
+    drop.style.display = 'none';
+    const close = () => (drop.style.display = 'none');
+    const item = (label: string, run?: () => void) =>
+      h(
+        'button',
+        {
+          class: 'menu-drop-item',
+          role: 'menuitem',
+          onclick: () => {
+            close();
+            run?.();
+          },
+        },
+        label,
+      );
+    drop.append(item('About Babel…', this.hooks.about), item('Settings…', this.hooks.settings), h('div', { class: 'menu-drop-sep' }), item('Quit to Title…', this.hooks.quitToTitle));
+    this.root.append(drop);
+    const button = h('button', {
+      class: 'menu-item menu-apple',
+      'aria-haspopup': 'menu',
+      onclick: () => {
+        if (drop.style.display !== 'none') return close();
+        const r = button.getBoundingClientRect();
+        drop.style.left = `${r.left / uiScale()}px`;
+        drop.style.display = '';
+      },
+    }, 'Babel');
+    window.addEventListener('mousedown', (e) => {
+      if (!drop.contains(e.target as Node) && e.target !== button) close();
+    });
+    return button;
   }
 
   // ---------------------------------------------------------------- board

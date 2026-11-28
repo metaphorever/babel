@@ -1,4 +1,13 @@
 import { h } from './dom';
+import { uiScale } from './prefs';
+
+/** The screen in the interface's own pixels (smaller than the window when the interface is scaled up). */
+function screenW(): number {
+  return window.innerWidth / uiScale();
+}
+function screenH(): number {
+  return window.innerHeight / uiScale();
+}
 
 // A minimal System 7 style window manager: pinstriped title bars, a close
 // box, dragging, and click-to-front.
@@ -53,8 +62,8 @@ export class WindowManager {
     const a = this.anchors.get(id)!;
     if (!a.placed) {
       a.placed = true;
-      const left = a.x < 0 ? window.innerWidth + a.x : a.x;
-      const top = a.y < 0 ? window.innerHeight + a.y : a.y;
+      const left = a.x < 0 ? screenW() + a.x : a.x;
+      const top = a.y < 0 ? screenH() + a.y : a.y;
       w.el.style.left = `${left}px`;
       w.el.style.top = `${top}px`;
     }
@@ -64,8 +73,8 @@ export class WindowManager {
 
   /** Pull a window back into view (after a resize, or a bad first position). */
   keepOnScreen(el: HTMLElement): void {
-    const maxLeft = Math.max(0, window.innerWidth - el.offsetWidth - 4);
-    const maxTop = Math.max(24, window.innerHeight - Math.min(el.offsetHeight, 120));
+    const maxLeft = Math.max(0, screenW() - el.offsetWidth - 4);
+    const maxTop = Math.max(24, screenH() - Math.min(el.offsetHeight, 120));
     el.style.left = `${Math.max(0, Math.min(maxLeft, el.offsetLeft))}px`;
     el.style.top = `${Math.max(24, Math.min(maxTop, el.offsetTop))}px`;
   }
@@ -96,11 +105,13 @@ export class WindowManager {
     handle.addEventListener('mousedown', (e) => {
       if ((e.target as HTMLElement).closest('button')) return;
       e.preventDefault();
-      const sx = e.clientX - el.offsetLeft;
-      const sy = e.clientY - el.offsetTop;
+      // mouse positions are in screen pixels; a window's position is in the interface's, which differ when it's scaled
+      const z = uiScale();
+      const sx = e.clientX / z - el.offsetLeft;
+      const sy = e.clientY / z - el.offsetTop;
       const move = (m: MouseEvent) => {
-        const x = Math.max(0, Math.min(window.innerWidth - 60, m.clientX - sx));
-        const y = Math.max(20, Math.min(window.innerHeight - 20, m.clientY - sy));
+        const x = Math.max(0, Math.min(screenW() - 60, m.clientX / z - sx));
+        const y = Math.max(20, Math.min(screenH() - 20, m.clientY / z - sy));
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
       };

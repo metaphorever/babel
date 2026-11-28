@@ -1,6 +1,6 @@
 # Credits
 
-*The text for the game's About / Credits window (on the roadmap, not built yet). The acknowledgements are the user's own words, lightly copy-edited (see the note at the end).*
+*The text for the game's About window (built: `src/ui/about.ts` holds the in-game copy, so change both together). The acknowledgements are the user's own words, lightly copy-edited (see the note at the end).*
 
 ## Who did what
 

@@ -652,6 +652,8 @@ Workers can leave by the right edge on a pilgrimage for a set time, and come bac
 
 An About window (System 7 style, under the Babel menu) saying who did what, with the user's acknowledgements. The text is in [CREDITS.md](CREDITS.md).
 
+*Built with the title screen (§16.9 step 9, session 13): `src/ui/about.ts`, from the title's About button and the Babel menu's "About Babel…". It has CREDITS.md's text without its editing notes, a line on what the game is, and the repository's link. The user's own credit reads "Clover" for now: CREDITS.md still asks how they'd like it to read.*
+
 ### 16.5 Alerts
 
 A popup message when something needs the player's attention, with a little sound effect.
@@ -666,7 +668,7 @@ A popup message when something needs the player's attention, with a little sound
 
 ### 16.9 Keeping workers, alerts, and a real start (planned 2026-11-26)
 
-*From the user's playtest notes and a friend's playtest. Agreed plan; built in this order. Steps 1 to 8 are built (step 6's word REPORT waits for flags and bells); **step 9, the title screen, is next.***
+*From the user's playtest notes and a friend's playtest. Agreed plan; built in this order. All nine steps are built (step 6's word REPORT waits for flags and bells).*
 
 1. **Quitting on shifts** *(built 2026-11-26: `morale.ts`; `QUIT` in tuning. A worker fed up for under 15 seconds when the shift ends waits for the next one, so the bubble always comes first)*.
    - **Fed up:** a worker whose mood falls below the quit threshold (30) shows the quitting bubble at once. That's the early warning, with no countdown yet. If their mood is back at the threshold before the shift ends, it passes quietly.
@@ -779,6 +781,21 @@ A popup message when something needs the player's attention, with a little sound
    - **Title:** "Welcome" scrambling through its translations above "to Babel", in the pixel font at 2× to 4× with the dithered white outline from the portraits.
    - **Buttons:** New Game, Load Game, Settings, About.
    - **Settings** are the player's, not the world's, kept in the browser: default writing language, sound levels, UI scale, reduce motion.
+   - **Built 2026-11-27, session 13** (`src/ui/title.ts` for the screen, `src/ui/showcase.ts` for its colony and the scramble, `src/render/titleText.ts` for the words, `src/ui/settings.ts` and `src/ui/prefs.ts` for Settings, `src/ui/about.ts`, `src/ui/loadgame.ts`, `src/ui/dialog.ts`; `tests/title.test.ts`). Claude's decisions:
+     - **The page starts here:** a plain page load is the title screen; New Game opens the New Game screen over it (its Cancel comes back), Start plays. Quit Game, from the alerts or the new Babel menu, comes back here. URL quick starts still skip everything.
+     - **The showcase colony** is a real game, running at 1× behind the menu with no windows and no labels: the large camp, 14 workers, the tower built to Level 9 and Level 10 already a third done, with BUILD TOWER and the usual work posted forever. Its settings keep it going while nobody watches: the sandbox's full stores, nobody fed up (the quit line at 0), no patience lost, no newcomers. When a level finishes, a ladder goes up onto it and the next is planned, up to 16 levels; the day turns to night as it runs. The same colony every time (a fixed seed), framed with the tower three-quarters of the way across and the ground near the bottom, at one world pixel to a screen pixel.
+     - **The words:** there's no pixel font yet (GNU Unifont is still to be checked), so the words are drawn with the browser's own bold font at 13 px, cut to pure ink and paper, given the portraits' white outline (a solid ring, then dithered to ½, ¼, ⅛; `BAYER` and `OUTLINE` from portrait.ts), and shown at 2× to 4× (as big as the widest word fits). That works in any script the browser can draw. When the pixel font arrives, `titleWords` is the one place to change.
+     - **"Welcome" scrambles** every 3.2 seconds into the next of ten: the game's own three first (Welcome, Bienvenue, Καλώς ήρθατε), then Willkommen, Benvenuti, Bienvenidos, Welkom, Добро пожаловать, ברוכים הבאים (Hebrew, for Genesis) and Salvete. Each scramble takes 0.9 seconds, the new word settling in from the left through random Latin, Greek, Cyrillic and Hebrew letters. "to Babel" stays put.
+     - **The buttons** sit in a System 7 panel under the words: New Game (the default), Load Game, Settings, About. **Load Game** is its own dialog (the saves in this browser, newest first, and "Load from a File…"); with nothing being played it loads without asking. It replaces the New Game screen's load panel from step 8.
+     - **Settings** apply as they're changed and are kept in localStorage (`babel.prefs`), never in a game or a save:
+       - **Write new orders in:** the scriptorium starts in that language as soon as you can write a word of it, unless you've chosen one there yourself this game.
+       - **Sound:** Effects and Music sliders, **greyed out**, saying Babel has no sound yet. They're kept for when it does.
+       - **Interface size:** 100%, 125%, 150% or 200%. It scales the menus, windows and dialogs (CSS zoom on the interface layer); dragging windows and keeping them on screen measure in the scaled size, and dialogs never grow past the screen. The world keeps its own zoom, and the title's words stay whole-pixel (only its buttons scale).
+       - **Reduce motion:** the title changes word without scrambling and the clouds hold still. A new player gets the system's own setting (`prefers-reduced-motion`) until they change it.
+     - **The Babel menu:** "Babel" in the menu bar is now a real menu, as the Apple menu is on a Mac: About Babel…, Settings…, and Quit to Title… (which asks first). The game stands still while its dialogs are open.
+     - **Checked in the browser (2026-11-27):** the colony behind the title with Level 10 going up, a scramble caught mid-word, the clouds once their art loaded; About; Settings at 150% (dialogs fit and scroll; a dragged window stayed under the pointer; the Babel menu dropped under the scaled bar); New Game → Cancel → New Game → Start; Quit to Title asked, then came back; Load Game listed the Autosave and Escape closed it; with reduce motion, "Welcome" changed without scrambling; the writing language stayed English until French could be written, then French, and a choice made in the scriptorium stuck.
+     - **Not done:** the sound itself (the sliders wait for it); the pixel font (the words are the browser's font in 1-bit until then).
+     - **Watch in playtests:** whether the showcase should be smaller or larger, closer or further; whether ten welcomes is too many; how the words look on other browsers' fonts (Geneva on a Mac, Verdana on Windows).
 
 ### 16.6 Social life: what moves feelings
 

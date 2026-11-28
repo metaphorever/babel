@@ -35,7 +35,7 @@ The live build is at https://metaphorever.github.io/babel/. Every push to `main`
 
 To build it yourself, the command above writes a static site to `dist/`: an `index.html` plus an `assets/` folder. Every path in it is relative, so you can upload the contents of `dist/` to any folder on any web host and open `index.html` there.
 
-A plain page load opens the New Game screen (difficulty, the patron's goal, the starting camp, and every setting). For quick playtests, any of these in the URL skips it and starts at once (Medium, a goal of 30 and the opening, unless given):
+A plain page load opens the title screen; its New Game button opens the New Game screen (difficulty, the patron's goal, the starting camp, and every setting). For quick playtests, any of these in the URL skips it and starts at once (Medium, a goal of 30 and the opening, unless given):
 
 - `?seed=123` replays a particular starting world.
 - `?difficulty=easy|normal|hard|custom|sandbox` picks the difficulty (`normal` is Medium; `sandbox` keeps the stores full).

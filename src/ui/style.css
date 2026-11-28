@@ -35,6 +35,8 @@ body {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  /* above the title screen (z-index 1), so dialogs open over it */
+  z-index: 2;
 }
 
 #ui > * {
@@ -121,7 +123,7 @@ body {
   background: var(--paper);
   border: 1px solid var(--ink);
   box-shadow: 1px 1px 0 var(--ink);
-  max-height: calc(100vh - 40px);
+  max-height: calc((100vh - 40px) / var(--ui-scale, 1));
   display: flex;
   flex-direction: column;
 }
@@ -883,8 +885,9 @@ details > summary {
 }
 
 .dialog {
-  width: min(520px, calc(100vw - 32px));
-  max-height: calc(100vh - 60px);
+  /* the screen, in the interface's own pixels: smaller when it's scaled up (--ui-scale, from Settings) */
+  width: min(520px, calc((100vw - 32px) / var(--ui-scale, 1)));
+  max-height: calc((100vh - 60px) / var(--ui-scale, 1));
   overflow: auto;
   background: var(--paper);
   border: 1px solid var(--ink);
@@ -1052,14 +1055,9 @@ details > summary {
 
 /* ------------------------------------------------- the New Game screen */
 
-/* the grey desktop: before a game there's no world behind the dialog */
-.newgame-back {
-  background: var(--paper) var(--dither-50);
-}
-
 .dialog.newgame {
-  width: min(620px, calc(100vw - 32px));
-  max-height: calc(100vh - 40px);
+  width: min(620px, calc((100vw - 32px) / var(--ui-scale, 1)));
+  max-height: calc((100vh - 40px) / var(--ui-scale, 1));
 }
 
 .group {
@@ -1148,4 +1146,128 @@ details > summary {
   .knobs {
     grid-template-columns: 1fr;
   }
+}
+
+/* --------------------------------------------------- the title screen */
+
+.title-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 9vh;
+  gap: 4vh;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.title-words-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title-words {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.title-menu {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 190px;
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  outline: 2px solid var(--paper);
+  box-shadow: 0 0 0 3px var(--ink), 3px 3px 0 3px var(--ink);
+}
+
+.title-btn {
+  font: bold 13px var(--font-title);
+  padding: 4px 12px;
+}
+
+.title-menu .btn-default {
+  margin: 3px;
+}
+
+/* ------------------------------------------------------ the Babel menu */
+
+.menu-drop {
+  position: fixed;
+  top: 22px;
+  min-width: 170px;
+  padding: 2px 0;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  z-index: 1001;
+  font: bold 12px var(--font-title);
+}
+
+.menu-drop-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  padding: 2px 16px;
+  border: none;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.menu-drop-item:hover,
+.menu-drop-item:focus-visible {
+  background: var(--ink);
+  color: var(--paper);
+  outline: none;
+}
+
+.menu-drop-sep {
+  border-top: 1px dotted var(--ink);
+  margin: 2px 0;
+}
+
+/* --------------------------------------------- About and Settings */
+
+.dialog.dialog-wide {
+  width: min(620px, calc((100vw - 32px) / var(--ui-scale, 1)));
+}
+
+.about-lede {
+  font-style: italic;
+}
+
+.about-list {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.about-list li {
+  margin: 2px 0;
+}
+
+.dialog a {
+  color: var(--ink);
+}
+
+.pref-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+}
+
+.pref-label {
+  min-width: 130px;
+}
+
+.pref-row input[type='range'] {
+  accent-color: var(--ink);
 }
